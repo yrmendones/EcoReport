@@ -1,9 +1,14 @@
 const { Resend } = require('resend');
 
-// Initialize Resend with API Key
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Resend safely so the server doesn't crash if the key is missing
+let resend = null;
+if (process.env.RESEND_API_KEY) {
+    resend = new Resend(process.env.RESEND_API_KEY);
+} else {
+    console.warn("⚠️ WARNING: RESEND_API_KEY is missing. Emails will not be sent.");
+}
 
-// verified domain later
+// change to verified domain later
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'EcoReport <onboarding@resend.dev>';
 
 // ─── PASSWORD RESET EMAIL ───
@@ -27,6 +32,11 @@ async function sendPasswordResetEmail(to, resetLink, fullName) {
             <p style="font-size: 11px; color: #999; line-height: 1.6; margin-top: 16px;">— The EcoReport Team</p>
         </div>
     `;
+
+    if (!resend) {
+        console.error(`❌ Cannot send email to ${to}: RESEND_API_KEY is not configured.`);
+        return;
+    }
 
     try {
         const { data, error } = await resend.emails.send({
@@ -64,6 +74,11 @@ async function sendNotificationEmail(to, title, message, type = 'Notification') 
         </div>
     `;
 
+    if (!resend) {
+        console.error(`❌ Cannot send email to ${to}: RESEND_API_KEY is not configured.`);
+        return;
+    }
+
     try {
         const { data, error } = await resend.emails.send({
             from: FROM_EMAIL,
@@ -97,6 +112,11 @@ async function sendVerificationCodeEmail(to, code, fullName) {
             <p style="font-size: 11px; color: #999; line-height: 1.6; margin-top: 16px;">— The EcoReport Team</p>
         </div>
     `;
+
+    if (!resend) {
+        console.error(`❌ Cannot send email to ${to}: RESEND_API_KEY is not configured.`);
+        return;
+    }
 
     try {
         const { data, error } = await resend.emails.send({
