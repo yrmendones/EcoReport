@@ -23,10 +23,13 @@ app.use(cors({
         // Allow localhost on any port
         const isLocalhost = /^http:\/\/localhost(:\d+)?$/.test(origin);
 
-        // Allow any private LAN IP (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+        // Allow any private LAN IP
         const isLanIp = /^http:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin);
 
-        if (allowed.includes(origin) || isLocalhost || isLanIp) {
+        // Allow any Cloudflare Pages deployment
+        const isCloudflarePages = /^https:\/\/.*\.pages\.dev$/.test(origin);
+
+        if (allowed.includes(origin) || isLocalhost || isLanIp || isCloudflarePages) {
             callback(null, true);
         } else {
             console.warn(`⚠️ CORS blocked: ${origin}`);
