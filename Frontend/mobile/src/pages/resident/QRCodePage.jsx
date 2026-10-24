@@ -145,21 +145,13 @@ export default function QRCodePage() {
   const StatusIcon = isVerified ? FaCheckCircle : isRejected ? FaTimesCircle : FaClock;
   const statusIconColor = isVerified ? "text-[#0B5D2A]" : isRejected ? "text-red-500" : "text-yellow-500";
 
-  // Get the correct base URL for the QR code
-  const getQrBaseUrl = () => {
-    // Viewing on a real phone via LAN IP, use that IP
-    if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-      return `http://${window.location.hostname}:5174`;
-    }
-    // Viewing on a PC (localhost), use the env variable
-    if (import.meta.env.VITE_QR_BASE_URL) {
-      return import.meta.env.VITE_QR_BASE_URL;
-    }
-    // Fallback
-    return "http://localhost:5174";
-  };
+  // Use the environment variable for the QR base URL
+const qrPublicBase = import.meta.env.VITE_QR_BASE_URL;
 
-  const qrPublicBase = getQrBaseUrl();
+// Fallback for local development if env var is missing
+if (!qrPublicBase) {
+  console.warn("⚠️ VITE_QR_BASE_URL is not set. Using localhost fallback.");
+}
   
   // Construct the secure URL using the token
   const qrImageUrl = qrToken
