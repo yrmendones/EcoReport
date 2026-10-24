@@ -26,10 +26,11 @@ app.use(cors({
         // Allow any private LAN IP
         const isLanIp = /^http:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin);
 
-        // Allow any Cloudflare Pages deployment
+        // Allow Cloudflare Pages and Workers deployments
         const isCloudflarePages = /^https:\/\/.*\.pages\.dev$/.test(origin);
+        const isCloudflareWorkers = /^https:\/\/.*\.workers\.dev$/.test(origin);
 
-        if (allowed.includes(origin) || isLocalhost || isLanIp || isCloudflarePages) {
+        if (allowed.includes(origin) || isLocalhost || isLanIp || isCloudflarePages || isCloudflareWorkers) {
             callback(null, true);
         } else {
             console.warn(`⚠️ CORS blocked: ${origin}`);
