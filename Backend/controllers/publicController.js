@@ -20,7 +20,8 @@ exports.generateQRToken = async (req, res) => {
 
         res.json({ 
             token, 
-            message: "Token generated successfully"
+            // Send the exact expiration time in milliseconds to sync with the phone
+            expires_at: Date.now() + 10 * 60 * 1000 
         });
     } catch (error) {
         console.error("Error generating QR token:", error);
