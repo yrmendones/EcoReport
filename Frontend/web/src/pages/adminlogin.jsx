@@ -103,15 +103,8 @@ export default function AdminLogin() {
               <div className="environment-text">
                 <h3>Protect Our Environment</h3>
                 <p>
-                  Report environmental
-                  <br />
-                  concerns quickly and help
-                  <br />
-                  keep Barangay Sto. Rosario
-                  <br />
-                  Kanluran clean, safe, and
-                  <br />
-                  sustainable for everyone.
+                  Report environmental concerns quickly and help keep Barangay
+                  Sto. Rosario Kanluran clean, safe, and sustainable for everyone.
                 </p>
               </div>
             </div>
@@ -262,30 +255,38 @@ export default function AdminLogin() {
           object-position: center center;
           z-index: 0;
         }
+
         .left-content {
           position: relative;
-          width: 100%; height: 100%;
           z-index: 2;
-          padding-top: 72px;
-          padding-left: 62px;
+          width: 100%;
+          height: 100%;
+          padding: 72px 52px 40px 62px;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 44px;
         }
-        
-        /* ✅ Light text colors for the dark background */
+
         .eco-brand {
           display: flex;
           align-items: center;
-          justify-content: flex-start;
           gap: 12px;
-          color: #bbf18f; 
+          color: #bbf18f;
           font-size: 30px;
           font-weight: 800;
           line-height: 1;
         }
         .leaf-image { width: 51.7px; height: 54px; display: block; object-fit: contain; flex-shrink: 0; }
 
-        .environment-text { position: absolute; top: 205px; left: 202px; width: 280px; }
-        .environment-text h3 { margin: 0 0 15px 0; color: #bbf18f; font-size: 15px; font-weight: 800; line-height: 1; }
-        .environment-text p { margin: 0; color: #e7ffd4; font-size: 17px; font-weight: 400; line-height: 1.4; }
+        /* Static block, aligned under the brand, wraps naturally */
+        .environment-text {
+          position: static;
+          width: 100%;
+          max-width: 300px;
+        }
+        .environment-text h3 { margin: 0 0 14px 0; color: #bbf18f; font-size: 15px; font-weight: 800; line-height: 1.2; }
+        .environment-text p { margin: 0; color: #e7ffd4; font-size: 17px; font-weight: 400; line-height: 1.45; }
 
         .right-side {
           width: 722.7px;
@@ -452,8 +453,15 @@ export default function AdminLogin() {
           .admin-card { width: 94vw; height: auto; min-height: 650px; transform: none; flex-direction: column; }
           .left-side { width: 100%; height: 250px; }
           .right-side { width: 100%; height: 450px; }
-          .left-content { padding-top: 40px; padding-left: 30px; }
-          .environment-text { top: 135px; left: 105px; }
+
+          /* Mobile: smaller padding + gap, text still flows and wraps */
+          .left-content { padding: 28px 24px; gap: 22px; }
+          .eco-brand { font-size: 24px; gap: 8px; }
+          .leaf-image { width: 38px; height: 40px; }
+          .environment-text { max-width: 100%; }
+          .environment-text h3 { font-size: 13px; margin-bottom: 8px; }
+          .environment-text p { font-size: 13px; line-height: 1.4; }
+
           .login-area { padding-top: 40px; transform: scale(0.85); transform-origin: top center; }
         }
       `}</style>

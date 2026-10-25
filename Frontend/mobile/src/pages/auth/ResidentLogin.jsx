@@ -55,8 +55,8 @@ export default function ResidentLogin() {
         />
         <div className="absolute inset-0 bg-white/20" />
 
-        {/* FIXED HEADER: logo + EcoReport + description, centered at the top */}
-        <div className="absolute top-9 inset-x-0 z-20 flex flex-col items-center gap-3 px-6 sm:px-8 pointer-events-none">
+        {/* logo + EcoReport + description, centered at the top */}
+        <div className="absolute top-9 inset-x-0 z-20 flex flex-col items-center gap-1 px-6 sm:px-8 pointer-events-none">
           <div className="flex items-center gap-2 h-[48px]">
             <img
               src={ecoLogo}
@@ -68,7 +68,7 @@ export default function ResidentLogin() {
             </h1>
           </div>
 
-          <div className="flex flex-col items-center gap-1.5 text-center">
+          <div className="flex flex-col items-center gap-2 text-center">
             <h3 className="text-[15px] font-bold text-[#075B2A]">
               Protect Our Environment
             </h3>
@@ -79,7 +79,7 @@ export default function ResidentLogin() {
           </div>
         </div>
 
-        {/* Back button, fixed top-left */}
+        {/* Back button */}
         <button
           type="button"
           onClick={() => navigate("/")}
@@ -89,108 +89,109 @@ export default function ResidentLogin() {
           <FaArrowLeft />
         </button>
 
-        {/* Scrollable content, starts below the fixed header */}
+        {/* header */}
         <div className="relative z-10 h-full flex flex-col gap-8 overflow-y-auto px-6 sm:px-8 pt-[210px] pb-8">
-          {/* Title + form + register, centered in the remaining space */}
-          <div className="flex-1 flex flex-col justify-center gap-8">
-            <h2 className="text-center text-[22px] font-bold text-[#075B2A]">
-              Resident Login
-            </h2>
+          <div className="flex-1 flex flex-col justify-center items-center w-full">
+            <div className="w-full max-w-[350px] flex flex-col gap-4">
+              <h2 className="text-center text-[22px] font-bold text-[#075B2A] mb-8">
+                Resident Login
+              </h2>
 
-            <form onSubmit={handleLogin} className="flex flex-col gap-5">
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="email"
-                  className="text-[14px] font-bold text-[#075B2A]"
-                >
-                  Email Address
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  autoComplete="email"
-                  className={inputClass}
-                  required
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="password"
-                  className="text-[14px] font-bold text-[#075B2A]"
-                >
-                  Password
-                </label>
-                <div className="relative">
+              <form onSubmit={handleLogin} className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="email"
+                    className="text-[14px] font-bold text-[#075B2A]"
+                  >
+                    Email Address
+                  </label>
                   <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
-                    className={`${inputClass} pr-12`}
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    autoComplete="email"
+                    className={inputClass}
                     required
                   />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="password"
+                    className="text-[14px] font-bold text-[#075B2A]"
+                  >
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      autoComplete="current-password"
+                      className={`${inputClass} pr-12`}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 w-[44px] h-[44px] flex items-center justify-center text-[#0B5D2A] text-[17px]"
+                    >
+                      {showPassword ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-100 border border-red-400 rounded-[14px] text-red-700 text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center gap-3">
+                  <label className="flex items-center gap-2 py-1 text-[12px] text-gray-700">
+                    <input
+                      type="checkbox"
+                      className="w-[16px] h-[16px] accent-[#0B5D2A]"
+                    />
+                    Remember me
+                  </label>
+
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 w-[44px] h-[44px] flex items-center justify-center text-[#0B5D2A] text-[17px]"
+                    onClick={handleForgotPassword}
+                    className="py-1 text-[12px] font-semibold text-[#075B2A] hover:underline"
                   >
-                    {showPassword ? <FaEyeSlash /> : <FaEye />}
+                    Forgot password?
                   </button>
                 </div>
-              </div>
 
-              {error && (
-                <div className="p-3 bg-red-100 border border-red-400 rounded-[14px] text-red-700 text-sm">
-                  {error}
+                <div className="pt-3">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full h-[52px] rounded-[14px] bg-[#176B05] text-white text-[14px] font-bold shadow-md hover:bg-[#125704] active:scale-95 transition disabled:opacity-50"
+                  >
+                    {loading ? "Logging in..." : "Login"}
+                  </button>
                 </div>
-              )}
+              </form>
 
-              <div className="flex justify-between items-center gap-3">
-                <label className="flex items-center gap-2 py-1 text-[12px] text-gray-700">
-                  <input
-                    type="checkbox"
-                    className="w-[16px] h-[16px] accent-[#0B5D2A]"
-                  />
-                  Remember me
-                </label>
-
+              <p className="text-center text-[12px] text-gray-700 mt-2">
+                Don't have an account?{" "}
                 <button
                   type="button"
-                  onClick={handleForgotPassword}
-                  className="py-1 text-[12px] font-semibold text-[#075B2A] hover:underline"
+                  onClick={() => navigate("/register")}
+                  className="py-1 text-[#0B5D2A] font-bold hover:underline"
                 >
-                  Forgot password?
+                  Register here
                 </button>
-              </div>
-
-              <div className="pt-3">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full h-[52px] rounded-[14px] bg-[#176B05] text-white text-[14px] font-bold shadow-md hover:bg-[#125704] active:scale-95 transition disabled:opacity-50"
-                >
-                  {loading ? "Logging in..." : "Login"}
-                </button>
-              </div>
-            </form>
-
-            <p className="text-center text-[12px] text-gray-700">
-              Don't have an account?{" "}
-              <button
-                type="button"
-                onClick={() => navigate("/register")}
-                className="py-1 text-[#0B5D2A] font-bold hover:underline"
-              >
-                Register here
-              </button>
-            </p>
+              </p>
+            </div>
           </div>
 
           {/* Fake home indicator, desktop frame only */}
