@@ -29,8 +29,11 @@ app.use(cors({
         // Allow Cloudflare Pages and Workers deployments
         const isCloudflarePages = /^https:\/\/.*\.pages\.dev$/.test(origin);
         const isCloudflareWorkers = /^https:\/\/.*\.workers\.dev$/.test(origin);
+        
+        // Allow custom domain and subdomains
+        const isCustomDomain = /^https:\/\/(.*\.)?ecoreportkanluran\.com$/.test(origin);
 
-        if (allowed.includes(origin) || isLocalhost || isLanIp || isCloudflarePages || isCloudflareWorkers) {
+        if (allowed.includes(origin) || isLocalhost || isLanIp || isCloudflarePages || isCloudflareWorkers || isCustomDomain) {
             callback(null, true);
         } else {
             console.warn(`⚠️ CORS blocked: ${origin}`);

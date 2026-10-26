@@ -9,7 +9,7 @@ if (process.env.RESEND_API_KEY) {
 }
 
 // change to verified domain later
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'EcoReport <onboarding@resend.dev>';
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'EcoReport <noreply@notifications.ecoreportkanluran.com>';
 
 // ─── PASSWORD RESET EMAIL ───
 async function sendPasswordResetEmail(to, resetLink, fullName) {
