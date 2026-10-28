@@ -13,20 +13,18 @@ const STATUS_CONFIG = {
 
 const formatDateTime = (dateString) => {
   if (!dateString) return "";
-  const safe = String(dateString).replace("T", " ").split(".")[0];
-  const [datePart, timePart] = safe.split(" ");
-  const [y, m, d] = (datePart || "").split("-");
-  if (!y || !m || !d) return dateString;
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString;
 
-  const [hh = "00", mm = "00"] = (timePart || "").split(":");
-  const hour24 = parseInt(hh, 10);
+  const hour24 = date.getHours();
   const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
   const ampm = hour24 >= 12 ? "PM" : "AM";
+  const minute = String(date.getMinutes()).padStart(2, "0");
 
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const monthName = months[parseInt(m, 10) - 1] || m;
+  const monthName = months[date.getMonth()];
 
-  return `${monthName} ${parseInt(d, 10)}, ${y} | ${String(hour12).padStart(2, "0")}:${mm} ${ampm}`;
+  return `${monthName} ${date.getDate()}, ${date.getFullYear()} | ${String(hour12).padStart(2, "0")}:${minute} ${ampm}`;
 };
 
 export default function ReportStatus() {

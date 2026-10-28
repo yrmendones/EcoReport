@@ -36,21 +36,19 @@ const EXPORT_LIMIT = 10000;
 
 const formatDateTime = (str) => {
   if (!str) return "N/A";
-  const safe = String(str).replace("T", " ");
-  const [datePart, timePart] = safe.split(" ");
-  const [y, m, d] = (datePart || "").split("-");
-  if (!y || !m || !d) return str;
+  const date = new Date(str);
+  if (isNaN(date.getTime())) return str;
 
-  const [hh = "00", mm = "00"] = (timePart || "").split(":");
-  const hour24 = parseInt(hh, 10);
+  const hour24 = date.getHours();
   const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
   const ampm = hour24 >= 12 ? "PM" : "AM";
+  const minute = String(date.getMinutes()).padStart(2, "0");
 
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const monthName = months[parseInt(m, 10) - 1] || m;
+  const monthName = months[date.getMonth()];
 
-  return `${monthName} ${parseInt(d, 10)}, ${y} | ${String(hour12).padStart(2, "0")}:${mm} ${ampm}`;
+  return `${monthName} ${date.getDate()}, ${date.getFullYear()} | ${String(hour12).padStart(2, "0")}:${minute} ${ampm}`;
 };
 
 const toLocalDateStr = (date) => {
