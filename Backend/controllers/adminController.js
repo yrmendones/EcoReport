@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const notificationController = require('./notificationController');
 const { logAudit } = require('../utils/auditLogger');
 const { logTimeline } = require('../utils/timelineLogger');
+const { formatRow, formatRows } = require('../utils/dateFormatter');
 
 async function generateResidentId() {
     const year = new Date().getFullYear();
@@ -121,7 +122,7 @@ exports.getAllReports = async (req, res) => {
             });
         }
 
-        res.json(results);
+        res.json(formatRows(results, ["submitted_at", "updated_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch reports.' });
@@ -155,7 +156,7 @@ exports.getReportDetails = async (req, res) => {
         );
         results[0].media = mediaRows || [];
 
-        res.json(results[0]);
+        res.json(formatRow(results[0], ["submitted_at", "updated_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch report.' });
@@ -283,7 +284,7 @@ exports.getAssignments = async (req, res) => {
         }
         sql += ' ORDER BY assignment_id DESC';
         const [results] = await db.query(sql, params);
-        res.json(results);
+        res.json(formatRows(results, ["created_at", "updated_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch assignments.' });
@@ -436,7 +437,7 @@ exports.getAllResidents = async (req, res) => {
         }
         sql += ' ORDER BY user_id DESC';
         const [results] = await db.query(sql, params);
-        res.json(results);
+        res.json(formatRows(results, ["last_active_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch residents.' });
@@ -460,7 +461,7 @@ exports.getResidentById = async (req, res) => {
             [req.params.id]
         );
         if (results.length === 0) return res.status(404).json({ error: 'Resident not found.' });
-        res.json(results[0]);
+        res.json(formatRow(results[0], ["last_active_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch resident.' });
@@ -657,7 +658,7 @@ exports.getCertificates = async (req, res) => {
         if (status && status !== 'All') { sql += ' WHERE c.status = ?'; params.push(status); }
         sql += ' ORDER BY c.requested_at DESC';
         const [results] = await db.query(sql, params);
-        res.json(results);
+        res.json(formatRows(results, ["requested_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch certificates.' });
@@ -730,7 +731,7 @@ exports.deleteCertificate = async (req, res) => {
 exports.getAppointments = async (req, res) => {
     try {
         const [results] = await db.query('SELECT * FROM appointments ORDER BY requested_at DESC');
-        res.json(results);
+        res.json(formatRows(results, ["requested_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch appointments.' });
@@ -876,7 +877,7 @@ exports.getWasteSchedule = async (req, res) => {
                 'Friday', 'Saturday', 'Sunday'
             )
         `);
-        res.json(results);
+        res.json(formatRows(results, ["created_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch schedule.' });
@@ -949,7 +950,7 @@ exports.getBusinesses = async (req, res) => {
             FROM business_permits
             ORDER BY permit_id DESC
         `);
-        res.json(results);
+        res.json(formatRows(results, ["created_at", "updated_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch businesses.' });
@@ -1024,7 +1025,7 @@ exports.deleteBusiness = async (req, res) => {
 exports.getInventory = async (req, res) => {
     try {
         const [results] = await db.query('SELECT * FROM inventory_items ORDER BY inventory_id DESC');
-        res.json(results);
+        res.json(formatRows(results, ["created_at", "updated_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch inventory.' });
@@ -1081,7 +1082,7 @@ exports.deleteInventoryItem = async (req, res) => {
 exports.getBlotterCases = async (req, res) => {
     try {
         const [results] = await db.query('SELECT * FROM blotter_cases ORDER BY blotter_id DESC');
-        res.json(results);
+        res.json(formatRows(results, ["created_at", "updated_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch blotter cases.' });
@@ -1140,7 +1141,7 @@ exports.deleteBlotterCase = async (req, res) => {
 exports.getDisasterAlerts = async (req, res) => {
     try {
         const [results] = await db.query('SELECT * FROM disaster_alerts ORDER BY alert_id DESC');
-        res.json(results);
+        res.json(formatRows(results, ["created_at", "updated_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch disaster alerts.' });
@@ -1379,7 +1380,7 @@ exports.getAuditLogs = async (req, res) => {
         );
 
         res.json({
-            logs: results,
+            logs: formatRows(results, ["created_at"]),
             total,
             page: pageNum,
             limit: limitNum,
@@ -1398,7 +1399,7 @@ exports.getAuditLogs = async (req, res) => {
 exports.getNotificationCenter = async (req, res) => {
     try {
         const [results] = await db.query('SELECT * FROM notification_center ORDER BY created_at DESC');
-        res.json(results);
+        res.json(formatRows(results, ["created_at", "updated_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch notification center.' });

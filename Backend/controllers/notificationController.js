@@ -1,5 +1,6 @@
 const db = require('../db');
 const { sendNotificationEmail } = require('../utils/mailer');
+const { formatRows } = require('../utils/dateFormatter');
 
 // ============================================================
 // RESIDENT FUNCTIONS (Mobile)
@@ -15,7 +16,7 @@ exports.getUserNotifications = async (req, res) => {
              ORDER BY created_at DESC`,
             [userId]
         );
-        res.json(results);
+        res.json(formatRows(results, ["created_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch notifications.' });

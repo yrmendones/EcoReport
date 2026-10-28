@@ -1,4 +1,5 @@
 const db = require('../db');
+const { formatRows } = require('../utils/dateFormatter');
 
 exports.getWasteSchedule = async (req, res) => {
     try {
@@ -10,7 +11,7 @@ exports.getWasteSchedule = async (req, res) => {
                 'Friday', 'Saturday', 'Sunday'
             )
         `);
-        res.json(results);
+        res.json(formatRows(results, ["created_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch schedule.' });

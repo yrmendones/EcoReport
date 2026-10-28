@@ -1,5 +1,6 @@
 const db = require('../db');
 const { logTimeline } = require('../utils/timelineLogger');
+const { formatRow, formatRows } = require('../utils/dateFormatter');
 
 function parseSettings(raw) {
     if (!raw) return {};
@@ -78,7 +79,7 @@ exports.getReports = async (req, res) => {
             delete report.settings;
             return report;
         });
-        res.json(processed);
+        res.json(formatRows(processed, ["submitted_at", "updated_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch reports.' });
@@ -104,7 +105,7 @@ exports.getReportById = async (req, res) => {
             });
         }
 
-        res.json(report);
+        res.json(formatRow(report, ["submitted_at", "updated_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch report.' });
@@ -183,7 +184,7 @@ exports.getNearbyReports = async (req, res) => {
             return report;
         });
 
-        res.json(processed);
+        res.json(formatRows(processed, ["submitted_at", "updated_at"]));
     } catch (error) {
         console.error("Error fetching nearby reports:", error);
         res.status(500).json({ error: 'Failed to fetch nearby reports.' });
@@ -214,7 +215,7 @@ exports.getReportMedia = async (req, res) => {
             'SELECT * FROM report_media WHERE report_id = ? ORDER BY created_at ASC',
             [req.params.id]
         );
-        res.json(results);
+        res.json(formatRows(results, ["created_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch media.' });
@@ -249,7 +250,7 @@ exports.getReportTimeline = async (req, res) => {
              ORDER BY created_at ASC, timeline_id ASC`,
             [req.params.id]
         );
-        res.json(results);
+        res.json(formatRows(results, ["created_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch timeline.' });

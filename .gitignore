@@ -7,7 +7,7 @@ node_modules/
 .env.*.local
 
 # Uploads
-Backend/uploads/
+Backend/uploads/*
 
 # Build outputs
 dist/

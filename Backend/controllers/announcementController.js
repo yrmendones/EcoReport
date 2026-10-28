@@ -1,5 +1,6 @@
 const db = require('../db');
 const { logAudit } = require('../utils/auditLogger');
+const { formatRow, formatRows } = require('../utils/dateFormatter');
 
 exports.getPublishedAnnouncements = async (req, res) => {
     try {
@@ -12,7 +13,7 @@ exports.getPublishedAnnouncements = async (req, res) => {
              WHERE status = 'Published'
              ORDER BY posted_at DESC`
         );
-        res.json(results);
+        res.json(formatRows(results, ["posted_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch announcements.' });
@@ -29,7 +30,7 @@ exports.getAllAnnouncements = async (req, res) => {
              FROM announcements 
              ORDER BY posted_at DESC`
         );
-        res.json(results);
+        res.json(formatRows(results, ["posted_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch announcements.' });
@@ -40,7 +41,7 @@ exports.getAnnouncementById = async (req, res) => {
     try {
         const [rows] = await db.query('SELECT * FROM announcements WHERE announcement_id = ?', [req.params.id]);
         if (rows.length === 0) return res.status(404).json({ error: 'Announcement not found.' });
-        res.json(rows[0]);
+        res.json(formatRow(rows[0], ["posted_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch announcement.' });
