@@ -1,6 +1,11 @@
-const path = require('path');
-const fs = require('fs');
-const { exec } = require('child_process');
+const { v2: cloudinary } = require('cloudinary');
+const { Readable } = require('stream');
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 function transcodeToMp4(inputPath) {
     return new Promise((resolve, reject) => {
@@ -22,36 +27,30 @@ function transcodeToMp4(inputPath) {
     });
 }
 
-async function processUploadedFile(file, req) {
-    let finalFilename = file.filename;
-    let finalMimetype = file.mimetype;
-    let finalPath = file.path;
-
+async function processUploadedFile(file) {
     const isVideo = file.mimetype.startsWith('video/');
 
-    if (isVideo) {
-        try {
-            console.log(`🎬 Transcoding video: ${file.filename} ...`);
-            const convertedPath = await transcodeToMp4(file.path);
+    return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+            {
+                resource_type: isVideo ? 'video' : 'image',
+                folder: 'ecoreport_uploads',
+            },
+            (error, result) => {
+                if (error) return reject(error);
+                resolve({
+                    filename: result.public_id,
+                    url: result.secure_url,
+                    size: result.bytes,
+                    mimetype: file.mimetype,
+                });
+            }
+        );
 
-            // Delete the original to save disk space
-            try { fs.unlinkSync(file.path); } catch (e) { /* ignore */ }
-
-            finalPath = convertedPath;
-            finalFilename = path.basename(convertedPath);
-            finalMimetype = 'video/mp4';
-            console.log(`✅ Transcode done: ${finalFilename}`);
-        } catch (err) {
-            console.error(`⚠️ Transcode failed for ${file.filename}:`, err.message);
-        }
-    }
-
-    return {
-        filename: finalFilename,
-        url: `${req.protocol}://${req.get('host')}/uploads/${finalFilename}`,
-        size: fs.existsSync(finalPath) ? fs.statSync(finalPath).size : 0,
-        mimetype: finalMimetype,
-    };
+        // Multer memoryStorage gives us a buffer
+        const bufferStream = Readable.from(file.buffer);
+        bufferStream.pipe(uploadStream);
+    });
 }
 
 // ============================================================
@@ -65,7 +64,7 @@ exports.uploadFiles = async (req, res) => {
 
         const fileUrls = [];
         for (const file of req.files) {
-            const processed = await processUploadedFile(file, req);
+            const processed = await processUploadedFile(file);
             fileUrls.push(processed);
         }
 
@@ -87,7 +86,7 @@ exports.guestUploadFiles = async (req, res) => {
 
         const fileUrls = [];
         for (const file of req.files) {
-            const processed = await processUploadedFile(file, req);
+            const processed = await processUploadedFile(file);
             fileUrls.push(processed);
         }
 

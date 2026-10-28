@@ -1,34 +1,8 @@
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 
-const uploadDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-function sanitizeFilename(originalName) {
-    const ext = path.extname(originalName).toLowerCase();
-    const base = path.basename(originalName, ext);
-
-    const safeBase = base
-        .normalize('NFKD')                          // decompose accented chars
-        .replace(/[^\w\s-]/g, '')                   // drop everything except word chars, spaces, dashes
-        .trim()
-        .replace(/[\s_-]+/g, '_')                   // collapse whitespace/dashes/underscores to single _
-        .slice(0, 60);
-
-    return (safeBase || 'file') + ext;
-}
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        const safeName = sanitizeFilename(file.originalname);
-        cb(null, uniqueSuffix + '-' + safeName);
-    },
-});
+// In-memory storage files are passed as `file.buffer` to the controller, which uploads them to Cloudinary.
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi/;
@@ -39,7 +13,7 @@ const fileFilter = (req, file, cb) => {
 };
 
 // Limit file size to 30MB
-const MAX_FILE_SIZE = 30 * 1024 * 1024; 
+const MAX_FILE_SIZE = 30 * 1024 * 1024;
 
 exports.upload = multer({
     storage,

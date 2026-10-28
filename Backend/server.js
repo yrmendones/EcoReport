@@ -46,9 +46,6 @@ app.use(cors({
 app.use(express.json());
 app.use(express.json());
 
-// Serve static files (uploads)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 // IMPORT ROUTES
 const authController = require('./controllers/authController');
 
