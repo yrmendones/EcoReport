@@ -27,7 +27,7 @@ const formatDate = (d) => {
 };
 
 export default function VerifyResident() {
-  const { id } = useParams();
+  const { token } = useParams();
   const navigate = useNavigate();
   const [resident, setResident] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -37,8 +37,7 @@ export default function VerifyResident() {
     const fetchResident = async () => {
       try {
         setLoading(true);
-        // Uses the token endpoint
-        const data = await apiFetch(`/api/public/verify-token/${encodeURIComponent(id)}`);
+        const data = await apiFetch(`/api/public/verify-token/${encodeURIComponent(token)}`);
         setResident(data);
       } catch (err) {
         console.error("Error fetching resident:", err);
@@ -48,7 +47,7 @@ export default function VerifyResident() {
       }
     };
     fetchResident();
-  }, [id]);
+  }, [token]);
 
   const getStatus = () => {
     if (!resident) return "Pending Verification";

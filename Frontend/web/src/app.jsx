@@ -136,7 +136,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ForgotPassword />} />
 
-        <Route path="/verify-resident/:id" element={<VerifyResident />} />
+        <Route path="/verify-resident/:token" element={<VerifyResident />} />
 
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/report" element={<Report />} />

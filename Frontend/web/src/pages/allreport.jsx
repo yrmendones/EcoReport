@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { apiFetch } from "../api";
@@ -36,6 +36,7 @@ function getVideoMimeType(url) {
 export default function AllReport() {
   const navigate = useNavigate();
   const routerLocation = useLocation();
+  const { id: routeId } = useParams();
   const mapRef = useRef(null);
   const mapContainerRef = useRef(null);
   const menuItems = getMenuItems("/allreport");
@@ -44,29 +45,39 @@ export default function AllReport() {
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [videoError, setVideoError] = useState(false);
 
-  const report = routerLocation.state?.report || {
-    id: "ER-0006-0115",
-    report_id: 1,
-    category: "Illegal Dumping",
-    user_id: null,
-    first_name: "Bench",
-    last_name: "Villanueva",
-    guest_name: null,
-    contact: "0917-123-6572",
-    guest_mobile: null,
-    contact_number: "0917-123-6572",
-    address: "P. Gomez St. Sto. Rosario Kanluran, Pateros",
-    submitted_at: new Date().toISOString(),
-    date: "May 30, 2026",
-    time: "10:30 AM",
-    description: "There is illegal dumping along the creek.",
-    status: "Pending",
-    latitude: null,
-    longitude: null,
-    media: [],
-  };
+  const [report, setReport] = useState(routerLocation.state?.report || null);
+  const [loading, setLoading] = useState(!routerLocation.state?.report && !!routeId);
+  const [error, setError] = useState("");
 
   const mode = routerLocation.state?.mode || "edit";
+
+  useEffect(() => {
+    // If router state already gave us the report, skip the fetch.
+    if (routerLocation.state?.report) return;
+
+    // No id in URL → nothing to load; send admin back to the report list.
+    if (!routeId) {
+      navigate("/report", { replace: true });
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const data = await apiFetch(`/api/admin/reports/${routeId}`);
+        if (!cancelled) setReport(data);
+      } catch (err) {
+        if (!cancelled) setError(err.message || "Failed to load report.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [routeId, routerLocation.state?.report, navigate]);
 
   // Normalized media list (fallback to empty array)
   const mediaList = Array.isArray(report.media) ? report.media : [];
@@ -117,6 +128,7 @@ export default function AllReport() {
   };
 
   useEffect(() => {
+    if (!report) return;
     if (!mapContainerRef.current || mapRef.current) return;
 
     const hasCoords = report.latitude && report.longitude;
@@ -259,6 +271,53 @@ export default function AllReport() {
 
   const currentMedia = lightboxIndex !== null ? mediaList[lightboxIndex] : null;
 
+  // ── Loading state ──
+  if (loading) {
+    return (
+      <div className="allreport-page">
+        <main className="main-content">
+          <header className="top-header">
+            <h2>Report Details</h2>
+            <ProfileHeaderButton />
+          </header>
+          <section className="allreport-content">
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh", color: "#666", fontSize: 13 }}>
+              Loading report...
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  // ── Error / not-found state ──
+  if (error || !report) {
+    return (
+      <div className="allreport-page">
+        <main className="main-content">
+          <header className="top-header">
+            <h2>Report Details</h2>
+            <ProfileHeaderButton />
+          </header>
+          <section className="allreport-content">
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "60vh", gap: 12 }}>
+              <p style={{ color: "#b91c1c", fontSize: 13, fontWeight: 700 }}>
+                {error || "Report not found."}
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate("/report")}
+                style={{ background: "#0B5D2A", color: "#fff", border: "none", padding: "8px 20px", borderRadius: 4, fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+              >
+                Back to Reports
+              </button>
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="allreport-page">
@@ -305,7 +364,7 @@ export default function AllReport() {
                   <div className="information-row">
                     <div className="information-label">Report ID</div>
                     <div className="information-value">
-                      {report.id || (report.report_id ? `ER-2026-${String(report.report_id).padStart(4, "0")}` : "N/A")}
+                      {report.id || (report.report_id ? `ER-${new Date().getFullYear()}-${String(report.report_id).padStart(4, "0")}` : "N/A")}
                     </div>
                   </div>
                   <div className="information-row">
