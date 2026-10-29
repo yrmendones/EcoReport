@@ -1,4 +1,4 @@
-const sanitizeHtml = require("sanitize-html");
+const xss = require("xss");
 
 function normalizeHrefs(html) {
     if (!html) return html;
@@ -7,16 +7,10 @@ function normalizeHrefs(html) {
         (match, quote, url) => {
             const trimmed = url.trim();
             if (!trimmed) return match;
-
-            // Already has a scheme or is a fragment → leave alone
             if (/^(https?:|mailto:|tel:|#)/i.test(trimmed)) return match;
-
-            // Protocol-relative (//example.com) → force https
             if (trimmed.startsWith("//")) {
                 return `href=${quote}https:${trimmed}${quote}`;
             }
-
-            // No scheme → prepend https://
             return `href=${quote}https://${trimmed.replace(/^\/+/, "")}${quote}`;
         }
     );
@@ -27,35 +21,37 @@ function sanitizeDescription(html) {
 
     const normalized = normalizeHrefs(String(html));
 
-    return sanitizeHtml(normalized, {
-        allowedTags: [
-            "p", "br", "strong", "em", "u", "s",
-            "h1", "h2", "h3",
-            "ul", "ol", "li",
-            "a", "blockquote",
-            "img", "video", "figure", "figcaption",
-            "span",
-        ],
-        allowedAttributes: {
+    const myXss = new xss.FilterXSS({
+        whiteList: {
+            p: [], br: [], strong: [], b: [], em: [], i: [], u: [], s: [],
+            h1: [], h2: [], h3: [],
+            ul: [], ol: [], li: [],
             a: ["href", "target", "rel"],
-            img: ["src", "alt", "width", "height"],
+            blockquote: [],
+            img: ["src", "alt", "width", "height", "loading"],
             video: ["src", "controls", "width", "height", "poster", "preload"],
-            "*": ["style"],
+            figure: [], figcaption: [],
+            span: ["style"],
         },
-        allowedSchemes: ["http", "https"],
-        allowedSchemesByTag: { img: ["http", "https", "data"], video: ["http", "https"] },
-        transformTags: {
-            a: sanitizeHtml.simpleTransform("a", {
-                target: "_blank",
-                rel: "noopener noreferrer",
-            }),
-            img: sanitizeHtml.simpleTransform("img", { loading: "lazy" }),
-            video: sanitizeHtml.simpleTransform("video", {
-                controls: "controls",
-                preload: "metadata",
-            }),
+        stripIgnoreTag: true,
+        stripIgnoreTagBody: ["script", "style"],
+        onTagAttr: (tag, name, value) => {
+            if (tag === "a" && name === "href") {
+                const safe = /^(https?:|mailto:|tel:|#)/i.test(value)
+                    ? value
+                    : `https://${value}`;
+                return `${name}="${safe}" target="_blank" rel="noopener noreferrer"`;
+            }
+            if (tag === "img" && name === "src") {
+                if (!/^(https?:|data:image\/)/i.test(value)) return "";
+            }
+            if (tag === "video" && name === "src") {
+                if (!/^https?:/i.test(value)) return "";
+            }
         },
     });
+
+    return myXss.process(normalized);
 }
 
 module.exports = { sanitizeDescription };
