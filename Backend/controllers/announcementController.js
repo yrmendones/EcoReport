@@ -1,6 +1,7 @@
 const db = require('../db');
 const { logAudit } = require('../utils/auditLogger');
 const { formatRow, formatRows } = require('../utils/dateFormatter');
+const notificationController = require('./notificationController');
 
 exports.getPublishedAnnouncements = async (req, res) => {
     try {
@@ -62,6 +63,24 @@ exports.createAnnouncement = async (req, res) => {
         // Audit
         await logAudit(req, `Created announcement "${title}" (category: ${category}, status: ${finalStatus})`);
 
+        // Broadcast to residents only if published
+        if (finalStatus === 'Published') {
+            const broadcastType =
+                category === 'Health'   ? 'Health Announcement' :
+                category === 'Disaster' ? 'Disaster Alert' :
+                                          'Announcement';
+            try {
+                await notificationController.broadcastToResidents(
+                    `New ${broadcastType}: ${title}`,
+                    content,
+                    broadcastType,
+                    result.insertId
+                );
+            } catch (notifErr) {
+                console.error('Failed to broadcast announcement:', notifErr);
+            }
+        }
+
         res.status(201).json({ message: 'Announcement created!', announcement_id: result.insertId });
     } catch (error) {
         console.error(error);
@@ -89,13 +108,32 @@ exports.updateAnnouncement = async (req, res) => {
             [title, content, category, status, req.params.id]
         );
 
-        // Audit — note status change if it happened
+        // Audit
         const statusChanged = existing[0].status !== status;
         const auditMsg = statusChanged
             ? `Updated announcement "${title}" status from ${existing[0].status} to ${status}`
             : `Updated announcement "${title}" (category: ${category})`;
 
         await logAudit(req, auditMsg);
+
+        // Broadcast only on Draft → Published transition
+        const justPublished = existing[0].status !== 'Published' && status === 'Published';
+        if (justPublished) {
+            const broadcastType =
+                category === 'Health'   ? 'Health Announcement' :
+                category === 'Disaster' ? 'Disaster Alert' :
+                                          'Announcement';
+            try {
+                await notificationController.broadcastToResidents(
+                    `New ${broadcastType}: ${title}`,
+                    content,
+                    broadcastType,
+                    req.params.id
+                );
+            } catch (notifErr) {
+                console.error('Failed to broadcast announcement:', notifErr);
+            }
+        }
 
         res.json({ message: 'Announcement updated!' });
     } catch (error) {

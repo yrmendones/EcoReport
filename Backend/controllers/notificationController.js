@@ -105,6 +105,51 @@ exports.createNotification = async (userId, title, message, type = 'Report Updat
     }
 };
 
+exports.broadcastToResidents = async (title, message, type = 'Announcement', referenceId = null) => {
+    try {
+        const [residents] = await db.query(
+            'SELECT user_id, email, settings FROM users WHERE role = "resident"'
+        );
+        if (residents.length === 0) return { inApp: 0, email: 0, total: 0 };
+
+        const inAppRows = [];
+        const emailTargets = [];
+
+        for (const resident of residents) {
+            const settings = parseSettings(resident.settings);
+
+            if (settings.pushNotifications !== false) {
+                inAppRows.push([resident.user_id, title, message, type, 0, referenceId]);
+            }
+            if (settings.emailNotifications === true && resident.email) {
+                emailTargets.push(resident.email);
+            }
+        }
+
+        // Batch insert all in-app notifications in a single query
+        if (inAppRows.length > 0) {
+            const placeholders = inAppRows.map(() => '(?, ?, ?, ?, ?, ?, NOW())').join(', ');
+            await db.query(
+                `INSERT INTO notifications (user_id, title, message, type, is_read, reference_id, created_at) VALUES ${placeholders}`,
+                inAppRows.flat()
+            );
+        }
+
+        // Fire emails asynchronously
+        for (const email of emailTargets) {
+            sendNotificationEmail(email, title, message, type).catch((err) => {
+                console.error(`⚠️ Email to ${email} failed:`, err.message);
+            });
+        }
+
+        console.log(`📢 Broadcast "${title}" [${type}] — in-app: ${inAppRows.length}, email: ${emailTargets.length}, total residents: ${residents.length}`);
+        return { inApp: inAppRows.length, email: emailTargets.length, total: residents.length };
+    } catch (err) {
+        console.error('Error broadcasting to residents:', err);
+        throw err;
+    }
+};
+
 // Send a notification center item to all residents
 exports.sendNotificationCenter = async (title, message) => {
     try {

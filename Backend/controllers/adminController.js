@@ -1177,6 +1177,20 @@ exports.addDisasterAlert = async (req, res) => {
 
         await logAudit(req, `Created disaster alert "${title}" (${type})`);
 
+        // Broadcast to residents only if the alert is Active
+        if (finalStatus === 'Active') {
+            try {
+                await notificationController.broadcastToResidents(
+                    `⚠️ Disaster Alert: ${title}`,
+                    description || 'No description provided.',
+                    'Disaster Alert',
+                    annResult.insertId
+                );
+            } catch (notifErr) {
+                console.error('Failed to broadcast disaster alert:', notifErr);
+            }
+        }
+
         res.status(201).json({ message: 'Disaster alert created!', alert_id: alertId });
     } catch (error) {
         console.error(error);
@@ -1193,10 +1207,11 @@ exports.updateDisasterAlert = async (req, res) => {
         const finalStatus = status || 'Active';
         const announcementStatus = finalStatus === 'Active' ? 'Published' : 'Draft';
 
-        const [alert] = await db.query('SELECT linked_announcement_id FROM disaster_alerts WHERE alert_id = ?', [req.params.id]);
+        const [alert] = await db.query('SELECT linked_announcement_id, status FROM disaster_alerts WHERE alert_id = ?', [req.params.id]);
         if (alert.length === 0) {
             return res.status(404).json({ error: 'Alert not found.' });
         }
+        const previouslyActive = alert[0].status === 'Active';
 
         await db.query(
             `UPDATE disaster_alerts SET title = ?, type = ?, description = ?, status = ? WHERE alert_id = ?`,
@@ -1230,6 +1245,21 @@ exports.updateDisasterAlert = async (req, res) => {
         }
 
         await logAudit(req, `Updated disaster alert "${title}" (status: ${finalStatus})`);
+
+        // Broadcast only on Inactive → Active transition
+        if (!previouslyActive && finalStatus === 'Active') {
+            try {
+                let announcementId = alert[0].linked_announcement_id;
+                await notificationController.broadcastToResidents(
+                    `⚠️ Disaster Alert: ${title}`,
+                    description || 'No description provided.',
+                    'Disaster Alert',
+                    announcementId
+                );
+            } catch (notifErr) {
+                console.error('Failed to broadcast disaster alert update:', notifErr);
+            }
+        }
 
         res.json({ message: 'Disaster alert updated!' });
     } catch (error) {
