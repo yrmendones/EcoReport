@@ -2,6 +2,7 @@ const db = require('../db');
 const { logAudit } = require('../utils/auditLogger');
 const { formatRow, formatRows } = require('../utils/dateFormatter');
 const notificationController = require('./notificationController');
+const { sanitizeDescription } = require('../utils/sanitizeHtml');
 
 exports.getPublishedAnnouncements = async (req, res) => {
     try {
@@ -55,9 +56,10 @@ exports.createAnnouncement = async (req, res) => {
         if (!title || !content || !category)
             return res.status(400).json({ error: 'Title, content, and category required.' });
         const finalStatus = status || 'Draft';
+        const cleanContent = sanitizeDescription(content);
         const [result] = await db.query(
             'INSERT INTO announcements (title, content, category, posted_by, posted_at, status) VALUES (?, ?, ?, ?, NOW(), ?)',
-            [title, content, category, req.user.id, finalStatus]
+            [title, cleanContent, category, req.user.id, finalStatus]
         );
 
         // Audit
@@ -72,7 +74,7 @@ exports.createAnnouncement = async (req, res) => {
             try {
                 await notificationController.broadcastToResidents(
                     `New ${broadcastType}: ${title}`,
-                    content,
+                    cleanContent,
                     broadcastType,
                     result.insertId
                 );
@@ -103,9 +105,10 @@ exports.updateAnnouncement = async (req, res) => {
             return res.status(404).json({ error: 'Announcement not found.' });
         }
 
+        const cleanContent = sanitizeDescription(content);
         await db.query(
             'UPDATE announcements SET title = ?, content = ?, category = ?, status = ? WHERE announcement_id = ?',
-            [title, content, category, status, req.params.id]
+            [title, cleanContent, category, status, req.params.id]
         );
 
         // Audit
@@ -126,7 +129,7 @@ exports.updateAnnouncement = async (req, res) => {
             try {
                 await notificationController.broadcastToResidents(
                     `New ${broadcastType}: ${title}`,
-                    content,
+                    cleanContent,
                     broadcastType,
                     req.params.id
                 );

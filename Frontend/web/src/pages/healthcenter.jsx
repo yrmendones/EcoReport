@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../api";
 import { getMenuItems } from "../menu";
 import ProfileHeaderButton from "../components/ProfileHeaderButton";
+import RichTextEditor from "../components/RichTextEditor";
 
 const PAGE_SIZE = 25;
 
@@ -1166,7 +1167,11 @@ export default function HealthCenter() {
               </div>
               <div className="form-group">
                 <label>Description</label>
-                <textarea value={annForm.content} onChange={(e) => setAnnForm({ ...annForm, content: e.target.value })} required rows="4" placeholder="Enter announcement description" style={{ width: "100%", padding: "8px 10px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", fontFamily: "Arial" }} />
+                <RichTextEditor
+                  value={annForm.content}
+                  onChange={(html) => setAnnForm({ ...annForm, content: html })}
+                  placeholder="Enter announcement description"
+                />
               </div>
               <div className="form-group">
                 <label>Status</label>
@@ -1195,7 +1200,11 @@ export default function HealthCenter() {
               </div>
               <div className="form-group">
                 <label>Description</label>
-                <textarea value={annForm.content} onChange={(e) => setAnnForm({ ...annForm, content: e.target.value })} required rows="4" style={{ width: "100%", padding: "8px 10px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", fontFamily: "Arial" }} />
+                <RichTextEditor
+                  value={annForm.content}
+                  onChange={(html) => setAnnForm({ ...annForm, content: html })}
+                  placeholder="Enter announcement description"
+                />
               </div>
               <div className="form-group">
                 <label>Status</label>

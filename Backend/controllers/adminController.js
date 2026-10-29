@@ -4,6 +4,7 @@ const notificationController = require('./notificationController');
 const { logAudit } = require('../utils/auditLogger');
 const { logTimeline } = require('../utils/timelineLogger');
 const { formatRow, formatRows } = require('../utils/dateFormatter');
+const { sanitizeDescription } = require('../utils/sanitizeHtml');
 
 async function generateResidentId() {
     const year = new Date().getFullYear();
@@ -1157,17 +1158,18 @@ exports.addDisasterAlert = async (req, res) => {
         const finalStatus = status || 'Active';
         const announcementStatus = finalStatus === 'Active' ? 'Published' : 'Draft';
 
+        const cleanDescription = sanitizeDescription(description || "");
         const [result] = await db.query(
             `INSERT INTO disaster_alerts (title, type, description, status, created_by) 
              VALUES (?, ?, ?, ?, ?)`,
-            [title, type, description || null, finalStatus, req.user.id]
+            [title, type, cleanDescription || null, finalStatus, req.user.id]
         );
         const alertId = result.insertId;
 
         const [annResult] = await db.query(
             `INSERT INTO announcements (title, content, category, status, posted_at, posted_by) 
              VALUES (?, ?, 'Disaster', ?, NOW(), ?)`,
-            [title, description || 'No description provided.', announcementStatus, req.user.id]
+            [title, cleanDescription || 'No description provided.', announcementStatus, req.user.id]
         );
 
         await db.query(
@@ -1182,7 +1184,7 @@ exports.addDisasterAlert = async (req, res) => {
             try {
                 await notificationController.broadcastToResidents(
                     `⚠️ Disaster Alert: ${title}`,
-                    description || 'No description provided.',
+                    cleanDescription || 'No description provided.',
                     'Disaster Alert',
                     annResult.insertId
                 );
@@ -1213,9 +1215,10 @@ exports.updateDisasterAlert = async (req, res) => {
         }
         const previouslyActive = alert[0].status === 'Active';
 
+        const cleanDescription = sanitizeDescription(description || "");
         await db.query(
             `UPDATE disaster_alerts SET title = ?, type = ?, description = ?, status = ? WHERE alert_id = ?`,
-            [title, type, description || null, finalStatus, req.params.id]
+            [title, type, cleanDescription || null, finalStatus, req.params.id]
         );
 
         let linkedId = alert[0].linked_announcement_id;
@@ -1230,13 +1233,13 @@ exports.updateDisasterAlert = async (req, res) => {
         if (linkedId) {
             await db.query(
                 `UPDATE announcements SET title = ?, content = ?, status = ? WHERE announcement_id = ?`,
-                [title, description || 'No description provided.', announcementStatus, linkedId]
+                [title, cleanDescription || 'No description provided.', announcementStatus, linkedId]
             );
         } else {
             const [annResult] = await db.query(
                 `INSERT INTO announcements (title, content, category, status, posted_at, posted_by) 
                  VALUES (?, ?, 'Disaster', ?, NOW(), ?)`,
-                [title, description || 'No description provided.', announcementStatus, req.user.id]
+                [title, cleanDescription || 'No description provided.', announcementStatus, req.user.id]
             );
             await db.query(
                 'UPDATE disaster_alerts SET linked_announcement_id = ? WHERE alert_id = ?',
@@ -1252,7 +1255,7 @@ exports.updateDisasterAlert = async (req, res) => {
                 let announcementId = alert[0].linked_announcement_id;
                 await notificationController.broadcastToResidents(
                     `⚠️ Disaster Alert: ${title}`,
-                    description || 'No description provided.',
+                    cleanDescription || 'No description provided.',
                     'Disaster Alert',
                     announcementId
                 );

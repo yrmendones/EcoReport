@@ -3,12 +3,21 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../api";
 import { getMenuItems } from "../menu";
 import ProfileHeaderButton from "../components/ProfileHeaderButton";
+import RichTextEditor from "../components/RichTextEditor";
 
 const PAGE_SIZE = 25;
 
+const stripHtml = (html) => {
+  if (!html) return "";
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.textContent || div.innerText || "";
+};
+
 const truncate = (text, maxLength = 30) => {
-  if (!text) return "";
-  return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
+  const plain = stripHtml(text);
+  if (!plain) return "";
+  return plain.length > maxLength ? plain.substring(0, maxLength) + "..." : plain;
 };
 
 const TYPE_OPTIONS = [
@@ -558,12 +567,10 @@ export default function DisasterEmergency() {
               </div>
               <div className="form-group">
                 <label>Description</label>
-                <textarea
+                <RichTextEditor
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows="4"
+                  onChange={(html) => setFormData({ ...formData, description: html })}
                   placeholder="Enter alert description"
-                  style={{ width: "100%", padding: "8px 10px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", fontFamily: "Arial" }}
                 />
               </div>
               <div className="form-group">
@@ -621,11 +628,10 @@ export default function DisasterEmergency() {
               </div>
               <div className="form-group">
                 <label>Description</label>
-                <textarea
+                <RichTextEditor
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows="4"
-                  style={{ width: "100%", padding: "8px 10px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", fontFamily: "Arial" }}
+                  onChange={(html) => setFormData({ ...formData, description: html })}
+                  placeholder="Enter alert description"
                 />
               </div>
               <div className="form-group">

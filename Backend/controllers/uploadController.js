@@ -1,5 +1,6 @@
 const { v2: cloudinary } = require('cloudinary');
 const { Readable } = require('stream');
+const { MAX_VIDEO_SIZE, MAX_IMAGE_SIZE } = require('../middleware/upload');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -29,6 +30,14 @@ function transcodeToMp4(inputPath) {
 
 async function processUploadedFile(file) {
     const isVideo = file.mimetype.startsWith('video/');
+
+    // Enforce per-type limits
+    const limit = isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+    if (file.size > limit) {
+        const limitMB = Math.round(limit / (1024 * 1024));
+        const kind = isVideo ? 'Video' : 'Image';
+        throw new Error(`${kind} is too large. Max ${limitMB}MB per file.`);
+    }
 
     return new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
@@ -71,7 +80,10 @@ exports.uploadFiles = async (req, res) => {
         res.status(201).json({ message: 'Files uploaded successfully!', files: fileUrls });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Failed to upload files.' });
+        const isClientError = /too large|Max \d+MB/i.test(error.message || '');
+        res.status(isClientError ? 413 : 500).json({
+            error: error.message || 'Failed to upload files.',
+        });
     }
 };
 
@@ -93,6 +105,9 @@ exports.guestUploadFiles = async (req, res) => {
         res.status(201).json({ message: 'Files uploaded successfully!', files: fileUrls });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Failed to upload files.' });
+        const isClientError = /too large|Max \d+MB/i.test(error.message || '');
+        res.status(isClientError ? 413 : 500).json({
+            error: error.message || 'Failed to upload files.',
+        });
     }
 };

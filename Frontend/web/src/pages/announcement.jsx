@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../api";
 import { getMenuItems } from "../menu";
 import ProfileHeaderButton from "../components/ProfileHeaderButton";
+import RichTextEditor from "../components/RichTextEditor";
 
 const PAGE_SIZE = 25;
 
@@ -543,13 +544,10 @@ export default function Announcement() {
               </div>
               <div className="form-group">
                 <label>Description</label>
-                <textarea
+                <RichTextEditor
                   value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  required
-                  rows="4"
+                  onChange={(html) => setFormData({ ...formData, content: html })}
                   placeholder="Enter announcement description"
-                  style={{ width: "100%", padding: "8px 10px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", fontFamily: "Arial" }}
                 />
               </div>
               <div className="form-group">
@@ -602,12 +600,10 @@ export default function Announcement() {
               </div>
               <div className="form-group">
                 <label>Description</label>
-                <textarea
+                <RichTextEditor
                   value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  required
-                  rows="4"
-                  style={{ width: "100%", padding: "8px 10px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", fontFamily: "Arial" }}
+                  onChange={(html) => setFormData({ ...formData, content: html })}
+                  placeholder="Enter announcement description"
                 />
               </div>
               <div className="form-group">

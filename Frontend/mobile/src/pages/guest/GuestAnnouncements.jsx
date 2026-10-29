@@ -2,10 +2,19 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaSpinner, FaBullhorn } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import DOMPurify from "dompurify";
+
+const stripHtml = (html) => {
+  if (!html) return "";
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.textContent || div.innerText || "";
+};
 
 const truncate = (text, maxLength = 80) => {
-  if (!text) return "";
-  return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
+  const plain = stripHtml(text);
+  if (!plain) return "";
+  return plain.length > maxLength ? plain.substring(0, maxLength) + "..." : plain;
 };
 
 export default function GuestAnnouncements() {

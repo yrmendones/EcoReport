@@ -12,8 +12,11 @@ const fileFilter = (req, file, cb) => {
     cb(new Error('Only images and videos are allowed.'));
 };
 
-// Limit file size to 30MB
-const MAX_FILE_SIZE = 30 * 1024 * 1024;
+// ─── File size limits ───
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024;   // 100 MB
+const MAX_IMAGE_SIZE = 30 * 1024 * 1024;    // 30 MB
+
+const MAX_FILE_SIZE = MAX_VIDEO_SIZE;
 
 exports.upload = multer({
     storage,
@@ -26,3 +29,6 @@ exports.guestUpload = multer({
     limits: { fileSize: MAX_FILE_SIZE },
     fileFilter,
 });
+
+exports.MAX_VIDEO_SIZE = MAX_VIDEO_SIZE;
+exports.MAX_IMAGE_SIZE = MAX_IMAGE_SIZE;

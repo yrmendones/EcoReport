@@ -97,6 +97,30 @@ app.get('/', (req, res) => {
 // ERROR HANDLER
 app.use((err, req, res, next) => {
     console.error(err.stack);
+
+    // Multer - file too large
+    if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({
+            error: 'File size exceeds the 100MB limit. Please upload a smaller file.',
+        });
+    }
+
+    // Multer - too many files
+    if (err.code === 'LIMIT_FILE_COUNT') {
+        return res.status(400).json({ error: 'Too many files in one upload. Max 10 files.' });
+    }
+
+    // Multer - unexpected field name
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({ error: 'Unexpected file field. Please try again.' });
+    }
+
+    // Multer file filter - wrong type
+    if (err.message === 'Only images and videos are allowed.') {
+        return res.status(400).json({ error: 'Only images and videos are allowed.' });
+    }
+
+    // Fallback
     res.status(500).json({ error: 'Something went wrong!' });
 });
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaArrowLeft, FaSpinner } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import DOMPurify from "dompurify";
 
 export default function GuestAnnouncementDetail() {
   const navigate = useNavigate();
@@ -84,9 +85,40 @@ export default function GuestAnnouncementDetail() {
             </h2>
             <p className="text-[12px] text-gray-500 mt-3">{announcement.date}</p>
             <div className="h-px bg-[#E5E7EB] my-5" />
-            <p className="text-[14px] text-gray-700 leading-7 whitespace-pre-wrap">
-              {announcement.content}
-            </p>
+            <div
+              className="ql-content text-[14px] text-gray-700 leading-7"
+              onClick={(e) => {
+                const anchor = e.target.closest("a");
+                if (!anchor) return;
+
+                let href = (anchor.getAttribute("href") || "").trim();
+                if (!href) return;
+                if (href === "#" || href.startsWith("#")) return;
+
+                if (!/^(https?:|mailto:|tel:)/i.test(href)) {
+                  if (href.startsWith("//")) {
+                    href = "https:" + href;
+                  } else {
+                    href = "https://" + href.replace(/^\/+/, "");
+                  }
+                }
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                const link = document.createElement("a");
+                link.href = href;
+                link.target = "_blank";
+                link.rel = "noopener noreferrer";
+                link.style.display = "none";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(announcement.content || ""),
+              }}
+            />
           </div>
         </main>
 

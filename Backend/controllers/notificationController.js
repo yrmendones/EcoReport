@@ -136,8 +136,22 @@ exports.broadcastToResidents = async (title, message, type = 'Announcement', ref
         }
 
         // Fire emails asynchronously
+        // Strip HTML for the email body
+        const plainMessage = String(message || "")
+            .replace(/<br\s*\/?>/gi, "\n")
+            .replace(/<\/p>/gi, "\n\n")
+            .replace(/<[^>]+>/g, "")
+            .replace(/&nbsp;/g, " ")
+            .replace(/&amp;/g, "&")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&quot;/g, '"')
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+
+        // Fire emails asynchronously (don't block the response)
         for (const email of emailTargets) {
-            sendNotificationEmail(email, title, message, type).catch((err) => {
+            sendNotificationEmail(email, title, plainMessage, type).catch((err) => {
                 console.error(`⚠️ Email to ${email} failed:`, err.message);
             });
         }
