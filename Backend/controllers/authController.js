@@ -7,12 +7,29 @@ const { sendVerificationCodeEmail } = require('../utils/mailer');
 
 async function generateResidentId() {
     const year = new Date().getFullYear();
+    const prefix = `RES-${year}-`;
+
     const [rows] = await db.query(
-        'SELECT COUNT(*) as total FROM users WHERE YEAR(registered_at) = ?',
-        [year]
+        `SELECT MAX(CAST(SUBSTRING_INDEX(resident_id, '-', -1) AS UNSIGNED)) AS max_num
+         FROM users
+         WHERE resident_id LIKE ?`,
+        [`${prefix}%`]
     );
-    const count = rows[0].total + 1;
-    return `RES-${year}-${String(count).padStart(4, '0')}`;
+
+    let nextNumber = 1;
+    if (rows.length > 0 && rows[0].max_num != null) {
+        nextNumber = Number(rows[0].max_num) + 1;
+    }
+
+    while (true) {
+        const candidate = `${prefix}${String(nextNumber).padStart(4, '0')}`;
+        const [existing] = await db.query(
+            'SELECT user_id FROM users WHERE resident_id = ? LIMIT 1',
+            [candidate]
+        );
+        if (existing.length === 0) return candidate;
+        nextNumber += 1;
+    }
 }
 
 exports.register = async (req, res) => {
