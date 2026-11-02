@@ -218,7 +218,7 @@ export default function UploadEvidence() {
                 <h3 className="text-[14px] font-bold text-gray-800">
                   Upload Video
                 </h3>
-                <p className="text-[12px] text-gray-500">MP4, MOV (Max 30MB)</p>
+                <p className="text-[12px] text-gray-500">MP4, MOV (Max 100MB)</p>
               </div>
               <input
                 type="file"

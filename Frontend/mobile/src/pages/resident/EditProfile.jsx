@@ -23,11 +23,18 @@ export default function EditProfile() {
     first_name: "",
     middle_name: "",
     last_name: "",
-    contact_number: "",
+    house_no: "",
     street: "",
+    contact_number: "",
     profile_picture: "",
     email: "",
   });
+
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+
+  const [nameSnapshot, setNameSnapshot] = useState(null);
+  const [addressSnapshot, setAddressSnapshot] = useState(null);
 
   const [profilePicturePreview, setProfilePicturePreview] = useState("");
   const [uploadingPicture, setUploadingPicture] = useState(false);
@@ -43,8 +50,9 @@ export default function EditProfile() {
           first_name: data.first_name || "",
           middle_name: data.middle_name || "",
           last_name: data.last_name || "",
-          contact_number: data.contact_number || "",
+          house_no: data.house_no || "",
           street: data.street || "",
+          contact_number: data.contact_number || "",
           profile_picture: data.profile_picture || "",
           email: data.email || "",
         });
@@ -65,7 +73,6 @@ export default function EditProfile() {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // Contact number restriction: digits only, max 11
     if (name === "contact_number") {
       const digitsOnly = value.replace(/\D/g, "").slice(0, 11);
       setFormData((prev) => ({ ...prev, contact_number: digitsOnly }));
@@ -73,6 +80,64 @@ export default function EditProfile() {
     }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const updateNameField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateAddressField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // ─── Name modal ───
+  const openNameModal = () => {
+    setNameSnapshot({
+      first_name: formData.first_name,
+      middle_name: formData.middle_name,
+      last_name: formData.last_name,
+    });
+    setShowNameModal(true);
+  };
+
+  const cancelNameModal = () => {
+    if (nameSnapshot) {
+      setFormData((prev) => ({
+        ...prev,
+        first_name: nameSnapshot.first_name,
+        middle_name: nameSnapshot.middle_name,
+        last_name: nameSnapshot.last_name,
+      }));
+    }
+    setShowNameModal(false);
+  };
+
+  const saveNameModal = () => {
+    setShowNameModal(false);
+  };
+
+  // ─── Address modal ───
+  const openAddressModal = () => {
+    setAddressSnapshot({
+      house_no: formData.house_no,
+      street: formData.street,
+    });
+    setShowAddressModal(true);
+  };
+
+  const cancelAddressModal = () => {
+    if (addressSnapshot) {
+      setFormData((prev) => ({
+        ...prev,
+        house_no: addressSnapshot.house_no,
+        street: addressSnapshot.street,
+      }));
+    }
+    setShowAddressModal(false);
+  };
+
+  const saveAddressModal = () => {
+    setShowAddressModal(false);
   };
 
   const handleProfilePictureUpload = async (e) => {
@@ -132,7 +197,6 @@ export default function EditProfile() {
     setError("");
     setSuccess(false);
 
-    // Validate contact number
     if (formData.contact_number) {
       const mobileRegex = /^(09)\d{9}$/;
       if (!mobileRegex.test(formData.contact_number)) {
@@ -143,17 +207,19 @@ export default function EditProfile() {
     }
 
     try {
-      const fullAddress = formData.street
-        ? `${formData.street}, ${BARANGAY_ADDRESS}`
+      const baseAddress = `${formData.house_no || ""} ${formData.street || ""}`.trim();
+      const fullAddress = baseAddress
+        ? `${baseAddress}, ${BARANGAY_ADDRESS}`
         : BARANGAY_ADDRESS;
 
       const updateData = {
         first_name: formData.first_name,
         middle_name: formData.middle_name,
         last_name: formData.last_name,
+        house_no: formData.house_no,
+        street: formData.street,
         contact_number: formData.contact_number,
         address: fullAddress,
-        street: formData.street,
         profile_picture: formData.profile_picture || null,
       };
 
@@ -247,53 +313,35 @@ export default function EditProfile() {
 
             <div className="space-y-7">
               <div>
-                <label className="block text-[13px] font-bold text-gray-800 mb-2">First Name</label>
-                <input
-                  type="text"
-                  name="first_name"
-                  value={formData.first_name}
-                  onChange={handleChange}
-                  className="w-full h-[52px] bg-white border border-[#C8DCC3] rounded-2xl px-4 text-[13px] outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10 transition"
-                  required
-                />
+                <label className="block text-[13px] font-bold text-gray-800 mb-2">Full Name</label>
+                <button
+                  type="button"
+                  onClick={openNameModal}
+                  className="w-full min-h-[52px] bg-white border border-[#C8DCC3] rounded-2xl px-4 py-3 text-left hover:border-[#0B5D2A] transition"
+                >
+                  <span className="text-[13px] text-gray-800 truncate block">
+                    {[formData.first_name, formData.middle_name, formData.last_name]
+                      .filter((n) => n && n.trim())
+                      .join(" ") || "Tap to set name"}
+                  </span>
+                </button>
               </div>
 
               <div>
-                <label className="block text-[13px] font-bold text-gray-800 mb-2">Middle Name</label>
-                <input
-                  type="text"
-                  name="middle_name"
-                  value={formData.middle_name}
-                  onChange={handleChange}
-                  className="w-full h-[52px] bg-white border border-[#C8DCC3] rounded-2xl px-4 text-[13px] outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10 transition"
-                />
+                <label className="block text-[13px] font-bold text-gray-800 mb-2">Address</label>
+                <button
+                  type="button"
+                  onClick={openAddressModal}
+                  className="w-full min-h-[52px] bg-white border border-[#C8DCC3] rounded-2xl px-4 py-3 text-left hover:border-[#0B5D2A] transition"
+                >
+                  <span className="text-[13px] text-gray-800 truncate block">
+                    {[formData.house_no, formData.street]
+                      .filter((n) => n && n.trim())
+                      .join(" ") || "Tap to set address"}
+                  </span>
+                </button>
               </div>
 
-              <div>
-                <label className="block text-[13px] font-bold text-gray-800 mb-2">Last Name</label>
-                <input
-                  type="text"
-                  name="last_name"
-                  value={formData.last_name}
-                  onChange={handleChange}
-                  className="w-full h-[52px] bg-white border border-[#C8DCC3] rounded-2xl px-4 text-[13px] outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10 transition"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-[13px] font-bold text-gray-800 mb-2">Email Address</label>
-                <input
-                  type="email"
-                  value={formData.email || "Not set"}
-                  className="w-full h-[52px] bg-gray-100 border border-gray-300 rounded-2xl px-4 text-[13px] text-gray-500 outline-none cursor-not-allowed"
-                  disabled
-                  readOnly
-                />
-                <p className="text-[10px] text-gray-400 mt-1">Email cannot be changed for security reasons</p>
-              </div>
-
-              {/* Contact Number */}
               <div>
                 <label className="block text-[13px] font-bold text-gray-800 mb-2">Contact Number</label>
                 <input
@@ -309,15 +357,15 @@ export default function EditProfile() {
               </div>
 
               <div>
-                <label className="block text-[13px] font-bold text-gray-800 mb-2">Street</label>
+                <label className="block text-[13px] font-bold text-gray-800 mb-2">Email Address</label>
                 <input
-                  type="text"
-                  name="street"
-                  value={formData.street}
-                  onChange={handleChange}
-                  placeholder="Enter your street (e.g., P. Gomez St.)"
-                  className="w-full h-[52px] bg-white border border-[#C8DCC3] rounded-2xl px-4 text-[13px] outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10 transition"
+                  type="email"
+                  value={formData.email || "Not set"}
+                  className="w-full h-[52px] bg-gray-100 border border-gray-300 rounded-2xl px-4 text-[13px] text-gray-500 outline-none cursor-not-allowed"
+                  disabled
+                  readOnly
                 />
+                <p className="text-[10px] text-gray-400 mt-1">Email cannot be changed for security reasons</p>
               </div>
             </div>
 
@@ -345,6 +393,154 @@ export default function EditProfile() {
         <div className="absolute bottom-3 left-0 right-0 flex justify-center pointer-events-none z-30">
           <div className="w-[70px] h-[5px] rounded-full bg-gray-800 opacity-70" />
         </div>
+
+        {/* ─── NAME MODAL ─── */}
+        {showNameModal && (
+          <div
+            className="fixed inset-0 bg-black/60 flex items-center justify-center"
+            style={{ zIndex: 9999, padding: "20px" }}
+            onClick={cancelNameModal}
+          >
+            <div
+              className="bg-white rounded-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl"
+              style={{ maxWidth: "340px", padding: "28px" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-[16px] font-extrabold text-[#0B5D2A]" style={{ marginBottom: "20px" }}>
+                Edit Full Name
+              </h3>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div>
+                  <label className="block text-[12px] font-bold text-gray-800" style={{ marginBottom: "6px" }}>
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.first_name}
+                    onChange={(e) => updateNameField("first_name", e.target.value)}
+                    className="w-full bg-white border border-[#C8DCC3] rounded-xl text-[13px] outline-none focus:border-[#0B5D2A]"
+                    style={{ height: "46px", padding: "0 12px" }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-bold text-gray-800" style={{ marginBottom: "6px" }}>
+                    Middle Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.middle_name}
+                    onChange={(e) => updateNameField("middle_name", e.target.value)}
+                    placeholder="N/A if none"
+                    className="w-full bg-white border border-[#C8DCC3] rounded-xl text-[13px] outline-none focus:border-[#0B5D2A]"
+                    style={{ height: "46px", padding: "0 12px" }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-bold text-gray-800" style={{ marginBottom: "6px" }}>
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.last_name}
+                    onChange={(e) => updateNameField("last_name", e.target.value)}
+                    className="w-full bg-white border border-[#C8DCC3] rounded-xl text-[13px] outline-none focus:border-[#0B5D2A]"
+                    style={{ height: "46px", padding: "0 12px" }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end" style={{ gap: "8px", marginTop: "24px" }}>
+                <button
+                  type="button"
+                  onClick={cancelNameModal}
+                  className="rounded-xl border border-gray-300 bg-white text-gray-700 font-bold text-[13px] hover:bg-gray-50 active:scale-95 transition"
+                  style={{ height: "42px", padding: "0 20px" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveNameModal}
+                  className="rounded-xl bg-[#0B5D2A] text-white font-bold text-[13px] hover:bg-[#084A21] active:scale-95 transition"
+                  style={{ height: "42px", padding: "0 20px" }}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── ADDRESS MODAL ─── */}
+        {showAddressModal && (
+          <div
+            className="fixed inset-0 bg-black/60 flex items-center justify-center"
+            style={{ zIndex: 9999, padding: "20px" }}
+            onClick={cancelAddressModal}
+          >
+            <div
+              className="bg-white rounded-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl"
+              style={{ maxWidth: "340px", padding: "28px" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-[16px] font-extrabold text-[#0B5D2A]" style={{ marginBottom: "20px" }}>
+                Edit Address
+              </h3>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div>
+                  <label className="block text-[12px] font-bold text-gray-800" style={{ marginBottom: "6px" }}>
+                    House Number
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.house_no}
+                    onChange={(e) => updateAddressField("house_no", e.target.value)}
+                    placeholder="e.g., 123"
+                    className="w-full bg-white border border-[#C8DCC3] rounded-xl text-[13px] outline-none focus:border-[#0B5D2A]"
+                    style={{ height: "46px", padding: "0 12px" }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-bold text-gray-800" style={{ marginBottom: "6px" }}>
+                    Street
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.street}
+                    onChange={(e) => updateAddressField("street", e.target.value)}
+                    placeholder="e.g., P. Gomez St."
+                    className="w-full bg-white border border-[#C8DCC3] rounded-xl text-[13px] outline-none focus:border-[#0B5D2A]"
+                    style={{ height: "46px", padding: "0 12px" }}
+                  />
+                </div>
+                <p className="text-[10px] text-gray-500 text-center" style={{ margin: 0 }}>
+                  Barangay is added automatically
+                </p>
+              </div>
+
+              <div className="flex justify-end" style={{ gap: "8px", marginTop: "24px" }}>
+                <button
+                  type="button"
+                  onClick={cancelAddressModal}
+                  className="rounded-xl border border-gray-300 bg-white text-gray-700 font-bold text-[13px] hover:bg-gray-50 active:scale-95 transition"
+                  style={{ height: "42px", padding: "0 20px" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveAddressModal}
+                  className="rounded-xl bg-[#0B5D2A] text-white font-bold text-[13px] hover:bg-[#084A21] active:scale-95 transition"
+                  style={{ height: "42px", padding: "0 20px" }}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

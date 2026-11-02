@@ -427,12 +427,44 @@ export default function Dashboard() {
         .month-labels { position: absolute; top: 86%; left: 0; right: 0; display: flex; justify-content: space-between; color: #555555; font-size: 9px; }
 
         @media (max-width: 1100px) {
-          .sidebar { width: 300px; min-width: 300px; }
           .main-content { width: calc(100vw - 300px); }
           .report-cards { left: 45px; right: 45px; gap: 10px; }
           .category-content { gap: 12px; }
           .pie-wrapper, .pie-chart { width: 140px; height: 140px; }
         }
+
+        @media (max-height: 850px) {
+          .welcome-section { height: 200px; }
+          .dashboard-lower { height: calc(100vh - 296px); }
+          .report-card { height: 90px; padding: 8px 9px; }
+          .report-title { font-size: 9px; }
+          .report-number { font-size: 18px; }
+          .report-description { font-size: 6px; margin-top: 3px; }
+          .welcome-text h1 { font-size: 15px; }
+          .welcome-text p { font-size: 10px; }
+        }
+
+        @media (max-height: 750px) {
+          .welcome-section { height: 170px; }
+          .dashboard-lower { height: calc(100vh - 256px); }
+          .report-card { height: 78px; }
+          .report-number { font-size: 16px; }
+          .category-panel { padding: 14px 16px; }
+          .category-panel h3 { font-size: 12px; margin-bottom: 6px; }
+          .pie-wrapper, .pie-chart { width: 130px; height: 130px; }
+          .monthly-panel { padding: 14px 16px; }
+          .monthly-title-row h3 { font-size: 12px; }
+        }
+
+        @media (max-height: 650px) {
+          .welcome-section { height: 150px; }
+          .dashboard-lower { height: calc(100vh - 236px); }
+          .report-card { height: 68px; }
+          .report-number { font-size: 14px; }
+          .report-title { font-size: 8px; }
+          .report-description { display: none; }
+        }
+
         @media (max-width: 850px) {
           body { overflow: auto; }
           .dashboard-page { width: 1100px; min-width: 1100px; height: 100vh; }

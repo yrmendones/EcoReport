@@ -44,7 +44,7 @@ exports.verifyQRToken = async (req, res) => {
         const [rows] = await db.query(
             `SELECT 
                 u.resident_id, u.first_name, u.middle_name, u.last_name,
-                u.address, u.contact_number,
+                u.address, u.permanent_address, u.contact_number,
                 u.is_verified, u.verification_status, u.registered_at
              FROM users u
              JOIN qr_tokens q ON u.user_id = q.user_id

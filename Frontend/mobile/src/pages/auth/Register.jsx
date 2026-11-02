@@ -1,40 +1,366 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  FaArrowLeft,
-  FaEye,
-  FaEyeSlash,
-  FaUpload,
-  FaCheck,
-  FaTimes,
+  FaArrowLeft, FaEye, FaEyeSlash, FaUpload, FaCheck, FaTimes, FaCamera, FaChevronDown, FaExclamationTriangle
 } from "react-icons/fa";
+import { PaddleOCR } from "@paddleocr/paddleocr-js";
+import * as faceapi from "face-api.js";
 import { apiFetch } from "../../api";
 
 const API_BASE = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_URL || "http://localhost:5000");
+
+const STREETS = [
+  "A. Mariano Street", "Alagao Street", "Apitong Street", "Ausmolo Compound", "Austria Compound",
+  "Banaba Street", "C. Lorenzo Street", "Camia Street", "Capitan E. Alvero Street",
+  "Capitan S. Cortez Street", "Chico Street", "College Street", "Concepcion Compound", "Duhat Street",
+  "E. Mendoza Street", "F. C. Tuazon Street", "F. Flores Street", "F. T. Angeles Street",
+  "G. Bunyi Street", "G. Conching Street", "Lieutenant J. Tiamsic Street", "Masaya Avenue",
+  "M. Armada Street", "M. Lozada Street", "M. R. Flores Street", "M. Tanangco Street",
+  "Talibong Street", "2nd Avenue", "3rd Avenue", "4th Avenue", "8th Avenue",
+  "9th Avenue", "10th Avenue", "12th Avenue", "13th Avenue", "14th Avenue",
+  "15th Avenue", "16th Avenue", "17th Avenue", "18th Avenue", "19th Avenue",
+  "20th Avenue", "21st Avenue", "22nd Avenue", "23rd Avenue"
+];
+
+const ID_TYPE_KEYWORDS = {
+  "Barangay ID": ["BARANGAY", "BRGY"],
+  "Driver's License": ["DRIVER", "LICENSE", "LTO"],
+  "ePhilID / Digital National ID": ["EPHILID", "PHILID", "PHILSYS", "PHILIPPINE IDENTIFICATION", "PAMBANSANG PAGKAKAKILANLAN"],
+  "National ID (PhilID)": ["PHILID", "PHILSYS", "PHILIPPINE IDENTIFICATION", "NATIONAL ID", "PAMBANSANG PAGKAKAKILANLAN"],
+  "National Police Clearance": ["POLICE", "CLEARANCE", "PNP"],
+  "PWD ID": ["PWD", "PERSON WITH DISABILITY", "DISABILITY"],
+  "Postal ID": ["POSTAL", "PHLPOST"],
+  "Senior Citizen ID": ["SENIOR", "OSCA"],
+  "Unified Multi-Purpose ID (UMID)": ["UMID", "UNIFIED MULTI-PURPOSE", "SSS", "GSIS"],
+};
+
+const PH_MARKERS = [
+  "REPUBLIC OF THE PHILIPPINES", "REPUBLIKA NG PILIPINAS", "PHILIPPINES", "PILIPINAS", "PAMBANSANG PAGKAKAKILANLAN"
+];
+
+function normalizeText(s) {
+  return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, ""); 
+}
+
+function looksLikeValidId(ocrText, idType) {
+  const text = normalizeText(ocrText);
+  const keywords = (ID_TYPE_KEYWORDS[idType] || []).map(normalizeText);
+  const hasIdKeyword = keywords.some((k) => text.includes(k));
+  const hasPhMarker = PH_MARKERS.map(normalizeText).some((m) => text.includes(m));
+  return hasIdKeyword || hasPhMarker;
+}
+
+function matchesName(ocrText, formData) {
+  const text = normalizeText(ocrText);
+  const first = normalizeText(formData.first_name);
+  const last = normalizeText(formData.last_name);
+  const middle = normalizeText(formData.middle_name);
+
+  const firstMatch = first ? text.includes(first) : true;
+  const lastMatch = last ? text.includes(last) : true;
+  const midIsBlank = !middle || middle === "na" || middle === "n/a";
+  let middleMatch = true;
+  
+  if (!midIsBlank) {
+    middleMatch = text.includes(middle) || text.includes(middle.charAt(0));
+  }
+
+  const passed = firstMatch && lastMatch && middleMatch;
+  const missing = [];
+  if (!firstMatch) missing.push("first name");
+  if (!lastMatch) missing.push("last name");
+  if (!middleMatch) missing.push("middle name");
+
+  return { passed, missing };
+}
+
+function preprocessIdImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const maxDim = 1600;
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.85);
+    };
+    img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
+  });
+}
 
 export default function Register() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    first_name: "",
-    middle_name: "",
-    last_name: "",
-    house_no: "",
-    street: "",
-    contact_number: "",
-    email: "",
-    password: "",
-    confirm_password: "",
+    first_name: "", middle_name: "", last_name: "", house_no: "", street: "",
+    permanent_address: "", contact_number: "", email: "", password: "", confirm_password: "", id_type: "",
   });
-
-  const [residentIdFile, setResidentIdFile] = useState(null);
-  const [residentIdPreview, setResidentIdPreview] = useState(null);
+  const [sameAsCurrent, setSameAsCurrent] = useState(false);
+  const [showStreetDropdown, setShowStreetDropdown] = useState(false);
+  
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // ─── OCR State ───
+  const [residentIdFile, setResidentIdFile] = useState(null);
+  const [residentIdPreview, setResidentIdPreview] = useState(null);
+  const [ocrText, setOcrText] = useState("");
+  const [ocrScanStatus, setOcrScanStatus] = useState("idle"); 
+  const [ocrScanError, setOcrScanError] = useState("");
+  const [ocrValidation, setOcrValidation] = useState({ passed: false, reason: "" });
+  const ocrRunIdRef = useRef(0);
+  const ocrEngineRef = useRef(null);
+
+  // ─── Face-api State ───
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [idDescriptor, setIdDescriptor] = useState(null);
+  const [idFaceFound, setIdFaceFound] = useState(false);
+  const [idFaceProcessing, setIdFaceProcessing] = useState(false);
+  const [idFaceError, setIdFaceError] = useState("");
+  
+  const [showSelfie, setShowSelfie] = useState(false);
+  const [selfieCaptured, setSelfieCaptured] = useState(null);
+  const [matchDistance, setMatchDistance] = useState(null);
+  
+  // Camera States
+  const [isFaceDetected, setIsFaceDetected] = useState(false);
+  const [modalError, setModalError] = useState("");
+  const latestDetectionRef = useRef(null);
+  
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const MODEL_URL = "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights";
+        await Promise.all([
+          // SSD is used for ID faces (better on small/printed faces than Tiny)
+          faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+          // Tiny is still used for the live selfie feed (fast, face is big)
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+        ]);
+        setModelsLoaded(true);
+      } catch (err) {
+        console.error("Failed to load face-api models:", err);
+      }
+    };
+    loadModels();
+  }, []);
+
+  const getOcrEngine = async () => {
+    if (ocrEngineRef.current) return ocrEngineRef.current;
+    const engine = await PaddleOCR.create({ lang: "en", ocrVersion: "PP-OCRv5", ortOptions: { backend: "wasm" } });
+    ocrEngineRef.current = engine;
+    return engine;
+  };
+
+  const processIdFace = async (file) => {
+    if (!modelsLoaded) return;
+    setIdFaceProcessing(true);
+    setIdFaceFound(false);
+    setIdDescriptor(null);
+    setIdFaceError("");
+    try {
+      const img = await faceapi.bufferToImage(file);
+      const detection = await faceapi
+        .detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (!detection) {
+        setIdFaceFound(false);
+        setIdFaceError(
+          "No face detected on this ID. Please retake the photo in a well-lit area."
+        );
+        return;
+      }
+
+      // Reject tiny faces — the descriptor on a <80px face is noise,
+      // which is what lets wrong faces "match" by accident.
+      const box = detection.detection.box;
+      if (box.width < 80 || box.height < 80) {
+        setIdFaceFound(false);
+        setIdDescriptor(null);
+        setIdFaceError(
+          `The face on your ID is too small (${Math.round(box.width)}×${Math.round(box.height)}px). ` +
+          "Please retake the photo closer so the entire ID fills the frame."
+        );
+        return;
+      }
+
+      setIdDescriptor(detection.descriptor);
+      setIdFaceFound(true);
+    } catch (err) {
+      console.error("Error processing ID face:", err);
+      setIdFaceFound(false);
+      setIdFaceError("Couldn't analyze the ID photo. Please try again.");
+    } finally {
+      setIdFaceProcessing(false);
+    }
+  };
+
+  const runIdOcr = async (file) => {
+    if (!file) return;
+    const runId = ++ocrRunIdRef.current;
+    setOcrScanStatus("scanning");
+    setOcrScanError("");
+    setOcrText("");
+    setOcrValidation({ passed: false, reason: "" });
+
+    try {
+      const blob = await preprocessIdImage(file);
+      const engine = await getOcrEngine();
+      if (runId !== ocrRunIdRef.current) return;
+
+      const result = await engine.predict(blob);
+      if (runId !== ocrRunIdRef.current) return;
+
+      const data = Array.isArray(result) ? result[0] : result;
+      const items = data?.items || [];
+      const text = items.map((i) => i.text || "").join(" ");
+
+      setOcrText(text);
+      setOcrScanStatus("done");
+    } catch (err) {
+      if (runId !== ocrRunIdRef.current) return;
+      setOcrScanStatus("error");
+      setOcrScanError("Couldn't read the ID photo. Please retake it.");
+    }
+  };
+
+  useEffect(() => {
+    if (ocrScanStatus !== "done" || !ocrText) {
+      setOcrValidation({ passed: false, reason: "" });
+      return;
+    }
+    const idOk = looksLikeValidId(ocrText, formData.id_type);
+    if (!idOk) {
+      setOcrValidation({ passed: false, reason: "This doesn't look like a valid ID." });
+      return;
+    }
+    const nameOk = matchesName(ocrText, formData);
+    if (!nameOk.passed) {
+      setOcrValidation({ passed: false, reason: `Name doesn't match (missing: ${nameOk.missing.join(", ")}).` });
+      return;
+    }
+    setOcrValidation({ passed: true, reason: "" });
+  }, [ocrText, ocrScanStatus, formData.first_name, formData.middle_name, formData.last_name, formData.id_type]);
+
+  useEffect(() => {
+    if (!showSelfie || !modelsLoaded) return;
+    let stream;
+    let cancelled = false;
+
+    const startCamera = async () => {
+      setModalError("");
+      setIsFaceDetected(false);
+      
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 720 } },
+          audio: false,
+        });
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play().catch(() => {});
+        }
+
+        intervalRef.current = setInterval(async () => {
+          if (cancelled || !videoRef.current) return;
+          
+          const detection = await faceapi.detectSingleFace(
+            videoRef.current, 
+            new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
+          ).withFaceLandmarks().withFaceDescriptor();
+
+          if (detection) {
+            setIsFaceDetected(true);
+            latestDetectionRef.current = detection; 
+          } else {
+            setIsFaceDetected(false);
+            latestDetectionRef.current = null;
+          }
+        }, 300);
+      } catch (err) {
+        if (cancelled) return;
+        setModalError("Unable to access camera. Please allow permission.");
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      cancelled = true;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      if (videoRef.current) videoRef.current.srcObject = null;
+      latestDetectionRef.current = null;
+    };
+  }, [showSelfie, modelsLoaded]);
+
+  const handleCaptureFace = () => {
+    if (!latestDetectionRef.current) return;
+
+    if (!idDescriptor) {
+      setModalError("System could not detect a face on your uploaded ID. Please retake your ID photo.");
+      return;
+    }
+
+    const detection = latestDetectionRef.current;
+    const distance = faceapi.euclideanDistance(idDescriptor, detection.descriptor);
+
+    const MATCH_THRESHOLD = 0.55;
+    const verdict = distance <= MATCH_THRESHOLD ? "MATCH" : "MISMATCH";
+    console.log(
+      `[Face Match] distance = ${distance.toFixed(3)} | threshold = ${MATCH_THRESHOLD} | ${verdict}`
+    );
+
+    if (distance > MATCH_THRESHOLD) {
+      setModalError(
+        `Face does not match the ID (score ${distance.toFixed(2)}, threshold ${MATCH_THRESHOLD}). ` +
+        "Try again with better lighting and hold the camera closer. " +
+        "If it still fails, a barangay official can verify you in person using your QR code."
+      );
+      return;
+    }
+
+    setMatchDistance(distance);
+    
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    setSelfieCaptured(canvas.toDataURL("image/jpeg", 0.85));
+    
+    closeSelfieModal();
+  };
+
+  const closeSelfieModal = () => {
+    setShowSelfie(false);
+    setModalError("");
+    if (intervalRef.current) clearInterval(intervalRef.current);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -47,55 +373,78 @@ export default function Register() {
       return;
     }
 
-    setFormData({ ...formData, [name]: value });
+    const newFormData = { ...formData, [name]: value };
+
+    if (sameAsCurrent && (name === "house_no" || name === "street")) {
+      const current = `${newFormData.house_no || ""} ${newFormData.street || ""}`.trim();
+      newFormData.permanent_address = current ? `${current}, P. Sto. Rosario Kanluran, Pateros` : "";
+    }
+
+    setFormData(newFormData);
+  };
+
+  const handleStreetSelect = (street) => {
+    const newFormData = { ...formData, street };
+    if (sameAsCurrent) {
+      const current = `${newFormData.house_no || ""} ${street}`.trim();
+      newFormData.permanent_address = current ? `${current}, P. Sto. Rosario Kanluran, Pateros` : "";
+    }
+    setFormData(newFormData);
+    setShowStreetDropdown(false);
+  };
+
+  const handleSameAsCurrent = (checked) => {
+    setSameAsCurrent(checked);
+    if (checked) {
+      const current = `${formData.house_no || ""} ${formData.street || ""}`.trim();
+      const full = current ? `${current}, P. Sto. Rosario Kanluran, Pateros` : "";
+      setFormData((prev) => ({ ...prev, permanent_address: full }));
+    } else {
+      setFormData((prev) => ({ ...prev, permanent_address: "" }));
+    }
   };
 
   const handleResidentIdUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    const validTypes = ["image/jpeg", "image/png", "image/jpg"];
-    if (!validTypes.includes(file.type)) {
-      alert("Please upload a valid image file (JPG, JPEG, PNG).");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert("File size must be less than 5MB.");
-      return;
-    }
+    if (!["image/jpeg", "image/png", "image/jpg"].includes(file.type)) return alert("Please upload a valid image.");
+    if (file.size > 5 * 1024 * 1024) return alert("File size must be less than 5MB.");
 
     setResidentIdFile(file);
     const reader = new FileReader();
-    reader.onload = () => {
-      setResidentIdPreview(reader.result);
-    };
+    reader.onload = () => setResidentIdPreview(reader.result);
     reader.readAsDataURL(file);
+
+    runIdOcr(file);
+    processIdFace(file);
   };
 
   const removeResidentId = () => {
+    ocrRunIdRef.current += 1;
     setResidentIdFile(null);
     setResidentIdPreview(null);
-    const fileInput = document.getElementById("resident-id-input");
-    if (fileInput) fileInput.value = "";
+    setIdDescriptor(null);
+    setIdFaceFound(false);
+    setIdFaceError("");
+    setOcrText("");
+    setOcrScanStatus("idle");
+    setOcrValidation({ passed: false, reason: "" });
+    document.getElementById("resident-id-camera").value = "";
+    document.getElementById("resident-id-upload").value = "";
   };
 
-  const uploadResidentId = async () => {
-    if (!residentIdFile) return null;
-    try {
-      const fd = new FormData();
-      fd.append("files", residentIdFile);
-      const response = await fetch(`${API_BASE}/api/guest/upload`, {
-        method: "POST",
-        body: fd,
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "ID upload failed.");
-      return data.files?.[0]?.url || null;
-    } catch (err) {
-      console.error("ID upload error:", err);
-      throw err;
-    }
+  const uploadToCloudinary = async (base64String, filename) => {
+    const res = await fetch(base64String);
+    const blob = await res.blob();
+    const file = new File([blob], filename, { type: "image/jpeg" });
+
+    const fd = new FormData();
+    fd.append("files", file);
+
+    const response = await fetch(`${API_BASE}/api/guest/upload`, { method: "POST", body: fd });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Upload failed.");
+    return data.files?.[0]?.url || null;
   };
 
   const isFormComplete =
@@ -104,11 +453,15 @@ export default function Register() {
     formData.last_name.trim() !== "" &&
     formData.house_no.trim() !== "" &&
     formData.street.trim() !== "" &&
+    formData.permanent_address.trim() !== "" &&
     formData.contact_number.trim() !== "" &&
     formData.email.trim() !== "" &&
     formData.password !== "" &&
     formData.confirm_password !== "" &&
+    formData.id_type.trim() !== "" &&
     residentIdFile !== null &&
+    ocrValidation.passed === true &&
+    selfieCaptured !== null &&
     agreedToTerms === true;
 
   const handleRegister = async (e) => {
@@ -116,663 +469,408 @@ export default function Register() {
     setLoading(true);
     setError("");
 
-    const requiredFields = [
-      { key: "first_name", label: "First Name" },
-      { key: "middle_name", label: "Middle Name (type N/A if you don't have one)" },
-      { key: "last_name", label: "Last Name" },
-      { key: "house_no", label: "House Number" },
-      { key: "street", label: "Street" },
-      { key: "contact_number", label: "Contact Number" },
-      { key: "email", label: "Email Address" },
-      { key: "password", label: "Password" },
-      { key: "confirm_password", label: "Confirm Password" },
-    ];
-
-    for (const field of requiredFields) {
-      if (!formData[field.key] || !String(formData[field.key]).trim()) {
-        setError(`Please fill in ${field.label}.`);
-        setLoading(false);
-        return;
-      }
-    }
-
-    const mobileRegex = /^(09)\d{9}$/;
-    if (!mobileRegex.test(formData.contact_number)) {
-      setError("Contact number must be 11 digits starting with 09.");
-      setLoading(false);
-      return;
-    }
-
-    if (formData.password.length < 8 || formData.password.length > 16) {
-      setError("Password must be between 8 and 16 characters.");
-      setLoading(false);
-      return;
-    }
-
     if (formData.password !== formData.confirm_password) {
-      setError("Passwords do not match.");
-      setLoading(false);
-      return;
+      setError("Passwords do not match."); setLoading(false); return;
     }
-
-    if (!residentIdFile) {
-      setError("Please upload your Resident ID (a photo of any valid ID).");
-      setLoading(false);
-      return;
-    }
-
-    if (!agreedToTerms) {
-      setError("Please agree to Terms & Conditions before registering.");
-      setLoading(false);
-      return;
+    if (!ocrValidation.passed) {
+      setError(ocrValidation.reason || "Please wait for ID verification."); setLoading(false); return;
     }
 
     try {
-      const valid_id_url = await uploadResidentId();
-      const payload = { ...formData, valid_id_url };
+      const fd = new FormData();
+      fd.append("files", residentIdFile);
+      const idRes = await fetch(`${API_BASE}/api/guest/upload`, { method: "POST", body: fd });
+      const idData = await idRes.json();
+      if (!idRes.ok) throw new Error("ID upload failed.");
+      const valid_id_url = idData.files?.[0]?.url;
+
+      const selfie_url = await uploadToCloudinary(selfieCaptured, "selfie.jpg");
+
       await apiFetch("/api/auth/register", {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...formData, valid_id_url, selfie_image: selfie_url }),
       });
 
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       navigate("/resident-login");
     } catch (err) {
-      setError(err.message || "Registration failed. Please try again.");
+      setError(err.message || "Registration failed.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAgreeInModal = () => {
-    setAgreedToTerms(true);
-    setShowTermsModal(false);
-  };
+  const filteredStreets = STREETS.filter(s => s.toLowerCase().includes(formData.street.toLowerCase()));
 
   return (
     <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center p-4">
       <div className="relative w-[390px] max-w-full h-[844px] max-h-[calc(100dvh-2rem)] bg-[#F8FAF8] rounded-[40px] shadow-2xl overflow-hidden border-[6px] border-white flex flex-col">
         <header className="shrink-0 bg-[#F8FAF8] px-6 pt-5 pb-3">
           <div className="h-[42px] flex items-center">
-            <button
-              type="button"
-              onClick={() => navigate("/resident-login")}
-              className="w-10 h-10 flex items-center justify-center rounded-full text-[#0B5D2A] text-xl hover:bg-[#E8F3E5] active:scale-95 transition"
-              aria-label="Back to Resident Login"
-            >
+            <button onClick={() => navigate("/resident-login")} className="w-10 h-10 flex items-center justify-center rounded-full text-[#0B5D2A] text-xl hover:bg-[#E8F3E5] transition">
               <FaArrowLeft />
             </button>
           </div>
-
           <div className="mt-5 text-center">
-            <h1 className="text-[#0B5D2A] text-[21px] font-extrabold leading-tight">
-              Resident Registration
-            </h1>
+            <h1 className="text-[#0B5D2A] text-[21px] font-extrabold">Resident Registration</h1>
           </div>
         </header>
 
         <main className="flex-1 min-h-0 overflow-y-auto px-6">
           <form id="register-form" onSubmit={handleRegister} className="space-y-3 pt-1 pb-6">
-            {error && (
-              <div className="p-3 bg-red-100 border border-red-400 rounded-lg text-red-700 text-sm">
-                {error}
-              </div>
-            )}
+            {error && <div className="p-3 bg-red-100 border border-red-400 rounded-lg text-red-700 text-sm">{error}</div>}
 
             <div>
-              <label className="block text-[#0B5D2A] text-sm font-bold mb-1">
-                First Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="first_name"
-                value={formData.first_name}
-                onChange={handleChange}
-                placeholder="Enter first name"
-                className="w-full h-[43px] px-4 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none focus:ring-2 focus:ring-[#0B5D2A]/20"
-                required
-              />
+              <label htmlFor="first_name" className="block text-[#0B5D2A] text-sm font-bold mb-1">First Name <span className="text-red-500">*</span></label>
+              <input id="first_name" name="first_name" value={formData.first_name} onChange={handleChange} placeholder="Enter first name" className="w-full h-[43px] px-4 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none focus:ring-2 focus:ring-[#0B5D2A]/20" required />
             </div>
 
             <div>
-              <label className="block text-[#0B5D2A] text-sm font-bold mb-1">
-                Middle Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="middle_name"
-                value={formData.middle_name}
-                onChange={handleChange}
-                placeholder="Enter middle name (or N/A if none)"
-                className="w-full h-[43px] px-4 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none"
-                required
-              />
+              <label htmlFor="middle_name" className="block text-[#0B5D2A] text-sm font-bold mb-1">Middle Name <span className="text-red-500">*</span></label>
+              <input id="middle_name" name="middle_name" value={formData.middle_name} onChange={handleChange} placeholder="Enter middle name (or N/A)" className="w-full h-[43px] px-4 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none" required />
             </div>
 
             <div>
-              <label className="block text-[#0B5D2A] text-sm font-bold mb-1">
-                Last Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="last_name"
-                value={formData.last_name}
-                onChange={handleChange}
-                placeholder="Enter last name"
-                className="w-full h-[43px] px-4 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none"
-                required
-              />
+              <label htmlFor="last_name" className="block text-[#0B5D2A] text-sm font-bold mb-1">Last Name <span className="text-red-500">*</span></label>
+              <input id="last_name" name="last_name" value={formData.last_name} onChange={handleChange} placeholder="Enter last name" className="w-full h-[43px] px-4 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none" required />
             </div>
 
             <div>
-              <label className="block text-[#0B5D2A] text-sm font-bold mb-1">
-                House Number <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="house_no"
-                value={formData.house_no}
-                onChange={handleChange}
-                placeholder="Enter house number"
-                className="w-full h-[43px] px-4 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none"
-                required
-              />
+              <label htmlFor="house_no" className="block text-[#0B5D2A] text-sm font-bold mb-1">House Number <span className="text-red-500">*</span></label>
+              <input id="house_no" name="house_no" value={formData.house_no} onChange={handleChange} placeholder="Enter house number" className="w-full h-[43px] px-4 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none" required />
             </div>
 
-            <div>
-              <label className="block text-[#0B5D2A] text-sm font-bold mb-1">
-                Street <span className="text-red-500">*</span>
-              </label>
+            <div className="relative">
+              <label htmlFor="street" className="block text-[#0B5D2A] text-sm font-bold mb-1">Street <span className="text-red-500">*</span></label>
               <input
-                type="text"
+                id="street"
                 name="street"
                 value={formData.street}
-                onChange={handleChange}
-                placeholder="Enter street"
+                onChange={(e) => { setFormData({ ...formData, street: e.target.value }); setShowStreetDropdown(true); }}
+                onFocus={() => setShowStreetDropdown(true)}
+                placeholder="Search or select street..."
                 className="w-full h-[43px] px-4 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none"
                 required
               />
+              {showStreetDropdown && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowStreetDropdown(false)}></div>
+                  <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {filteredStreets.length > 0 ? (
+                      filteredStreets.map(s => (
+                        <div key={s} onClick={() => handleStreetSelect(s)} className="px-4 py-2 text-sm text-gray-700 hover:bg-[#F3F8F1] cursor-pointer">
+                          {s}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-2 text-sm text-gray-500">No streets found.</div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             <div>
-              <label className="block text-[#0B5D2A] text-sm font-bold mb-1">
-                Contact Number <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="tel"
-                name="contact_number"
-                value={formData.contact_number}
-                onChange={handleChange}
-                placeholder="Enter Phone Number"
-                maxLength={11}
-                inputMode="numeric"
-                className="w-full h-[43px] px-4 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none focus:ring-2 focus:ring-[#0B5D2A]/20"
-                required
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="permanent_address" className="block text-[#0B5D2A] text-sm font-bold">Permanent Address <span className="text-red-500">*</span></label>
+                <label className="flex items-center gap-1.5 text-[11px] text-gray-600 cursor-pointer select-none">
+                  <input type="checkbox" checked={sameAsCurrent} onChange={(e) => handleSameAsCurrent(e.target.checked)} className="w-4 h-4 accent-[#0B5D2A] cursor-pointer" />
+                  Same as above
+                </label>
+              </div>
+              <input id="permanent_address" name="permanent_address" value={formData.permanent_address} onChange={handleChange} placeholder="Enter permanent address" disabled={sameAsCurrent} className={`w-full h-[43px] px-4 rounded-lg border border-[#8BB37A] text-sm outline-none ${sameAsCurrent ? "bg-gray-100 text-gray-500" : "bg-white"}`} required />
             </div>
 
             <div>
-              <label className="block text-[#0B5D2A] text-sm font-bold mb-1">
-                Email Address <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter email address"
-                className="w-full h-[43px] px-4 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none focus:ring-2 focus:ring-[#0B5D2A]/20"
-                required
-              />
+              <label htmlFor="contact_number" className="block text-[#0B5D2A] text-sm font-bold mb-1">Contact Number <span className="text-red-500">*</span></label>
+              <input id="contact_number" name="contact_number" value={formData.contact_number} onChange={handleChange} placeholder="Enter Phone Number" maxLength={11} inputMode="numeric" className="w-full h-[43px] px-4 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none focus:ring-2 focus:ring-[#0B5D2A]/20" required />
             </div>
 
             <div>
-              <label className="block text-[#0B5D2A] text-sm font-bold mb-1">
-                Password <span className="text-red-500">*</span>
-              </label>
+              <label htmlFor="email" className="block text-[#0B5D2A] text-sm font-bold mb-1">Email Address <span className="text-red-500">*</span></label>
+              <input id="email" name="email" type="email" value={formData.email} onChange={handleChange} placeholder="Enter email address" className="w-full h-[43px] px-4 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none focus:ring-2 focus:ring-[#0B5D2A]/20" required />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-[#0B5D2A] text-sm font-bold mb-1">Password <span className="text-red-500">*</span></label>
               <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Enter password (8-16 characters)"
-                  maxLength={16}
-                  className="w-full h-[43px] px-4 pr-12 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none focus:ring-2 focus:ring-[#0B5D2A]/20"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#0B5D2A]"
-                >
-                  {showPassword ? <FaEyeSlash /> : <FaEye />}
-                </button>
+                <input id="password" name="password" type={showPassword ? "text" : "password"} value={formData.password} onChange={handleChange} placeholder="Enter password (8-16 characters)" maxLength={16} autoComplete="new-password" className="w-full h-[43px] px-4 pr-12 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none focus:ring-2 focus:ring-[#0B5D2A]/20" required />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#0B5D2A]">{showPassword ? <FaEyeSlash /> : <FaEye />}</button>
               </div>
             </div>
 
             <div>
-              <label className="block text-[#0B5D2A] text-sm font-bold mb-1">
-                Confirm Password <span className="text-red-500">*</span>
-              </label>
+              <label htmlFor="confirm_password" className="block text-[#0B5D2A] text-sm font-bold mb-1">Confirm Password <span className="text-red-500">*</span></label>
               <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  name="confirm_password"
-                  value={formData.confirm_password}
-                  onChange={handleChange}
-                  placeholder="Confirm password"
-                  maxLength={16}
-                  className="w-full h-[43px] px-4 pr-12 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none focus:ring-2 focus:ring-[#0B5D2A]/20"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#0B5D2A]"
-                >
-                  {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
-                </button>
+                <input id="confirm_password" name="confirm_password" type={showConfirmPassword ? "text" : "password"} value={formData.confirm_password} onChange={handleChange} placeholder="Confirm password" maxLength={16} autoComplete="new-password" className="w-full h-[43px] px-4 pr-12 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none focus:ring-2 focus:ring-[#0B5D2A]/20" required />
+                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#0B5D2A]">{showConfirmPassword ? <FaEyeSlash /> : <FaEye />}</button>
               </div>
             </div>
 
             <div>
-              <label className="block text-[#0B5D2A] text-sm font-bold mb-1">
-                Upload Resident ID <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="resident-id-input"
-                type="file"
-                accept="image/jpeg,image/png,image/jpg"
-                onChange={handleResidentIdUpload}
-                className="hidden"
-              />
+              <label htmlFor="id_type" className="block text-[#0B5D2A] text-sm font-bold mb-1">Type of Resident ID <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <select id="id_type" name="id_type" value={formData.id_type} onChange={handleChange} className="w-full h-[43px] px-4 pr-10 rounded-lg border border-[#8BB37A] bg-white text-sm outline-none focus:ring-2 focus:ring-[#0B5D2A]/20 appearance-none" required>
+                  <option value="">Select ID type</option>
+                  <option value="Barangay ID">Barangay ID</option>
+                  <option value="Driver's License">Driver's License</option>
+                  <option value="ePhilID / Digital National ID">ePhilID / Digital National ID</option>
+                  <option value="National ID (PhilID)">National ID (PhilID)</option>
+                  <option value="National Police Clearance">National Police Clearance</option>
+                  <option value="PWD ID">PWD ID</option>
+                  <option value="Postal ID">Postal ID</option>
+                  <option value="Senior Citizen ID">Senior Citizen ID</option>
+                  <option value="Unified Multi-Purpose ID (UMID)">Unified Multi-Purpose ID (UMID)</option>
+                </select>
+                <FaChevronDown size={12} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#0B5D2A] pointer-events-none" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[#0B5D2A] text-sm font-bold mb-1">Upload Resident ID <span className="text-red-500">*</span></label>
+              <input id="resident-id-camera" type="file" accept="image/jpeg,image/png,image/jpg" capture="environment" onChange={handleResidentIdUpload} className="hidden" />
+              <input id="resident-id-upload" type="file" accept="image/jpeg,image/png,image/jpg" onChange={handleResidentIdUpload} className="hidden" />
+
               {residentIdPreview ? (
                 <div className="relative">
-                  <img
-                    src={residentIdPreview}
-                    alt="Resident ID Preview"
-                    className="w-full h-[150px] rounded-lg border border-[#8BB37A] object-cover bg-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={removeResidentId}
-                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-500 text-white font-bold text-sm flex items-center justify-center hover:bg-red-600 transition"
-                  >
-                    ✕
-                  </button>
+                  <img src={residentIdPreview} alt="Resident ID Preview" className="w-full h-[150px] rounded-lg border border-[#8BB37A] object-cover bg-white" />
+                  <button type="button" onClick={removeResidentId} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-500 text-white font-bold text-sm flex items-center justify-center">✕</button>
+                  
+                  {idFaceProcessing && <div className="mt-2 text-xs text-blue-600">Analyzing ID face...</div>}
+                  
+                  {!idFaceProcessing && !idFaceFound && residentIdPreview && (
+                    <div className="mt-2 flex items-start gap-2 p-2 rounded-lg bg-red-50 border border-red-300 text-red-700 text-xs">
+                      <FaExclamationTriangle className="mt-0.5 shrink-0" size={12} />
+                      <span>{idFaceError || "No face detected on this ID. Please upload a clearer photo."}</span>
+                    </div>
+                  )}
+                  {!idFaceProcessing && idFaceFound && (
+                    <div className="mt-2 flex items-center gap-2 p-2 rounded-lg bg-green-50 border border-green-300 text-green-700 text-xs">
+                      <FaCheck size={11} /> <span>Face found on ID.</span>
+                    </div>
+                  )}
+
+                  {ocrScanStatus === "scanning" && <div className="mt-2 p-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-xs">Reading ID text...</div>}
+                  {ocrScanStatus === "error" && <div className="mt-2 p-2 rounded-lg bg-red-50 border border-red-300 text-red-700 text-xs">{ocrScanError}</div>}
+                  {ocrScanStatus === "done" && ocrValidation.passed && (
+                    <div className="mt-2 flex items-center gap-2 p-2 rounded-lg bg-green-50 border border-green-300 text-green-700 text-xs">
+                      <FaCheck size={11} /> <span>ID text verified.</span>
+                    </div>
+                  )}
+                  {ocrScanStatus === "done" && !ocrValidation.passed && (
+                    <div className="mt-2 p-2 rounded-lg bg-red-50 border border-red-300 text-red-700 text-xs">{ocrValidation.reason}</div>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <label htmlFor="resident-id-camera" className="h-[82px] rounded-lg border border-[#8BB37A] bg-white flex flex-col items-center justify-center text-[#0B5D2A] hover:bg-[#F3F8F1] cursor-pointer">
+                    <FaCamera size={20} /><span className="font-bold text-[11px] mt-1">TAKE PHOTO</span>
+                  </label>
+                  <label htmlFor="resident-id-upload" className="h-[82px] rounded-lg border border-[#8BB37A] bg-white flex flex-col items-center justify-center text-[#0B5D2A] hover:bg-[#F3F8F1] cursor-pointer">
+                    <FaUpload size={20} /><span className="font-bold text-[11px] mt-1">UPLOAD FILE</span>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-[#0B5D2A] text-sm font-bold mb-1">Face Verification <span className="text-red-500">*</span></label>
+              {selfieCaptured ? (
+                <div className="relative">
+                  <img src={selfieCaptured} alt="Selfie Preview" className="w-full h-[150px] rounded-lg border border-[#8BB37A] object-cover bg-white" />
+                  <button type="button" onClick={() => { setSelfieCaptured(null); setMatchDistance(null); }} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center">✕</button>
                   <div className="mt-2 flex items-center gap-2 text-green-600 text-xs">
-                    <FaCheck size={12} />
-                    <span>File uploaded successfully</span>
+                    <FaCheck size={12} /> <span>Face matched. (Distance: {matchDistance?.toFixed(2)})</span>
                   </div>
                 </div>
               ) : (
-                <label
-                  htmlFor="resident-id-input"
-                  className="w-full h-[82px] rounded-lg border border-[#8BB37A] bg-white flex flex-col items-center justify-center text-[#0B5D2A] hover:bg-[#F3F8F1] transition cursor-pointer"
-                >
-                  <FaUpload size={22} />
-                  <span className="font-bold text-sm mt-1">UPLOAD FILE</span>
-                  <span className="text-xs text-gray-500">JPG, PNG (Max. 5MB)</span>
-                </label>
+                <button type="button" onClick={() => setShowSelfie(true)} disabled={!modelsLoaded || !idFaceFound} className="w-full h-[82px] rounded-lg border border-[#8BB37A] bg-white flex flex-col items-center justify-center text-[#0B5D2A] disabled:opacity-50 hover:bg-[#F3F8F1]">
+                  <FaCamera size={22} />
+                  <span className="font-bold text-sm mt-1">{idFaceFound ? "CAPTURE LIVE FACE" : "Upload a clear ID first"}</span>
+                </button>
               )}
-              <p className="text-[10px] text-gray-400 mt-1">
-                Upload a photo of any valid ID (barangay ID, driver's license, etc.). Used by admin for verification.
-              </p>
             </div>
 
             <div className="flex items-start gap-2 pt-1">
-              <input
-                id="terms-checkbox"
-                type="checkbox"
-                checked={agreedToTerms}
-                onChange={(e) => setAgreedToTerms(e.target.checked)}
-                className="w-4 h-4 accent-[#0B5D2A] mt-0.5 cursor-pointer"
-              />
+              <input id="terms-checkbox" type="checkbox" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)} className="w-4 h-4 accent-[#0B5D2A] mt-0.5" />
               <label htmlFor="terms-checkbox" className="text-xs text-gray-700 cursor-pointer">
-                I agree to the{" "}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setShowTermsModal(true);
-                  }}
-                  className="font-bold text-[#0B5D2A] underline underline-offset-2 hover:text-[#094C23]"
-                >
-                  Terms &amp; Conditions
-                </button>{" "}
-                and confirm that all information provided is accurate.
+                I agree to the <button type="button" onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }} className="font-bold text-[#0B5D2A] underline">Terms & Conditions</button> and confirm that all information provided is accurate.
               </label>
             </div>
           </form>
         </main>
 
         <footer className="shrink-0 bg-[#F8FAF8] px-6 pt-3">
-          <div className="flex flex-col items-center">
-            <button
-              type="submit"
-              form="register-form"
-              disabled={loading || !isFormComplete}
-              className={`w-[210px] h-[46px] rounded-lg font-bold text-sm shadow-md transition
-                ${
-                  loading || !isFormComplete
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-[#0B5D2A] text-white hover:bg-[#094C23] hover:scale-[1.02] active:scale-95"
-                }
-              `}
-            >
+          <div className="flex flex-col items-center pb-4">
+            <button type="submit" form="register-form" disabled={loading || !isFormComplete} className={`w-[210px] h-[46px] rounded-lg font-bold text-sm shadow-md transition ${loading || !isFormComplete ? "bg-gray-300 text-gray-500" : "bg-[#0B5D2A] text-white hover:bg-[#094C23]"}`}>
               {loading ? "Registering..." : "Register"}
             </button>
-
-            <p
-              className={`text-[10px] text-gray-400 mt-2 text-center max-w-[260px] ${
-                isFormComplete ? "invisible" : ""
-              }`}
-            >
-              Please complete all fields, upload your ID, and agree to Terms &amp; Conditions.
+            <p className={`text-[10px] text-gray-400 mt-2 text-center max-w-[260px] ${isFormComplete ? "invisible" : ""}`}>
+              Please complete all fields, upload a matching ID, capture a face photo, and agree to Terms.
             </p>
-          </div>
-
-          <div className="flex items-center justify-center pb-2 pt-1">
-            <div className="w-[95px] h-[5px] rounded-full bg-[#1F2937]" />
           </div>
         </footer>
 
-        {/* Terms & Conditions Modal */}
+        {/* Terms and Conditions Modal */}
         {showTermsModal && (
-          <div
-            className="absolute inset-0 z-30 bg-black/50 flex items-center justify-center p-4"
-            onClick={() => setShowTermsModal(false)}
-          >
-            <div
-              className="bg-white rounded-2xl w-full max-h-[82%] flex flex-col shadow-2xl overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal header */}
+          <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowTermsModal(false)}>
+            <div className="bg-white rounded-2xl w-full max-h-[82%] flex flex-col shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
               <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-[#F8FAF8]">
                 <div>
-                  <h2 className="text-[#0B5D2A] text-base font-extrabold leading-tight">
-                    Terms and Conditions
-                  </h2>
-                  <p className="text-[10px] text-gray-500 mt-0.5">
-                    Barangay EcoReport System · Last Updated: October 27, 2026
-                  </p>
+                  <h2 className="text-[#0B5D2A] text-base font-extrabold leading-tight">Terms and Conditions</h2>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Barangay EcoReport System · Last Updated: October 27, 2026</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowTermsModal(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-200 active:scale-95 transition"
-                  aria-label="Close Terms and Conditions"
-                >
+                <button type="button" onClick={() => setShowTermsModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-200 active:scale-95 transition" aria-label="Close Terms and Conditions">
                   <FaTimes />
                 </button>
               </div>
 
-              {/* Scrollable body */}
               <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4 text-xs text-gray-700 leading-relaxed">
-                <p>
-                  Welcome to the Barangay EcoReport System. By accessing or using this
-                  system, you agree to comply with the following Terms and Conditions.
-                  Please read them carefully before creating an account or submitting
-                  any information.
-                </p>
+                <p>Welcome to the Barangay EcoReport System. By accessing or using this system, you agree to comply with the following Terms and Conditions. Please read them carefully before creating an account or submitting any information.</p>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    1. Acceptance of Terms
-                  </h3>
-                  <p>
-                    By registering for or using the Barangay EcoReport System, you
-                    acknowledge that you have read, understood, and agreed to these
-                    Terms and Conditions. If you do not agree with these terms, please
-                    refrain from using the system.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">1. Acceptance of Terms</h3>
+                  <p>By registering for or using the Barangay EcoReport System, you acknowledge that you have read, understood, and agreed to these Terms and Conditions. If you do not agree with these terms, please refrain from using the system.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    2. Purpose of the System
-                  </h3>
-                  <p>
-                    The Barangay EcoReport System is designed to help residents report
-                    environmental concerns, monitor the status of submitted reports,
-                    receive community announcements, access waste collection schedules,
-                    and use other available barangay services.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">2. Purpose of the System</h3>
+                  <p>The Barangay EcoReport System is designed to help residents report environmental concerns, monitor the status of submitted reports, receive community announcements, access waste collection schedules, and use other available barangay services.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    3. Account Registration and Responsibilities
-                  </h3>
-                  <p>
-                    Users must provide accurate, complete, and updated information when
-                    registering. Each user is responsible for maintaining the
-                    confidentiality of their account credentials and for all activities
-                    performed through their account. Users must promptly report any
-                    suspected unauthorized access to their accounts.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">3. Account Registration and Responsibilities</h3>
+                  <p>Users must provide accurate, complete, and updated information when registering. Each user is responsible for maintaining the confidentiality of their account credentials and for all activities performed through their account. Users must promptly report any suspected unauthorized access to their accounts.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    4. Submission of Environmental Reports
-                  </h3>
-                  <p>
-                    Users must provide truthful and accurate information when submitting
-                    environmental reports. Reports may include descriptions, locations,
-                    photographs, videos, and other supporting evidence relevant to the
-                    reported concern.
-                  </p>
-                  <p className="mt-2">
-                    Users must not submit false, misleading, malicious, irrelevant, or
-                    intentionally duplicated reports. The barangay may review, verify,
-                    reject, or take appropriate action on submitted reports based on the
-                    information provided and the applicable barangay procedures.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">4. Submission of Environmental Reports</h3>
+                  <p>Users must provide truthful and accurate information when submitting environmental reports. Reports may include descriptions, locations, photographs, videos, and other supporting evidence relevant to the reported concern.</p>
+                  <p className="mt-2">Users must not submit false, misleading, malicious, irrelevant, or intentionally duplicated reports. The barangay may review, verify, reject, or take appropriate action on submitted reports based on the information provided and the applicable barangay procedures.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    5. Uploaded Photos, Videos, and Other Evidence
-                  </h3>
-                  <p>
-                    Users must ensure that uploaded photos, videos, and other evidence
-                    are relevant to their reports and do not unlawfully violate the
-                    rights or privacy of others. Users must not upload illegal, harmful,
-                    offensive, or unauthorized content.
-                  </p>
-                  <p className="mt-2">
-                    The system may restrict or remove submitted content when necessary,
-                    subject to applicable rules and procedures.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">5. Uploaded Photos, Videos, and Other Evidence</h3>
+                  <p>Users must ensure that uploaded photos, videos, and other evidence are relevant to their reports and do not unlawfully violate the rights or privacy of others. Users must not upload illegal, harmful, offensive, or unauthorized content.</p>
+                  <p className="mt-2">The system may restrict or remove submitted content when necessary, subject to applicable rules and procedures.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    6. Report Status and Response Time
-                  </h3>
-                  <p>
-                    Users may track the status of their submitted reports through the
-                    system. Report statuses and updates are provided for information and
-                    monitoring purposes. Submission of a report does not guarantee
-                    immediate action, a specific resolution time, or a particular
-                    outcome. Processing depends on report verification, available
-                    resources, and the appropriate barangay personnel.
-                  </p>
-                  <p className="mt-2">
-                    For emergencies requiring immediate assistance, users should contact
-                    the appropriate emergency services or barangay authorities directly
-                    rather than relying solely on this system.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">6. Report Status and Response Time</h3>
+                  <p>Users may track the status of their submitted reports through the system. Report statuses and updates are provided for information and monitoring purposes. Submission of a report does not guarantee immediate action, a specific resolution time, or a particular outcome. Processing depends on report verification, available resources, and the appropriate barangay personnel.</p>
+                  <p className="mt-2">For emergencies requiring immediate assistance, users should contact the appropriate emergency services or barangay authorities directly rather than relying solely on this system.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    7. Proper Use of the System
-                  </h3>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">7. Proper Use of the System</h3>
                   <p>Users agree not to:</p>
                   <ul className="list-disc pl-5 mt-2 space-y-1">
                     <li>• Provide false identities or impersonate another person.</li>
                     <li>• Submit fraudulent, abusive, or intentionally misleading reports.</li>
-                    <li>• 
-                      Attempt to access another user's account or private information
-                      without authorization.
-                    </li>
+                    <li>• Attempt to access another user's account or private information without authorization.</li>
                     <li>• Interfere with, damage, or disrupt the system or its services.</li>
-                    <li>• 
-                      Use the system for unlawful activities or purposes unrelated to its
-                      intended functions.
-                    </li>
+                    <li>• Use the system for unlawful activities or purposes unrelated to its intended functions.</li>
                   </ul>
-                  <p className="mt-2">
-                    Violations may result in account restrictions or other appropriate
-                    action in accordance with applicable policies and laws.
-                  </p>
+                  <p className="mt-2">Violations may result in account restrictions or other appropriate action in accordance with applicable policies and laws.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    8. Privacy and Personal Information
-                  </h3>
-                  <p>
-                    The system may collect personal information necessary to provide its
-                    services, verify accounts, process reports, communicate updates, and
-                    maintain system operations.
-                  </p>
-                  <p className="mt-2">
-                    Personal information shall be handled in accordance with applicable
-                    data protection laws and the system's Privacy Policy. Access to
-                    personal information should be limited to authorized personnel with a
-                    legitimate purpose. Users are encouraged not to include unnecessary
-                    sensitive personal information in reports or uploaded evidence.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">8. Privacy and Personal Information</h3>
+                  <p>The system may collect personal information necessary to provide its services, verify accounts, process reports, communicate updates, and maintain system operations.</p>
+                  <p className="mt-2">Personal information shall be handled in accordance with applicable data protection laws and the system's Privacy Policy. Access to personal information should be limited to authorized personnel with a legitimate purpose. Users are encouraged not to include unnecessary sensitive personal information in reports or uploaded evidence.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    9. Data Accuracy and System Availability
-                  </h3>
-                  <p>
-                    Users are responsible for the accuracy of the information they
-                    submit. The system administrators will take reasonable steps to
-                    maintain accurate records and reliable services; however, temporary
-                    interruptions, maintenance, technical errors, or service
-                    unavailability may occur.
-                  </p>
-                  <p className="mt-2">
-                    The system does not guarantee uninterrupted access or that every
-                    submitted report will result in a specific action.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">9. Data Accuracy and System Availability</h3>
+                  <p>Users are responsible for the accuracy of the information they submit. The system administrators will take reasonable steps to maintain accurate records and reliable services; however, temporary interruptions, maintenance, technical errors, or service unavailability may occur.</p>
+                  <p className="mt-2">The system does not guarantee uninterrupted access or that every submitted report will result in a specific action.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    10. Third-Party Services and External Links
-                  </h3>
-                  <p>
-                    The system may contain links to external websites or services for
-                    additional information or assistance. These external services may be
-                    governed by their own terms and privacy policies. The Barangay
-                    EcoReport System is not responsible for the content or practices of
-                    third-party services outside its control.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">10. Third-Party Services and External Links</h3>
+                  <p>The system may contain links to external websites or services for additional information or assistance. These external services may be governed by their own terms and privacy policies. The Barangay EcoReport System is not responsible for the content or practices of third-party services outside its control.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    11. Account Suspension or Restriction
-                  </h3>
-                  <p>
-                    The system administrators may investigate suspected misuse and
-                    restrict, suspend, or disable accounts when there are reasonable
-                    grounds to believe that these Terms and Conditions have been
-                    violated, subject to applicable policies and laws.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">11. Account Suspension or Restriction</h3>
+                  <p>The system administrators may investigate suspected misuse and restrict, suspend, or disable accounts when there are reasonable grounds to believe that these Terms and Conditions have been violated, subject to applicable policies and laws.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    12. Changes to These Terms
-                  </h3>
-                  <p>
-                    These Terms and Conditions may be revised when necessary to reflect
-                    changes in system features, operational procedures, or applicable
-                    laws. Updated terms will be made available through the system,
-                    together with the revised effective or update date when appropriate.
-                    Continued use of the system after updates constitutes acceptance of
-                    the revised terms where permitted by applicable law.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">12. Changes to These Terms</h3>
+                  <p>These Terms and Conditions may be revised when necessary to reflect changes in system features, operational procedures, or applicable laws. Updated terms will be made available through the system, together with the revised effective or update date when appropriate. Continued use of the system after updates constitutes acceptance of the revised terms where permitted by applicable law.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    13. Limitation of Responsibility
-                  </h3>
-                  <p>
-                    The system is provided to support communication between residents
-                    and barangay personnel. To the extent permitted by applicable law,
-                    the system administrators are not responsible for losses arising from
-                    inaccurate information submitted by users, interruptions beyond their
-                    reasonable control, or actions taken by third parties. Nothing in
-                    these terms excludes responsibilities that cannot legally be
-                    excluded.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">13. Limitation of Responsibility</h3>
+                  <p>The system is provided to support communication between residents and barangay personnel. To the extent permitted by applicable law, the system administrators are not responsible for losses arising from inaccurate information submitted by users, interruptions beyond their reasonable control, or actions taken by third parties. Nothing in these terms excludes responsibilities that cannot legally be excluded.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    14. Governing Laws
-                  </h3>
-                  <p>
-                    These Terms and Conditions shall be interpreted in accordance with
-                    applicable laws and regulations of the Republic of the Philippines.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">14. Governing Laws</h3>
+                  <p>These Terms and Conditions shall be interpreted in accordance with applicable laws and regulations of the Republic of the Philippines.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    15. Contact and Assistance
-                  </h3>
-                  <p>
-                    For questions, concerns, or assistance regarding the Barangay
-                    EcoReport System, users may contact the authorized barangay office or
-                    the designated system administrator through the official contact
-                    channels provided by the barangay.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">15. Contact and Assistance</h3>
+                  <p>For questions, concerns, or assistance regarding the Barangay EcoReport System, users may contact the authorized barangay office or the designated system administrator through the official contact channels provided by the barangay.</p>
                 </section>
 
                 <section>
-                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-                    16. Agreement and Consent
-                  </h3>
-                  <p>
-                    By checking the acceptance box or selecting the designated agreement
-                    button, you confirm that you have read and understood these Terms and
-                    Conditions and agree to follow them when using the Barangay EcoReport
-                    System.
-                  </p>
+                  <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">16. Agreement and Consent</h3>
+                  <p>By checking the acceptance box or selecting the designated agreement button, you confirm that you have read and understood these Terms and Conditions and agree to follow them when using the Barangay EcoReport System.</p>
                 </section>
               </div>
 
-              {/* Modal footer */}
               <div className="shrink-0 px-5 py-3 border-t border-gray-200 bg-[#F8FAF8] flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowTermsModal(false)}
-                  className="flex-1 h-[40px] rounded-lg font-bold text-sm border border-[#0B5D2A] text-[#0B5D2A] bg-white hover:bg-[#E8F3E5] active:scale-95 transition"
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  onClick={handleAgreeInModal}
-                  className="flex-1 h-[40px] rounded-lg font-bold text-sm bg-[#0B5D2A] text-white shadow-md hover:bg-[#094C23] active:scale-95 transition"
-                >
-                  I Agree
-                </button>
+                <button type="button" onClick={() => setShowTermsModal(false)} className="flex-1 h-[40px] rounded-lg font-bold text-sm border border-[#0B5D2A] text-[#0B5D2A] bg-white hover:bg-[#E8F3E5] active:scale-95 transition">Close</button>
+                <button type="button" onClick={() => { setAgreedToTerms(true); setShowTermsModal(false); }} className="flex-1 h-[40px] rounded-lg font-bold text-sm bg-[#0B5D2A] text-white shadow-md hover:bg-[#094C23] active:scale-95 transition">I Agree</button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Face Verification Modal */}
+        {showSelfie && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[9999]">
+            <div className="bg-white rounded-2xl w-full max-w-[380px] p-4 relative">
+              <button onClick={closeSelfieModal} className="absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-xl z-20">×</button>
+              <h3 className="text-[15px] font-extrabold text-[#0B5D2A] text-center mb-4">Face Verification</h3>
+              
+              <div className="relative w-full rounded-xl overflow-hidden bg-black h-[340px]">
+                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" style={{ transform: "scaleX(-1)" }} />
+                
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="rounded-full border-4 transition-all duration-300"
+                    style={{
+                      width: "220px", height: "220px",
+                      borderColor: isFaceDetected ? "#22c55e" : "#ef4444",
+                      boxShadow: `0 0 0 9999px rgba(0,0,0,0.55)`
+                    }}
+                  />
+                </div>
+
+                <div className="absolute bottom-3 left-0 right-0 text-center pointer-events-none">
+                  <span className="inline-block px-4 py-2 rounded-full text-[12px] font-bold text-white shadow-lg"
+                    style={{ background: isFaceDetected ? "#22c55e" : "#ef4444" }}
+                  >
+                    {isFaceDetected ? "Face detected! Ready to capture." : "Position your face inside the circle"}
+                  </span>
+                </div>
+              </div>
+
+              {modalError && <div className="mt-3 p-2 bg-red-100 text-red-700 text-xs text-center rounded">{modalError}</div>}
+
+              <button 
+                onClick={handleCaptureFace} 
+                disabled={!isFaceDetected}
+                className={`w-full h-[46px] mt-4 rounded-xl font-extrabold text-[13px] transition ${isFaceDetected ? "bg-[#0B5D2A] text-white hover:bg-[#084A21]" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}
+              >
+                Capture Face
+              </button>
+              
+              <canvas ref={canvasRef} style={{ display: "none" }} />
             </div>
           </div>
         )}

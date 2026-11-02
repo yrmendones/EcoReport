@@ -419,9 +419,10 @@ exports.getAllResidents = async (req, res) => {
         const { search } = req.query;
         let sql = `
             SELECT 
-                user_id, resident_id, first_name, middle_name, last_name, address,
+                user_id, resident_id, first_name, middle_name, last_name,
+                house_no, street, address, permanent_address,
                 contact_number, email, is_verified, verification_status,
-                valid_id_url, registered_at, last_active_at,
+                valid_id_url, selfie_image, registered_at, last_active_at,
                 CASE
                     WHEN status = 'Deactivated' THEN 'Deactivated'
                     WHEN last_active_at IS NOT NULL
@@ -449,8 +450,8 @@ exports.getResidentById = async (req, res) => {
     try {
         const [results] = await db.query(
             `SELECT 
-                user_id, resident_id, first_name, middle_name, last_name, house_no, street, address,
-                contact_number, email, is_verified, verification_status, valid_id_url, registered_at,
+                user_id, resident_id, first_name, middle_name, last_name, house_no, street, address, permanent_address,
+                contact_number, email, is_verified, verification_status, valid_id_url, selfie_image, registered_at,
                 last_active_at,
                 CASE
                     WHEN status = 'Deactivated' THEN 'Deactivated'
@@ -472,8 +473,8 @@ exports.getResidentById = async (req, res) => {
 exports.getResidentByResidentId = async (req, res) => {
     try {
         const [results] = await db.query(
-            `SELECT user_id, resident_id, first_name, middle_name, last_name, house_no, street, address, 
-                    contact_number, email, status, is_verified, verification_status, valid_id_url, registered_at
+            `SELECT user_id, resident_id, first_name, middle_name, last_name, house_no, street, address, permanent_address, 
+                    contact_number, email, status, is_verified, verification_status, valid_id_url, selfie_image, registered_at
              FROM users 
              WHERE resident_id = ? AND role = 'resident'`,
             [req.params.residentId]
@@ -490,7 +491,7 @@ exports.getResidentByResidentId = async (req, res) => {
 
 exports.addResident = async (req, res) => {
     try {
-        const { first_name, middle_name, last_name, address, contact_number, email, password } = req.body;
+        const { first_name, middle_name, last_name, address, permanent_address, contact_number, email, password } = req.body;
         if (!first_name || !last_name || !email || !password)
             return res.status(400).json({ error: 'First name, last name, email, and password required.' });
         const [existing] = await db.query('SELECT user_id FROM users WHERE email = ?', [email]);
@@ -502,9 +503,9 @@ exports.addResident = async (req, res) => {
             fullAddress = `${fullAddress}, P. Sto. Rosario Kanluran, Pateros`;
         }
         const [result] = await db.query(
-            `INSERT INTO users (resident_id, first_name, middle_name, last_name, address, contact_number, email, password_hash, role, status, is_verified, verification_status, registered_at) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'resident', 'Online', 0, 'Pending Verification', CURDATE())`,
-            [resident_id, first_name, middle_name || null, last_name, fullAddress, contact_number || null, email, password_hash]
+            `INSERT INTO users (resident_id, first_name, middle_name, last_name, address, permanent_address, contact_number, email, password_hash, role, status, is_verified, verification_status, registered_at) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'resident', 'Online', 0, 'Pending Verification', CURDATE())`,
+            [resident_id, first_name, middle_name || null, last_name, fullAddress, permanent_address || null, contact_number || null, email, password_hash]
         );
 
         await logAudit(req, `Added resident ${resident_id} (${first_name} ${last_name})`);
@@ -518,22 +519,40 @@ exports.addResident = async (req, res) => {
 
 exports.updateResident = async (req, res) => {
     try {
-        const { first_name, middle_name, last_name, address, contact_number, email, status } = req.body;
+        const { first_name, middle_name, last_name, house_no, street, address, contact_number, email, status } = req.body;
         const allowedStatus = ['Online', 'Offline', 'Deactivated'];
         if (status && !allowedStatus.includes(status)) {
             return res.status(400).json({ error: 'Invalid status. Must be Online, Offline, or Deactivated.' });
         }
-        let updateEmail = email;
-        if (!email) {
-            const [user] = await db.query('SELECT email FROM users WHERE user_id = ?', [req.params.id]);
-            if (user.length > 0) updateEmail = user[0].email;
+
+        const [existing] = await db.query(
+            'SELECT email, permanent_address FROM users WHERE user_id = ?',
+            [req.params.id]
+        );
+        if (existing.length === 0) {
+            return res.status(404).json({ error: 'Resident not found.' });
         }
+        const updateEmail = email || existing[0].email;
+        const updatePermanentAddress = existing[0].permanent_address;
+
+        // Compose full address from house_no + street
+        let finalAddress = address;
+        if (house_no !== undefined || street !== undefined) {
+            const base = `${house_no || ''} ${street || ''}`.trim();
+            finalAddress = base
+                ? `${base}, P. Sto. Rosario Kanluran, Pateros`
+                : 'P. Sto. Rosario Kanluran, Pateros';
+        }
+
         await db.query(
             `UPDATE users SET 
                 first_name = ?, 
                 middle_name = ?, 
                 last_name = ?, 
+                house_no = ?,
+                street = ?,
                 address = ?, 
+                permanent_address = ?,
                 contact_number = ?, 
                 email = ?, 
                 status = ? 
@@ -542,7 +561,10 @@ exports.updateResident = async (req, res) => {
                 first_name,
                 middle_name || null,
                 last_name,
-                address || null,
+                house_no || null,
+                street || null,
+                finalAddress || null,
+                updatePermanentAddress,
                 contact_number || null,
                 updateEmail,
                 status || 'Online',

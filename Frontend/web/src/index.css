@@ -16,12 +16,26 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Use dynamic viewport height on browsers that support it (mobile Safari, Chrome mobile) - desktop falls back to 100vh */
+@supports (height: 100dvh) {
+  html, body, #root {
+    height: 100dvh;
+  }
+}
+
 .sidebar {
   display: none !important;
 }
 
 .main-content {
   margin-left: 320px !important;
+}
+
+/* Reduced padding on short screens — gains ~6px of vertical space */
+@media (max-height: 750px) {
+  .main-content {
+    padding-bottom: 6px !important;
+  }
 }
 
 
@@ -61,6 +75,9 @@ html, body, #root {
   z-index: 2;
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .persistent-sidebar-brand {
@@ -69,6 +86,7 @@ html, body, #root {
   align-items: center;
   padding-left: 36px;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .persistent-sidebar-brand-img {
@@ -96,11 +114,108 @@ html, body, #root {
   font-size: 11px;
   font-weight: 500;
   border-bottom: 1px solid rgba(255,255,255,0.14);
+  flex-shrink: 0;
 }
 
 .persistent-sidebar-menu {
   width: 100%;
   padding-top: 5px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+/* Custom scrollbar (Chrome/Edge/Safari) */
+.persistent-sidebar-menu::-webkit-scrollbar {
+  width: 6px;
+}
+.persistent-sidebar-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+.persistent-sidebar-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+.persistent-sidebar-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* ─── Compact sidebar on short laptop screens ─── */
+@media (max-height: 850px) {
+  .persistent-sidebar-brand {
+    height: 70px;
+  }
+  .persistent-sidebar-brand-img {
+    width: 44px;
+    height: 46px;
+  }
+  .persistent-sidebar-brand-name {
+    font-size: 18px;
+  }
+  .persistent-menu-item {
+    height: 27px;
+    font-size: 14px;
+  }
+  .persistent-menu-icon {
+    width: 26px;
+    height: 24px;
+  }
+}
+
+@media (max-height: 750px) {
+  .persistent-sidebar-brand {
+    height: 60px;
+    padding-left: 28px;
+    gap: 8px;
+  }
+  .persistent-sidebar-brand-img {
+    width: 38px;
+    height: 40px;
+  }
+  .persistent-sidebar-brand-name {
+    font-size: 16px;
+  }
+  .persistent-sidebar-barangay {
+    padding-left: 60px;
+    font-size: 10px;
+  }
+  .persistent-menu-item {
+    height: 24px;
+    font-size: 13px;
+    padding: 0 12px 0 34px;
+  }
+  .persistent-menu-item.active {
+    padding-left: 30px;
+  }
+  .persistent-menu-icon {
+    width: 22px;
+    height: 20px;
+  }
+}
+
+@media (max-height: 650px) {
+  .persistent-sidebar-brand {
+    height: 52px;
+    padding-left: 22px;
+  }
+  .persistent-sidebar-brand-img {
+    width: 32px;
+    height: 34px;
+  }
+  .persistent-sidebar-brand-name {
+    font-size: 14px;
+  }
+  .persistent-menu-item {
+    height: 22px;
+    font-size: 12px;
+  }
+  .persistent-menu-icon {
+    width: 20px;
+    height: 18px;
+  }
 }
 
 .persistent-menu-item {

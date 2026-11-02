@@ -6,6 +6,7 @@ import { getMenuItems } from "../menu";
 import ProfileHeaderButton from "../components/ProfileHeaderButton";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const BARANGAY_ADDRESS = "P. Sto. Rosario Kanluran, Pateros";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -28,25 +29,34 @@ export default function Profile() {
     first_name: cachedAdmin?.first_name || "",
     middle_name: cachedAdmin?.middle_name || "",
     last_name: cachedAdmin?.last_name || "",
+    house_no: cachedAdmin?.house_no || "",
+    street: cachedAdmin?.street || "",
     contact_number: cachedAdmin?.contact_number || "",
   });
+
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
 
+  // Name / Address sub-modals
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [nameSnapshot, setNameSnapshot] = useState(null);
+  const [addressSnapshot, setAddressSnapshot] = useState(null);
+
+  // Change password modal
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [pwdForm, setPwdForm] = useState({
     current_password: "",
     new_password: "",
     confirm_password: "",
   });
-  
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [pwdError, setPwdError] = useState("");
   const [pwdLoading, setPwdLoading] = useState(false);
 
-    const fetchProfile = async () => {
+  const fetchProfile = async () => {
     try {
       const data = await apiFetch("/api/users/me");
       setAdmin(data);
@@ -54,6 +64,8 @@ export default function Profile() {
         first_name: data.first_name || "",
         middle_name: data.middle_name || "",
         last_name: data.last_name || "",
+        house_no: data.house_no || "",
+        street: data.street || "",
         contact_number: data.contact_number || "",
       });
       try {
@@ -84,6 +96,64 @@ export default function Profile() {
       return;
     }
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const updateNameField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateAddressField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Name modal
+  const openNameModal = () => {
+    setNameSnapshot({
+      first_name: formData.first_name,
+      middle_name: formData.middle_name,
+      last_name: formData.last_name,
+    });
+    setShowNameModal(true);
+  };
+
+  const cancelNameModal = () => {
+    if (nameSnapshot) {
+      setFormData((prev) => ({
+        ...prev,
+        first_name: nameSnapshot.first_name,
+        middle_name: nameSnapshot.middle_name,
+        last_name: nameSnapshot.last_name,
+      }));
+    }
+    setShowNameModal(false);
+  };
+
+  const saveNameModal = () => {
+    setShowNameModal(false);
+  };
+
+  // Address modal
+  const openAddressModal = () => {
+    setAddressSnapshot({
+      house_no: formData.house_no,
+      street: formData.street,
+    });
+    setShowAddressModal(true);
+  };
+
+  const cancelAddressModal = () => {
+    if (addressSnapshot) {
+      setFormData((prev) => ({
+        ...prev,
+        house_no: addressSnapshot.house_no,
+        street: addressSnapshot.street,
+      }));
+    }
+    setShowAddressModal(false);
+  };
+
+  const saveAddressModal = () => {
+    setShowAddressModal(false);
   };
 
   const handlePictureSelect = async (e) => {
@@ -151,13 +221,21 @@ export default function Profile() {
     }
 
     try {
+      const baseAddress = `${formData.house_no || ""} ${formData.street || ""}`.trim();
+      const fullAddress = baseAddress
+        ? `${baseAddress}, ${BARANGAY_ADDRESS}`
+        : BARANGAY_ADDRESS;
+
       await apiFetch("/api/users/me", {
         method: "PUT",
         body: JSON.stringify({
           first_name: formData.first_name,
           middle_name: formData.middle_name,
           last_name: formData.last_name,
+          house_no: formData.house_no,
+          street: formData.street,
           contact_number: formData.contact_number,
+          address: fullAddress,
         }),
       });
 
@@ -233,7 +311,7 @@ export default function Profile() {
     return role || "Staff";
   };
 
-    const getFullName = () => {
+  const getFullName = () => {
     if (!admin) return "";
     if (admin.first_name || admin.last_name) {
       return `${admin.first_name || ""} ${admin.last_name || ""}`.trim() || "Staff";
@@ -257,7 +335,6 @@ export default function Profile() {
   return (
     <>
       <div className="profile-page">
-
         <main className="main-content">
           <header className="top-header">
             <h2>My Profile</h2>
@@ -317,57 +394,43 @@ export default function Profile() {
                 </button>
               </aside>
 
-              {/* edit form */}
+              {/* Edit form */}
               <div className="profile-form-card">
                 <h3>Edit Profile</h3>
-                <p className="form-sub">Update your name and contact details.</p>
+                <p className="form-sub">Update your name, address, and contact details.</p>
 
                 {error && <div className="msg error">{error}</div>}
                 {success && <div className="msg success">{success}</div>}
 
                 <form onSubmit={handleSaveProfile}>
                   <div className="form-group">
-                    <label>First Name</label>
-                    <input
-                      type="text"
-                      name="first_name"
-                      value={formData.first_name}
-                      onChange={handleChange}
-                      required
-                    />
+                    <label>Full Name</label>
+                    <button
+                      type="button"
+                      className="summary-field-btn"
+                      onClick={openNameModal}
+                    >
+                      <span>
+                        {[formData.first_name, formData.middle_name, formData.last_name]
+                          .filter((n) => n && n.trim())
+                          .join(" ") || "Tap to set name"}
+                      </span>
+                    </button>
                   </div>
 
                   <div className="form-group">
-                    <label>Middle Name</label>
-                    <input
-                      type="text"
-                      name="middle_name"
-                      value={formData.middle_name}
-                      onChange={handleChange}
-                      placeholder="N/A if none"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Last Name</label>
-                    <input
-                      type="text"
-                      name="last_name"
-                      value={formData.last_name}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Email Address</label>
-                    <input
-                      type="email"
-                      value={admin?.email || ""}
-                      disabled
-                      className="disabled-input"
-                    />
-                    <small>Email cannot be changed</small>
+                    <label>Address</label>
+                    <button
+                      type="button"
+                      className="summary-field-btn"
+                      onClick={openAddressModal}
+                    >
+                      <span>
+                        {[formData.house_no, formData.street]
+                          .filter((n) => n && n.trim())
+                          .join(" ") || "Tap to set address"}
+                      </span>
+                    </button>
                   </div>
 
                   <div className="form-group">
@@ -383,6 +446,17 @@ export default function Profile() {
                     />
                   </div>
 
+                  <div className="form-group">
+                    <label>Email Address</label>
+                    <input
+                      type="email"
+                      value={admin?.email || ""}
+                      disabled
+                      className="disabled-input"
+                    />
+                    <small>Email cannot be changed</small>
+                  </div>
+
                   <button type="submit" className="save-btn" disabled={saving}>
                     {saving ? "Saving..." : "Save Changes"}
                   </button>
@@ -392,6 +466,141 @@ export default function Profile() {
           </section>
         </main>
       </div>
+
+      {/* ═══ NAME MODAL ═══ */}
+      {showNameModal && (
+        <div
+          className="modal-overlay"
+          style={{ zIndex: 2000 }}
+          onClick={cancelNameModal}
+        >
+          <div
+            className="modal-content"
+            style={{ padding: "28px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginBottom: "20px" }}>Edit Full Name</h3>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#333", marginBottom: "6px" }}>
+                  First Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.first_name}
+                  onChange={(e) => updateNameField("first_name", e.target.value)}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#333", marginBottom: "6px" }}>
+                  Middle Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.middle_name}
+                  onChange={(e) => updateNameField("middle_name", e.target.value)}
+                  placeholder="N/A if none"
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#333", marginBottom: "6px" }}>
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.last_name}
+                  onChange={(e) => updateNameField("last_name", e.target.value)}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px" }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "24px" }}>
+              <button
+                type="button"
+                onClick={cancelNameModal}
+                style={{ padding: "9px 20px", borderRadius: "6px", border: "1px solid #ccc", background: "#fff", color: "#333", fontWeight: 700, fontSize: "12px", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveNameModal}
+                style={{ padding: "9px 20px", borderRadius: "6px", border: "none", background: "#0B5D2A", color: "#fff", fontWeight: 700, fontSize: "12px", cursor: "pointer" }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ ADDRESS MODAL ═══ */}
+      {showAddressModal && (
+        <div
+          className="modal-overlay"
+          style={{ zIndex: 2000 }}
+          onClick={cancelAddressModal}
+        >
+          <div
+            className="modal-content"
+            style={{ padding: "28px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginBottom: "20px" }}>Edit Address</h3>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#333", marginBottom: "6px" }}>
+                  House Number
+                </label>
+                <input
+                  type="text"
+                  value={formData.house_no}
+                  onChange={(e) => updateAddressField("house_no", e.target.value)}
+                  placeholder="e.g., 123"
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#333", marginBottom: "6px" }}>
+                  Street
+                </label>
+                <input
+                  type="text"
+                  value={formData.street}
+                  onChange={(e) => updateAddressField("street", e.target.value)}
+                  placeholder="e.g., P. Gomez St."
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px" }}
+                />
+              </div>
+              <p style={{ fontSize: "10px", color: "#888", textAlign: "center", margin: 0 }}>
+                Barangay is added automatically when saved
+              </p>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "24px" }}>
+              <button
+                type="button"
+                onClick={cancelAddressModal}
+                style={{ padding: "9px 20px", borderRadius: "6px", border: "1px solid #ccc", background: "#fff", color: "#333", fontWeight: 700, fontSize: "12px", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveAddressModal}
+                style={{ padding: "9px 20px", borderRadius: "6px", border: "none", background: "#0B5D2A", color: "#fff", fontWeight: 700, fontSize: "12px", cursor: "pointer" }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CHANGE PASSWORD MODAL */}
       {showPasswordModal && (
@@ -588,6 +797,21 @@ export default function Profile() {
         .form-group input:focus { border-color: #0B5D2A; box-shadow: 0 0 0 2px rgba(11,93,42,0.10); }
         .form-group input.disabled-input { background: #f5f5f5; color: #777; cursor: not-allowed; }
         .form-group small { display: block; font-size: 10px; color: #999; margin-top: 3px; }
+
+        /* Clickable summary field */
+        .summary-field-btn {
+          width: 100%; height: 40px; padding: 0 12px;
+          border: 1px solid #ccc; border-radius: 4px;
+          font-size: 13px; background: #fff;
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 8px; cursor: pointer; text-align: left;
+          transition: border-color 0.15s ease;
+        }
+        .summary-field-btn:hover { border-color: #0B5D2A; }
+        .summary-field-btn span:first-child {
+          flex: 1; overflow: hidden; text-overflow: ellipsis;
+          white-space: nowrap; color: #333;
+        }
 
         .msg { padding: 10px 14px; border-radius: 6px; font-size: 12px; margin-bottom: 14px; }
         .msg.error { background: #fdecec; border: 1px solid #f5a5a5; color: #a71d1d; }

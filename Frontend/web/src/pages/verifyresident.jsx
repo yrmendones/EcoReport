@@ -115,6 +115,7 @@ export default function VerifyResident() {
           <InfoRow label="Resident ID" value={resident.resident_id} />
           <InfoRow label="Full Name" value={getFullName(resident)} />
           <InfoRow label="Address" value={resident.address || "—"} />
+          <InfoRow label="Permanent Address" value={resident.permanent_address || "—"} />
           <InfoRow label="Contact" value={resident.contact_number || "—"} />
           <InfoRow label="Date Registered" value={formatDate(resident.registered_at)} last />
         </div>

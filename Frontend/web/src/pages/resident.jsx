@@ -38,11 +38,16 @@ export default function Resident() {
     first_name: "",
     middle_name: "",
     last_name: "",
-    address: "",
+    house_no: "",
+    street: "",
     contact_number: "",
     email: "",
     status: "Online",
   });
+  const [showNameSubModal, setShowNameSubModal] = useState(false);
+  const [showAddressSubModal, setShowAddressSubModal] = useState(false);
+  const [nameSnapshot, setNameSnapshot] = useState(null);
+  const [addressSnapshot, setAddressSnapshot] = useState(null);
 
   // ============================================================
   // FETCH
@@ -149,7 +154,8 @@ export default function Resident() {
       first_name: resident.first_name || "",
       middle_name: resident.middle_name || "",
       last_name: resident.last_name || "",
-      address: resident.address || "",
+      house_no: resident.house_no || "",
+      street: resident.street || "",
       contact_number: resident.contact_number || "",
       email: resident.email || "",
       status: resident.status === "Deactivated" ? "Deactivated" : "Active",
@@ -163,6 +169,56 @@ export default function Resident() {
     if (digits.length >= 1 && digits[0] !== "0") return;
     if (digits.length >= 2 && digits[1] !== "9") return;
     setEditForm((prev) => ({ ...prev, contact_number: digits.slice(0, 11) }));
+  };
+
+  // ─── Name sub-modal handlers ───
+  const openNameSubModal = () => {
+    setNameSnapshot({
+      first_name: editForm.first_name,
+      middle_name: editForm.middle_name,
+      last_name: editForm.last_name,
+    });
+    setShowNameSubModal(true);
+  };
+
+  const cancelNameSubModal = () => {
+    if (nameSnapshot) {
+      setEditForm((prev) => ({
+        ...prev,
+        first_name: nameSnapshot.first_name,
+        middle_name: nameSnapshot.middle_name,
+        last_name: nameSnapshot.last_name,
+      }));
+    }
+    setShowNameSubModal(false);
+  };
+
+  const saveNameSubModal = () => {
+    setShowNameSubModal(false);
+  };
+
+  // ─── Address sub-modal handlers ───
+  const openAddressSubModal = () => {
+    setAddressSnapshot({
+      house_no: editForm.house_no,
+      street: editForm.street,
+    });
+    setShowAddressSubModal(true);
+  };
+
+  const cancelAddressSubModal = () => {
+    if (addressSnapshot) {
+      setEditForm((prev) => ({
+        ...prev,
+        house_no: addressSnapshot.house_no,
+        street: addressSnapshot.street,
+      }));
+    }
+    setShowAddressSubModal(false);
+  };
+
+  const saveAddressSubModal = () => {
+    setShowAddressSubModal(false);
   };
 
   const handleUpdateResident = async (e) => {
@@ -179,7 +235,12 @@ export default function Resident() {
 
     try {
       const payload = {
-        ...editForm,
+        first_name: editForm.first_name,
+        middle_name: editForm.middle_name,
+        last_name: editForm.last_name,
+        house_no: editForm.house_no,
+        street: editForm.street,
+        contact_number: editForm.contact_number,
         status: editForm.status === "Deactivated" ? "Deactivated" : "Online",
       };
       await apiFetch(`/api/admin/residents/${editingResident.user_id}`, {
@@ -425,50 +486,42 @@ export default function Resident() {
         </main>
       </div>
 
-      {/* ============ EDIT MODAL ============ */}
+            {/* ============ EDIT MODAL ============ */}
       {showEditModal && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>Edit Resident</h3>
             <form onSubmit={handleUpdateResident}>
               <div className="form-group">
-                <label>First Name</label>
-                <input
-                  type="text"
-                  value={editForm.first_name}
-                  onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
-                  required
-                />
+                <label>Full Name</label>
+                <button
+                  type="button"
+                  className="summary-field-btn"
+                  onClick={openNameSubModal}
+                >
+                  <span>
+                    {[editForm.first_name, editForm.middle_name, editForm.last_name]
+                      .filter((n) => n && n.trim())
+                      .join(" ") || "Tap to set name"}
+                  </span>
+                </button>
               </div>
-              <div className="form-group">
-                <label>Middle Name</label>
-                <input
-                  type="text"
-                  value={editForm.middle_name}
-                  onChange={(e) => setEditForm({ ...editForm, middle_name: e.target.value })}
-                  placeholder="N/A if none"
-                />
-                <small style={{ color: "#888", fontSize: "10px" }}>
-                  Displayed as blank in the list if set to N/A
-                </small>
-              </div>
-              <div className="form-group">
-                <label>Last Name</label>
-                <input
-                  type="text"
-                  value={editForm.last_name}
-                  onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
-                  required
-                />
-              </div>
+
               <div className="form-group">
                 <label>Address</label>
-                <input
-                  type="text"
-                  value={editForm.address}
-                  onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                />
+                <button
+                  type="button"
+                  className="summary-field-btn"
+                  onClick={openAddressSubModal}
+                >
+                  <span>
+                    {[editForm.house_no, editForm.street]
+                      .filter((n) => n && n.trim())
+                      .join(" ") || "Tap to set address"}
+                  </span>
+                </button>
               </div>
+
               <div className="form-group">
                 <label>Contact Number</label>
                 <input
@@ -480,6 +533,7 @@ export default function Resident() {
                   inputMode="numeric"
                 />
               </div>
+
               <div className="form-group">
                 <label>Email</label>
                 <input
@@ -490,6 +544,7 @@ export default function Resident() {
                 />
                 <small style={{ color: "#888", fontSize: "10px" }}>Email cannot be changed</small>
               </div>
+
               <div className="form-group">
                 <label>Status</label>
                 <select
@@ -500,6 +555,7 @@ export default function Resident() {
                   <option value="Deactivated">Deactivated</option>
                 </select>
               </div>
+
               <div className="modal-actions">
                 <button type="button" className="btn-cancel" onClick={() => setShowEditModal(false)}>
                   Cancel
@@ -507,6 +563,86 @@ export default function Resident() {
                 <button type="submit" className="btn-save">Update</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============ NAME SUB-MODAL ============ */}
+      {showNameSubModal && (
+        <div className="modal-overlay" style={{ zIndex: 2000 }} onClick={cancelNameSubModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Edit Full Name</h3>
+            <div className="form-group">
+              <label>First Name</label>
+              <input
+                type="text"
+                value={editForm.first_name}
+                onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>Middle Name</label>
+              <input
+                type="text"
+                value={editForm.middle_name}
+                onChange={(e) => setEditForm({ ...editForm, middle_name: e.target.value })}
+                placeholder="N/A if none"
+              />
+            </div>
+            <div className="form-group">
+              <label>Last Name</label>
+              <input
+                type="text"
+                value={editForm.last_name}
+                onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
+              />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn-cancel" onClick={cancelNameSubModal}>
+                Cancel
+              </button>
+              <button type="button" className="btn-save" onClick={saveNameSubModal}>
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ ADDRESS SUB-MODAL ============ */}
+      {showAddressSubModal && (
+        <div className="modal-overlay" style={{ zIndex: 2000 }} onClick={cancelAddressSubModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Edit Address</h3>
+            <div className="form-group">
+              <label>House Number</label>
+              <input
+                type="text"
+                value={editForm.house_no}
+                onChange={(e) => setEditForm({ ...editForm, house_no: e.target.value })}
+                placeholder="e.g., 123"
+              />
+            </div>
+            <div className="form-group">
+              <label>Street</label>
+              <input
+                type="text"
+                value={editForm.street}
+                onChange={(e) => setEditForm({ ...editForm, street: e.target.value })}
+                placeholder="e.g., P. Gomez St."
+              />
+            </div>
+            <small style={{ color: "#888", fontSize: "10px", display: "block", marginTop: "6px" }}>
+              Barangay is added automatically when saved
+            </small>
+            <div className="modal-actions">
+              <button type="button" className="btn-cancel" onClick={cancelAddressSubModal}>
+                Cancel
+              </button>
+              <button type="button" className="btn-save" onClick={saveAddressSubModal}>
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -759,6 +895,10 @@ export default function Resident() {
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; font-size: 12px; font-weight: 700; color: #333; margin-bottom: 4px; }
         .form-group input, .form-group select { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+
+        .summary-field-btn { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: #fff; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; text-align: left; transition: border-color 0.15s ease; }
+        .summary-field-btn:hover { border-color: #0B5D2A; }
+        .summary-field-btn span:first-child { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #333; }
         .disabled-input { background: #f5f5f5; cursor: not-allowed; opacity: 0.7; }
         .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
         .btn-cancel { background: #ccc; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-weight: 600; }

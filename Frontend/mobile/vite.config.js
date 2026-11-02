@@ -9,18 +9,20 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
     proxy: {
-      // API calls → forwarded to local backend
       '/api': {
         target: 'http://localhost:5000',
-        changeOrigin: false, // Preserve Host header so file URLs work
+        changeOrigin: false,
         secure: false,
       },
-      // Uploaded files (photos, videos, profile pics) → forwarded to backend
       '/uploads': {
         target: 'http://localhost:5000',
         changeOrigin: false,
         secure: false,
       },
     },
+  },
+  optimizeDeps: {
+    exclude: ['@paddleocr/paddleocr-js'],
+    include: ['clipper-lib', '@techstark/opencv-js', 'js-yaml'],
   },
 });

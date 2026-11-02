@@ -73,7 +73,7 @@ export default function QR() {
   const [selectedResident, setSelectedResident] = useState(null);
   const [verifying, setVerifying] = useState(false);
   const [rejecting, setRejecting] = useState(false);
-  const [showIdLightbox, setShowIdLightbox] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState(null); 
 
   // ============================================================
   // FETCH
@@ -98,11 +98,11 @@ export default function QR() {
 
   // Close lightbox on ESC
   useEffect(() => {
-    if (!showIdLightbox) return;
-    const onKey = (e) => { if (e.key === "Escape") setShowIdLightbox(false); };
+    if (!lightboxImage) return;
+    const onKey = (e) => { if (e.key === "Escape") setLightboxImage(null); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showIdLightbox]);
+  }, [lightboxImage]);
 
   // ============================================================
   // PRINT
@@ -498,13 +498,35 @@ export default function QR() {
                   <div className="uploaded-id-wrapper">
                     {selectedResident.valid_id_url ? (
                       <button type="button" className="uploaded-id-button"
-                        onClick={() => setShowIdLightbox(true)} title="Click to view full size">
+                        onClick={() => setLightboxImage({
+                          url: selectedResident.valid_id_url,
+                          alt: "Uploaded Resident ID",
+                        })} title="Click to view full size">
                         <img src={selectedResident.valid_id_url} alt="Uploaded Resident ID"
                           className="uploaded-id-image" />
                         <div className="zoom-hint">🔍 Click to enlarge</div>
                       </button>
                     ) : (
                       <div className="uploaded-id-empty">No ID uploaded during registration</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="uploaded-id-card">
+                  <div className="card-title">Selfie Verification</div>
+                  <div className="uploaded-id-wrapper">
+                    {selectedResident.selfie_image ? (
+                      <button type="button" className="uploaded-id-button"
+                        onClick={() => setLightboxImage({
+                          url: selectedResident.selfie_image,
+                          alt: "Resident Selfie",
+                        })} title="Click to view full size">
+                        <img src={selectedResident.selfie_image} alt="Resident Selfie"
+                          className="uploaded-id-image" />
+                        <div className="zoom-hint">🔍 Click to enlarge</div>
+                      </button>
+                    ) : (
+                      <div className="uploaded-id-empty">No selfie captured during registration</div>
                     )}
                   </div>
                 </div>
@@ -538,14 +560,14 @@ export default function QR() {
         </main>
       </div>
 
-      {/* FULLSCREEN LIGHTBOX for Uploaded Resident ID */}
-      {showIdLightbox && selectedResident?.valid_id_url && (
-        <div className="lightbox-overlay" onClick={() => setShowIdLightbox(false)}>
+      {/* FULLSCREEN LIGHTBOX for ID or Selfie */}
+      {lightboxImage && (
+        <div className="lightbox-overlay" onClick={() => setLightboxImage(null)}>
           <button type="button" className="lightbox-close"
-            onClick={(e) => { e.stopPropagation(); setShowIdLightbox(false); }}
+            onClick={(e) => { e.stopPropagation(); setLightboxImage(null); }}
             aria-label="Close">✕</button>
           <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
-            <img src={selectedResident.valid_id_url} alt="Uploaded Resident ID (full size)"
+            <img src={lightboxImage.url} alt={`${lightboxImage.alt} (full size)`}
               className="lightbox-media" />
           </div>
         </div>
@@ -649,8 +671,8 @@ export default function QR() {
         .back-button:hover { text-decoration: underline; }
 
         .verification-cards { width: 100%; height: 303px; display: flex; gap: 14px; margin-bottom: 14px; }
-        .resident-information-card { flex: 1.2; height: 303px; border: 1px solid #78957e; border-radius: 2px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.14); overflow: hidden; }
-        .uploaded-id-card { flex: 1; height: 303px; border: 1px solid #78957e; border-radius: 2px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.14); overflow: hidden; }
+        .resident-information-card { flex: 1.3; height: 303px; border: 1px solid #78957e; border-radius: 2px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.14); overflow: hidden; }
+        .uploaded-id-card { flex: 1; height: 303px; min-width: 0; border: 1px solid #78957e; border-radius: 2px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.14); overflow: hidden; }
         .card-title { height: 37px; padding: 12px 10px 0 10px; color: #111111; font-size: 9px; font-weight: 800; }
 
         .resident-info-row { width: 100%; min-height: 43px; display: flex; align-items: center; padding: 0 10px; }

@@ -35,8 +35,8 @@ async function generateResidentId() {
 exports.register = async (req, res) => {
     try {
         const {
-            first_name, middle_name, last_name, house_no, street,
-            contact_number, email, password, confirm_password, valid_id_url
+            first_name, middle_name, last_name, house_no, street, permanent_address,
+            contact_number, email, password, confirm_password, id_type, valid_id_url, selfie_image
         } = req.body;
 
         if (!first_name || !last_name || !email || !password)
@@ -70,13 +70,16 @@ exports.register = async (req, res) => {
 
         const [result] = await db.query(
             `INSERT INTO users 
-            (resident_id, first_name, middle_name, last_name, house_no, street, address, contact_number, email, password_hash, valid_id_url, role, status, is_verified, verification_status, registered_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'resident', 'Online', 0, 'Pending Verification', CURDATE())`,
+            (resident_id, first_name, middle_name, last_name, house_no, street, address, permanent_address, contact_number, email, password_hash, id_type, valid_id_url, selfie_image, role, status, is_verified, verification_status, registered_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'resident', 'Online', 0, 'Pending Verification', CURDATE())`,
             [
                 resident_id, first_name, middle_name || null, last_name,
                 house_no || null, street || null, fullAddress,
+                permanent_address || null,
                 contact_number || null, email, password_hash,
-                valid_id_url || null
+                id_type || null,
+                valid_id_url || null,
+                selfie_image || null
             ]
         );
 

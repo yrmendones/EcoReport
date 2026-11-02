@@ -5,7 +5,7 @@ exports.getProfile = async (req, res) => {
     try {
         const [users] = await db.query(
             `SELECT user_id, resident_id, first_name, middle_name, last_name, 
-                    house_no, street, contact_number, address, email, role, status, 
+                    house_no, street, address, permanent_address, contact_number, email, role, status, 
                     is_verified, verification_status, valid_id_url,
                     settings, profile_picture, registered_at
              FROM users WHERE user_id = ?`,
@@ -21,7 +21,7 @@ exports.getProfile = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
     try {
-        const { first_name, middle_name, last_name, contact_number, address, street, profile_picture } = req.body;
+        const { first_name, middle_name, last_name, house_no, contact_number, address, street, permanent_address, profile_picture } = req.body;
         const updates = [];
         const values = [];
         if (first_name !== undefined) { updates.push('first_name = ?'); values.push(first_name); }
@@ -29,7 +29,9 @@ exports.updateProfile = async (req, res) => {
         if (last_name !== undefined) { updates.push('last_name = ?'); values.push(last_name); }
         if (contact_number !== undefined) { updates.push('contact_number = ?'); values.push(contact_number || null); }
         if (address !== undefined) { updates.push('address = ?'); values.push(address || null); }
+        if (house_no !== undefined) { updates.push('house_no = ?'); values.push(house_no || null); }
         if (street !== undefined) { updates.push('street = ?'); values.push(street || null); }
+        if (permanent_address !== undefined) { updates.push('permanent_address = ?'); values.push(permanent_address || null); }
         if (profile_picture !== undefined) { updates.push('profile_picture = ?'); values.push(profile_picture || null); }
         if (updates.length === 0) return res.status(400).json({ error: 'No fields to update.' });
         values.push(req.user.id);
