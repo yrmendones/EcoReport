@@ -5,7 +5,19 @@ import {
 } from "react-icons/fa";
 import { PaddleOCR } from "@paddleocr/paddleocr-js";
 import * as faceapi from "face-api.js";
+import * as ort from "onnxruntime-web";
 import { apiFetch } from "../../api";
+
+try {
+  const cores = navigator.hardwareConcurrency || 4;
+  ort.env.wasm.numThreads = Math.min(4, cores);
+  ort.env.wasm.simd = true;
+  console.log(`[ORT] numThreads = ${ort.env.wasm.numThreads} (device has ${cores} cores)`);
+} catch (e) {
+  console.warn("[ORT] Could not configure WASM threads:", e);
+}
+
+ort.env.logLevel = "error";
 
 const API_BASE = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_URL || "http://localhost:5000");
 
@@ -80,7 +92,7 @@ function preprocessIdImage(file) {
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const maxDim = 1600;
+      const maxDim = 960;
       let { width, height } = img;
       if (width > maxDim || height > maxDim) {
         const scale = maxDim / Math.max(width, height);
@@ -167,10 +179,34 @@ export default function Register() {
   }, []);
 
   const getOcrEngine = async () => {
-    if (ocrEngineRef.current) return ocrEngineRef.current;
-    const engine = await PaddleOCR.create({ lang: "en", ocrVersion: "PP-OCRv5", ortOptions: { backend: "wasm" } });
-    ocrEngineRef.current = engine;
-    return engine;
+    if (window.__ecoOcrEngine) {
+      ocrEngineRef.current = window.__ecoOcrEngine;
+      return window.__ecoOcrEngine;
+    }
+    if (ocrEngineRef.current) {
+      window.__ecoOcrEngine = ocrEngineRef.current;
+      return ocrEngineRef.current;
+    }
+
+    const originalWarn = console.warn;
+    console.warn = (...args) => {
+      const msg = args.join(" ");
+      if (msg.includes("CleanUnusedInitializersAndNodeArgs")) return;
+      originalWarn(...args);
+    };
+
+    try {
+      const engine = await PaddleOCR.create({
+        lang: "en",
+        ocrVersion: "PP-OCRv5",
+        ortOptions: { backend: "wasm" },
+      });
+      ocrEngineRef.current = engine;
+      window.__ecoOcrEngine = engine;
+      return engine;
+    } finally {
+      console.warn = originalWarn;
+    }
   };
 
   const processIdFace = async (file) => {
@@ -226,12 +262,25 @@ export default function Register() {
     setOcrText("");
     setOcrValidation({ passed: false, reason: "" });
 
+    const t0 = performance.now();
     try {
       const blob = await preprocessIdImage(file);
+      const tPre = performance.now();
+
       const engine = await getOcrEngine();
+      const tEngine = performance.now();
+
       if (runId !== ocrRunIdRef.current) return;
 
       const result = await engine.predict(blob);
+      const tPredict = performance.now();
+
+      console.log(
+        `[OCR Timing] preprocess=${(tPre - t0).toFixed(0)}ms ` +
+        `engine_create=${(tEngine - tPre).toFixed(0)}ms ` +
+        `predict=${(tPredict - tEngine).toFixed(0)}ms`
+      );
+
       if (runId !== ocrRunIdRef.current) return;
 
       const data = Array.isArray(result) ? result[0] : result;

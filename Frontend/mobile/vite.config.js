@@ -8,6 +8,10 @@ export default defineConfig({
     host: true,
     port: 5173,
     strictPort: false,
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "require-corp",
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
