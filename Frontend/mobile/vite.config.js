@@ -21,6 +21,15 @@ export default defineConfig({
       },
     },
   },
+  resolve: {
+    alias: {
+      // PaddleOCR imports the default `onnxruntime-web` entry, which bundles
+      // the ~28 MB WebGPU/JSEP WASM. That exceeds Cloudflare Pages' 25 MiB
+      // per-file limit. We force the CPU-only WASM backend anyway, so this
+      // alias drops the dead WebGPU artifact and leaves only the ~13 MB CPU WASM.
+      'onnxruntime-web': 'onnxruntime-web/wasm',
+    },
+  },
   optimizeDeps: {
     exclude: ['@paddleocr/paddleocr-js'],
     include: ['clipper-lib', '@techstark/opencv-js', 'js-yaml'],
