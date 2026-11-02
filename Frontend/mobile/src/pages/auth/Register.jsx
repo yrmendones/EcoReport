@@ -12,7 +12,13 @@ try {
   const cores = navigator.hardwareConcurrency || 4;
   ort.env.wasm.numThreads = Math.min(4, cores);
   ort.env.wasm.simd = true;
-  console.log(`[ORT] numThreads = ${ort.env.wasm.numThreads} (device has ${cores} cores)`);
+
+  ort.env.wasm.wasmPaths = "/ort/";
+
+  console.log(
+    `[ORT] numThreads = ${ort.env.wasm.numThreads} (device has ${cores} cores), ` +
+    `wasmPaths = ${ort.env.wasm.wasmPaths}`
+  );
 } catch (e) {
   console.warn("[ORT] Could not configure WASM threads:", e);
 }
