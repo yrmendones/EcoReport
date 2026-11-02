@@ -7,8 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "prebuild": "node scripts/copy-ort.mjs"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@paddleocr/paddleocr-js": "^0.4.2",

@@ -13,7 +13,8 @@ try {
   ort.env.wasm.numThreads = Math.min(4, cores);
   ort.env.wasm.simd = true;
 
-  ort.env.wasm.wasmPaths = "/ort/";
+  ort.env.wasm.wasmPaths =
+    "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/";
 
   console.log(
     `[ORT] numThreads = ${ort.env.wasm.numThreads} (device has ${cores} cores), ` +
