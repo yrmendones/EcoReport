@@ -90,10 +90,27 @@ function stripHtmlToPlainText(html) {
 // parse user settings JSON safely
 function parseSettings(raw) {
     if (!raw) return {};
-    if (typeof raw === 'string') {
+
+    if (Buffer.isBuffer(raw) || raw instanceof Uint8Array) {
+        try {
+            return JSON.parse(Buffer.from(raw).toString("utf8"));
+        } catch {
+            return {};
+        }
+    }
+    if (typeof raw === "string") {
         try { return JSON.parse(raw); } catch { return {}; }
     }
-    return raw;
+    if (typeof raw === "object") return raw;
+
+    return {};
+}
+
+function toBool(v, defaultValue) {
+    if (v === undefined || v === null) return defaultValue;
+    if (v === true || v === 1 || v === 1.0 || v === "true" || v === "1" || v === "TRUE") return true;
+    if (v === false || v === 0 || v === "false" || v === "0" || v === "FALSE") return false;
+    return defaultValue;
 }
 
 // Create individual notification for a user
@@ -110,7 +127,7 @@ exports.createNotification = async (userId, title, message, type = 'Report Updat
 
         const plainMessage = stripHtmlToPlainText(message);
 
-        if (settings.pushNotifications !== false) {
+        if (toBool(settings.pushNotifications, true)) {
             await db.query(
                 'INSERT INTO notifications (user_id, title, message, type, is_read, created_at, reference_id) VALUES (?, ?, ?, ?, 0, NOW(), ?)',
                 [userId, title, plainMessage, type, referenceId]
@@ -119,7 +136,7 @@ exports.createNotification = async (userId, title, message, type = 'Report Updat
             console.log(`⏭️ Push notifications OFF for user ${userId} — skipping in-app.`);
         }
 
-        if (settings.emailNotifications === true && userEmail) {
+        if (toBool(settings.emailNotifications, false) && userEmail) {
             sendNotificationEmail(userEmail, title, plainMessage, type).catch((emailErr) => {
                 console.error('⚠️ Email notification failed:', emailErr.message);
             });
@@ -139,18 +156,34 @@ exports.broadcastToResidents = async (title, message, type = 'Announcement', ref
         const inAppRows = [];
         const emailTargets = [];
 
-        // Strip HTML once — same plain text used for both in-app and email
         const plainMessage = stripHtmlToPlainText(message);
+
+        // Temporary debug — reveals what mysql2 actually returns for `settings`
+        if (residents.length > 0) {
+            const sample = residents[0];
+            console.log(
+                `[BCAST DEBUG] total=${residents.length} ` +
+                `sample_user=${sample.user_id} ` +
+                `raw_type=${typeof sample.settings} ` +
+                `isBuffer=${Buffer.isBuffer(sample.settings)} ` +
+                `parsed=${JSON.stringify(parseSettings(sample.settings))}`
+            );
+        }
 
         for (const resident of residents) {
             const settings = parseSettings(resident.settings);
 
-            if (settings.pushNotifications !== false) {
+            const pushOn = toBool(settings.pushNotifications, true);
+            const emailOn = toBool(settings.emailNotifications, false);
+
+            if (pushOn) {
                 inAppRows.push([resident.user_id, title, plainMessage, type, 0, referenceId]);
+            }
+            if (emailOn && resident.email) {
+                emailTargets.push(resident.email);
             }
         }
 
-        // Batch insert all in-app notifications in a single query
         if (inAppRows.length > 0) {
             const placeholders = inAppRows.map(() => '(?, ?, ?, ?, ?, ?, NOW())').join(', ');
             await db.query(
@@ -159,14 +192,17 @@ exports.broadcastToResidents = async (title, message, type = 'Announcement', ref
             );
         }
 
-        // Fire emails asynchronously
         for (const email of emailTargets) {
             sendNotificationEmail(email, title, plainMessage, type).catch((err) => {
                 console.error(`⚠️ Email to ${email} failed:`, err.message);
             });
         }
 
-        console.log(`📢 Broadcast "${title}" [${type}] — in-app: ${inAppRows.length}, email: ${emailTargets.length}, total residents: ${residents.length}`);
+        console.log(
+            `📢 Broadcast "${title}" [${type}] — ` +
+            `in-app: ${inAppRows.length}, email: ${emailTargets.length}, total residents: ${residents.length}`
+        );
+
         return { inApp: inAppRows.length, email: emailTargets.length, total: residents.length };
     } catch (err) {
         console.error('Error broadcasting to residents:', err);
@@ -186,33 +222,31 @@ exports.sendNotificationCenter = async (title, message) => {
         const [residents] = await db.query(
             'SELECT user_id, email, settings FROM users WHERE role = "resident"'
         );
+
+        const plainMessage = stripHtmlToPlainText(message);
         let inAppCount = 0;
         let emailCount = 0;
 
         for (const resident of residents) {
-          const settings = parseSettings(resident.settings);
+            const settings = parseSettings(resident.settings);
 
-          const plainMessage = stripHtmlToPlainText(message);
+            const pushOn = toBool(settings.pushNotifications, true);
+            const emailOn = toBool(settings.emailNotifications, false);
 
-            // In-app notification
-            if (settings.pushNotifications !== false) {
+            if (pushOn) {
                 await db.query(
                     'INSERT INTO notifications (user_id, title, message, type, is_read, created_at) VALUES (?, ?, ?, "Notification Center", 0, NOW())',
-                    [resident.user_id, title, stripHtmlToPlainText(message)]
+                    [resident.user_id, title, plainMessage]
                 );
                 inAppCount++;
             }
 
-          if (settings.emailNotifications === true && userEmail) {
-            sendNotificationEmail(userEmail, title, plainMessage, type).catch(
-              (emailErr) => {
-                console.error(
-                  "⚠️ Email notification failed:",
-                  emailErr.message,
-                );
-              },
-            );
-          }
+            if (emailOn && resident.email) {
+                sendNotificationEmail(resident.email, title, plainMessage, 'Notification Center').catch((emailErr) => {
+                    console.error(`⚠️ Email to ${resident.email} failed:`, emailErr.message);
+                });
+                emailCount++;
+            }
         }
 
         console.log(
