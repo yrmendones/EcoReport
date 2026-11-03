@@ -26,7 +26,7 @@ function sanitizeDescription(html) {
             p: [], br: [], strong: [], b: [], em: [], i: [], u: [], s: [],
             h1: [], h2: [], h3: [],
             ul: [], ol: [], li: [],
-            a: ["href", "target", "rel"],
+            a: ["href"],
             blockquote: [],
             img: ["src", "alt", "width", "height", "loading"],
             video: ["src", "controls", "width", "height", "poster", "preload"],
@@ -40,6 +40,7 @@ function sanitizeDescription(html) {
                 const safe = /^(https?:|mailto:|tel:|#)/i.test(value)
                     ? value
                     : `https://${value}`;
+
                 return `${name}="${safe}" target="_blank" rel="noopener noreferrer"`;
             }
             if (tag === "img" && name === "src") {

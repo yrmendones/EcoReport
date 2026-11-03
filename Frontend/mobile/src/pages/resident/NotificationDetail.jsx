@@ -71,7 +71,7 @@ export default function NotificationDetail() {
               {notification.message}
             </p>
 
-            {/* Show button only if it's a Report Update with reference_id */}
+            {/* Report Update → link to report detail */}
             {notification.type === "Report Update" && notification.reference_id && (
               <button
                 onClick={handleGoToReport}
@@ -80,6 +80,17 @@ export default function NotificationDetail() {
                 View Report Details
               </button>
             )}
+
+            {/* Announcement / Health Announcement / Disaster Alert / Notification Center → link to announcement detail */}
+            {["Announcement", "Health Announcement", "Disaster Alert"].includes(notification.type) &&
+              notification.reference_id && (
+                <button
+                  onClick={() => navigate(`/announcement-detail/${notification.reference_id}`)}
+                  className="mt-6 w-full h-[48px] bg-[#0B5D2A] text-white rounded-xl font-bold text-[14px] shadow-md hover:bg-[#084A21] active:scale-[0.98] transition"
+                >
+                  View Full Announcement
+                </button>
+              )}
           </div>
         </main>
 

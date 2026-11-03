@@ -65,6 +65,28 @@ exports.markAllAsRead = async (req, res) => {
 // INTERNAL HELPERS
 // ============================================================
 
+// parse user settings JSON safely Convert sanitized announcement HTML into readable plain text for notifications.
+function stripHtmlToPlainText(html) {
+  if (!html) return "";
+  return String(html)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/h[1-6]>/gi, "\n\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/blockquote>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 // parse user settings JSON safely
 function parseSettings(raw) {
     if (!raw) return {};
@@ -86,17 +108,19 @@ exports.createNotification = async (userId, title, message, type = 'Report Updat
         const settings = parseSettings(users[0].settings);
         const userEmail = users[0].email;
 
+        const plainMessage = stripHtmlToPlainText(message);
+
         if (settings.pushNotifications !== false) {
             await db.query(
                 'INSERT INTO notifications (user_id, title, message, type, is_read, created_at, reference_id) VALUES (?, ?, ?, ?, 0, NOW(), ?)',
-                [userId, title, message, type, referenceId]
+                [userId, title, plainMessage, type, referenceId]
             );
         } else {
             console.log(`⏭️ Push notifications OFF for user ${userId} — skipping in-app.`);
         }
 
         if (settings.emailNotifications === true && userEmail) {
-            sendNotificationEmail(userEmail, title, message, type).catch((emailErr) => {
+            sendNotificationEmail(userEmail, title, plainMessage, type).catch((emailErr) => {
                 console.error('⚠️ Email notification failed:', emailErr.message);
             });
         }
@@ -115,14 +139,14 @@ exports.broadcastToResidents = async (title, message, type = 'Announcement', ref
         const inAppRows = [];
         const emailTargets = [];
 
+        // Strip HTML once — same plain text used for both in-app and email
+        const plainMessage = stripHtmlToPlainText(message);
+
         for (const resident of residents) {
             const settings = parseSettings(resident.settings);
 
             if (settings.pushNotifications !== false) {
-                inAppRows.push([resident.user_id, title, message, type, 0, referenceId]);
-            }
-            if (settings.emailNotifications === true && resident.email) {
-                emailTargets.push(resident.email);
+                inAppRows.push([resident.user_id, title, plainMessage, type, 0, referenceId]);
             }
         }
 
@@ -136,20 +160,6 @@ exports.broadcastToResidents = async (title, message, type = 'Announcement', ref
         }
 
         // Fire emails asynchronously
-        // Strip HTML for the email body
-        const plainMessage = String(message || "")
-            .replace(/<br\s*\/?>/gi, "\n")
-            .replace(/<\/p>/gi, "\n\n")
-            .replace(/<[^>]+>/g, "")
-            .replace(/&nbsp;/g, " ")
-            .replace(/&amp;/g, "&")
-            .replace(/&lt;/g, "<")
-            .replace(/&gt;/g, ">")
-            .replace(/&quot;/g, '"')
-            .replace(/\n{3,}/g, "\n\n")
-            .trim();
-
-        // Fire emails asynchronously (don't block the response)
         for (const email of emailTargets) {
             sendNotificationEmail(email, title, plainMessage, type).catch((err) => {
                 console.error(`⚠️ Email to ${email} failed:`, err.message);
@@ -179,35 +189,30 @@ exports.sendNotificationCenter = async (title, message) => {
         let inAppCount = 0;
         let emailCount = 0;
 
-                for (const resident of residents) {
-            const settings = parseSettings(resident.settings);
+        for (const resident of residents) {
+          const settings = parseSettings(resident.settings);
+
+          const plainMessage = stripHtmlToPlainText(message);
 
             // In-app notification
             if (settings.pushNotifications !== false) {
                 await db.query(
                     'INSERT INTO notifications (user_id, title, message, type, is_read, created_at) VALUES (?, ?, ?, "Notification Center", 0, NOW())',
-                    [resident.user_id, title, message]
+                    [resident.user_id, title, stripHtmlToPlainText(message)]
                 );
                 inAppCount++;
             }
 
-            if (settings.emailNotifications === true && resident.email) {
-                sendNotificationEmail(
-                    resident.email,
-                    title,
-                    message,
-                    'Notification Center'
-                )
-                    .then(() => {
-                        console.log(`✅ Email sent to ${resident.email}`);
-                    })
-                    .catch((emailErr) => {
-                        console.error(
-                            `⚠️ Email to ${resident.email} failed:`,
-                            emailErr.message
-                        );
-                    });
-            }
+          if (settings.emailNotifications === true && userEmail) {
+            sendNotificationEmail(userEmail, title, plainMessage, type).catch(
+              (emailErr) => {
+                console.error(
+                  "⚠️ Email notification failed:",
+                  emailErr.message,
+                );
+              },
+            );
+          }
         }
 
         console.log(
