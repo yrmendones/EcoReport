@@ -158,18 +158,6 @@ exports.broadcastToResidents = async (title, message, type = 'Announcement', ref
 
         const plainMessage = stripHtmlToPlainText(message);
 
-        // Temporary debug — reveals what mysql2 actually returns for `settings`
-        if (residents.length > 0) {
-            const sample = residents[0];
-            console.log(
-                `[BCAST DEBUG] total=${residents.length} ` +
-                `sample_user=${sample.user_id} ` +
-                `raw_type=${typeof sample.settings} ` +
-                `isBuffer=${Buffer.isBuffer(sample.settings)} ` +
-                `parsed=${JSON.stringify(parseSettings(sample.settings))}`
-            );
-        }
-
         for (const resident of residents) {
             const settings = parseSettings(resident.settings);
 
