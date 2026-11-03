@@ -15,11 +15,22 @@ L.Icon.Default.mergeOptions({
 });
 
 const BARANGAY_BOUNDS = {
-  north: 14.5545,
-  south: 14.5505,
-  east: 121.0745008909207,
-  west: 121.06424180477325,
+  north: 14.55769923756584,
+  south: 14.549030925901317,
+  east: 121.07067839910466,
+  west: 121.06177492093398,
 };
+
+const BARANGAY_POLYGON = [
+  [14.55769923756584, 121.06629257249703],
+  [14.556346053245349, 121.06304747722577],
+  [14.553353114581022, 121.06177492093398],
+  [14.5503472066974, 121.06301684973586],
+  [14.549030925901317, 121.06622365594112],
+  [14.550284671220394, 121.0694687321997],
+  [14.553314388592, 121.07067839910466],
+  [14.556455506786161, 121.06931238647843],
+];
 
 // ============================================================
 // STATUS COLORS
@@ -145,7 +156,7 @@ export default function MapPage() {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
-    L.rectangle(bounds, {
+    L.polygon(BARANGAY_POLYGON, {
       color: "#0B5D2A",
       weight: 2,
       opacity: 0.6,

@@ -14,10 +14,34 @@ L.Icon.Default.mergeOptions({
 });
 
 const BARANGAY_BOUNDS = {
-  north: 14.5545,
-  south: 14.5505,
-  east: 121.0745008909207,
-  west: 121.06424180477325,
+  north: 14.55769923756584,
+  south: 14.549030925901317,
+  east: 121.07067839910466,
+  west: 121.06177492093398,
+};
+
+const BARANGAY_POLYGON = [
+  [14.55769923756584, 121.06629257249703],
+  [14.556346053245349, 121.06304747722577],
+  [14.553353114581022, 121.06177492093398],
+  [14.5503472066974, 121.06301684973586],
+  [14.549030925901317, 121.06622365594112],
+  [14.550284671220394, 121.0694687321997],
+  [14.553314388592, 121.07067839910466],
+  [14.556455506786161, 121.06931238647843],
+];
+
+const isPointInPolygon = (lat, lng, polygon) => {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [latI, lngI] = polygon[i];
+    const [latJ, lngJ] = polygon[j];
+    const intersect =
+      (lngI > lng) !== (lngJ > lng) &&
+      lat < ((latJ - latI) * (lng - lngI)) / (lngJ - lngI) + latI;
+    if (intersect) inside = !inside;
+  }
+  return inside;
 };
 
 // Map from file extension
@@ -106,8 +130,7 @@ export default function AllReport() {
     if (report.latitude && report.longitude) {
       const lat = parseFloat(report.latitude);
       const lng = parseFloat(report.longitude);
-      const isInside = lat >= BARANGAY_BOUNDS.south && lat <= BARANGAY_BOUNDS.north &&
-                       lng >= BARANGAY_BOUNDS.west && lng <= BARANGAY_BOUNDS.east;
+      const isInside = isPointInPolygon(lat, lng, BARANGAY_POLYGON);
       if (isInside) {
         return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       } else {
@@ -146,7 +169,7 @@ export default function AllReport() {
       [BARANGAY_BOUNDS.south, BARANGAY_BOUNDS.west],
       [BARANGAY_BOUNDS.north, BARANGAY_BOUNDS.east],
     ];
-    L.rectangle(bounds, {
+    L.polygon(BARANGAY_POLYGON, {
       color: "#0B5D2A",
       weight: 2,
       opacity: 0.6,
