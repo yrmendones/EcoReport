@@ -36,7 +36,9 @@ async function generateResidentId() {
 exports.register = async (req, res) => {
     try {
         const {
-            first_name, middle_name, last_name, house_no, street, permanent_address,
+            first_name, middle_name, last_name, house_no, street,
+            permanent_house_no, permanent_street, permanent_barangay, permanent_city,
+            permanent_same_as_current, permanent_address: legacy_permanent_address,
             contact_number, email, password, confirm_password, id_type, valid_id_url, selfie_image
         } = req.body;
 
@@ -82,16 +84,48 @@ exports.register = async (req, res) => {
         const safeContact = contact_number ? sanitizeText(contact_number, 20) : null;
         const safeIdType = id_type ? sanitizeText(id_type, 50) : null;
 
+        let permHouse = permanent_house_no;
+        let permStreet = permanent_street;
+        let permBrgy = permanent_barangay;
+        let permCity = permanent_city;
+
+        if (permanent_same_as_current === true) {
+            permHouse = house_no || null;
+            permStreet = street || null;
+            permBrgy = "Sto. Rosario Kanluran";
+            permCity = "Pateros";
+        }
+
+        const hasStructuredPermanent =
+            permHouse || permStreet || permBrgy || permCity;
+
+        const permanent_address = hasStructuredPermanent
+            ? [
+                  `${permHouse || ""} ${permStreet || ""}`.trim(),
+                  permBrgy,
+                  permCity,
+              ]
+                  .filter(Boolean)
+                  .join(", ")
+            : (legacy_permanent_address || null);
+
         const [result] = await db.query(
             `INSERT INTO users 
-            (resident_id, first_name, middle_name, last_name, house_no, street, address, permanent_address, contact_number, email, password_hash, id_type, valid_id_url, selfie_image, role, status, is_verified, verification_status, registered_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'resident', 'Online', 0, 'Pending Verification', CURDATE())`,
+            (resident_id, first_name, middle_name, last_name, house_no, street, address,
+             permanent_house_no, permanent_street, permanent_barangay, permanent_city,
+             permanent_address, contact_number, email, password_hash, id_type, valid_id_url, selfie_image,
+             role, status, is_verified, verification_status, registered_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'resident', 'Online', 0, 'Pending Verification', CURDATE())`,
             [
-                resident_id, safeFirst, safeMiddle, safeLast,
-                safeHouse, safeStreet, safeAddress,
-                safePermAddr,
-                safeContact, email, password_hash,
-                safeIdType,
+                resident_id, first_name, middle_name || null, last_name,
+                house_no || null, street || null, fullAddress,
+                permHouse || null,
+                permStreet || null,
+                permBrgy || null,
+                permCity || null,
+                permanent_address,
+                contact_number || null, email, password_hash,
+                id_type || null,
                 valid_id_url || null,
                 selfie_image || null
             ]
