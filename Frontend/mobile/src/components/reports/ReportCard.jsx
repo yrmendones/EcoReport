@@ -58,16 +58,19 @@ export default function ReportCard({ report, onClick }) {
 
         {/* ================= DETAILS ================= */}
         <div className="flex-1 min-w-0">
-          <h3 className="text-[15px] font-extrabold text-gray-900 leading-tight truncate">
+          <h3
+            title={report.title}
+            className="text-[15px] font-extrabold text-gray-900 leading-tight truncate"
+          >
             {report.title}
           </h3>
 
-          <p className="text-[11px] text-gray-500 mt-2">Reference No.</p>
-          <p className="text-[11px] font-semibold text-[#0B5D2A] mt-0.5">
+          <p className="text-[12px] text-gray-500 mt-2">Reference No.</p>
+          <p className="text-[12px] font-semibold text-[#0B5D2A] mt-0.5">
             {report.ref}
           </p>
 
-          <p className="text-[11px] text-gray-500 mt-1">{report.date}</p>
+          <p className="text-[12px] text-gray-500 mt-1">{report.date}</p>
         </div>
 
         {/* ================= RIGHT SIDE ================= */}

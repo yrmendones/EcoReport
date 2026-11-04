@@ -1,56 +1,39 @@
 import { useNavigate } from "react-router-dom";
-import { FaBullhorn, FaChevronRight } from "react-icons/fa";
+import { FaChevronRight } from "react-icons/fa";
 
 export default function AnnouncementCard({ title, subtitle, announcementId }) {
   const navigate = useNavigate();
-
-  const handleClick = () => {
-    if (announcementId) {
-      navigate(`/announcement-detail/${announcementId}`);
-    }
-  };
+  const canOpen = announcementId !== null && announcementId !== undefined;
 
   return (
     <button
       type="button"
-      onClick={handleClick}
-      className="
-        w-full
-        min-h-[82px]
-        bg-white
-        border
-        border-[#C8DCC3]
-        rounded-[22px]
-        px-5
-        py-4
-  ؠ     flex
- Ġ   Р  items-center
-        justify-between
-        gap-4
-        shadow-sm
-        hover:shadow-md
-        hover:border-[#0B5D2A]
-        transition-all
-        text-left
-        focus:outline-none
-        active:scale-[0.99]
-      "
+      disabled={!canOpen}
+      onClick={() => canOpen && navigate(`/announcement-detail/${announcementId}`)}
+      className={`block w-full bg-white text-left transition ${
+        canOpen ? "hover:shadow-md active:scale-[0.99]" : "cursor-default"
+      }`}
+      style={{
+        padding: "24px",
+        border: "1px solid #D5E4D1",
+        borderRadius: "22px",
+        boxShadow: "0 1px 4px rgba(0, 0, 0, 0.06)",
+        boxSizing: "border-box",
+      }}
     >
-      <div className="flex items-center gap-4 min-w-0 flex-1">
-        <div className="w-12 h-12 rounded-2xl bg-[#E8F5E3] flex items-center justify-center shrink-0">
-          <FaBullhorn className="text-[#0B5D2A] -scale-x-100" size={21} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h3 className="text-[15px] font-extrabold text-gray-900 leading-5 truncate">
+      <div className="flex items-center justify-between" style={{ gap: "16px" }}>
+        <div className="min-w-0 flex flex-col" style={{ gap: "8px" }}>
+          <h3 className="text-[17px] font-extrabold text-gray-900 leading-7 break-words">
             {title}
           </h3>
-          <p className="text-[12px] text-gray-500 font-medium leading-5 truncate mt-1">
+          <p className="text-[14px] text-gray-500 leading-5 break-words">
             {subtitle}
           </p>
         </div>
-      </div>
-      <div className="w-8 h-8 rounded-full bg-[#F0F8ED] flex items-center justify-center shrink-0">
-        <FaChevronRight className="text-[#0B5D2A]" size={13} />
+
+        {canOpen && (
+          <FaChevronRight className="shrink-0 text-[#0B5D2A]" size={16} />
+        )}
       </div>
     </button>
   );

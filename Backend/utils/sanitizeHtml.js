@@ -40,7 +40,6 @@ function sanitizeDescription(html) {
                 const safe = /^(https?:|mailto:|tel:|#)/i.test(value)
                     ? value
                     : `https://${value}`;
-
                 return `${name}="${safe}" target="_blank" rel="noopener noreferrer"`;
             }
             if (tag === "img" && name === "src") {
@@ -55,4 +54,22 @@ function sanitizeDescription(html) {
     return myXss.process(normalized);
 }
 
-module.exports = { sanitizeDescription };
+/**
+ * Strip HTML from a plain-text field (name, address, category, etc.).
+ * Escaping the 5 dangerous chars prevents both tag injection and attribute
+ * injection when the value is later interpolated into an HTML template
+ *
+ * @param {*} value        raw input
+ * @param {number} maxLength  truncate to this many characters (default 255)
+ * @returns {*}            sanitized string, or value unchanged if null/undefined
+ */
+function sanitizeText(value, maxLength = 255) {
+    if (value === null || value === undefined) return value;
+    return String(value)
+        .replace(/[<>"'`]/g, "")
+        .replace(/[\u0000-\u001F\u007F]/g, "")
+        .trim()
+        .slice(0, maxLength);
+}
+
+module.exports = { sanitizeDescription, sanitizeText };
