@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 
 /* Authentication */
 import Welcome from "../pages/auth/Welcome";
@@ -44,6 +44,24 @@ import Description from "../pages/Report/Description";
 import ReportLocation from "../pages/Report/ReportLocation";
 import ReportSuccess from "../pages/Report/SuccessReport";
 
+// RequireResident - blocks every resident-only page when there's
+// no valid session. Redirects to the resident login screen.
+function RequireResident() {
+  const token = localStorage.getItem("token");
+  let role = null;
+  try {
+    role = JSON.parse(localStorage.getItem("user") || "{}").role || null;
+  } catch {
+    role = null;
+  }
+
+  if (!token || role !== "resident") {
+    return <Navigate to="/resident-login" replace />;
+  }
+
+  return <Outlet />;
+}
+
 export default function AppRouter() {
   return (
     <BrowserRouter>
@@ -66,41 +84,46 @@ export default function AppRouter() {
         <Route path="/guest-hotlines" element={<GuestHotlines />} />
         <Route path="/guest-waste-schedule" element={<GuestWasteSchedule />} />
 
-        {/* ================= DASHBOARD ================= */}
-        <Route path="/resident-dashboard" element={<Dashboard />} />
+        {/* ============ RESIDENT-ONLY ROUTES ============ */}
+        <Route element={<RequireResident />}>
 
-        {/* ================= REPORT SUBMISSION ================= */}
-        <Route path="/create-report" element={<CreateReport />} />
-        <Route path="/upload-evidence" element={<UploadEvidence />} />
-        <Route path="/description-step" element={<Description />} />
-        <Route path="/report-location" element={<ReportLocation />} />
-        <Route path="/report-success" element={<ReportSuccess />} />
+          {/* ================= DASHBOARD ================= */}
+          <Route path="/resident-dashboard" element={<Dashboard />} />
 
-        {/* ================= REPORTS ================= */}
-        <Route path="/my-reports" element={<MyReports />} />
-        <Route path="/report-details/:id" element={<ReportDetails />} />
-        <Route path="/report-status/:id" element={<ReportStatus />} />
+          {/* ================= REPORT SUBMISSION ================= */}
+          <Route path="/create-report" element={<CreateReport />} />
+          <Route path="/upload-evidence" element={<UploadEvidence />} />
+          <Route path="/description-step" element={<Description />} />
+          <Route path="/report-location" element={<ReportLocation />} />
+          <Route path="/report-success" element={<ReportSuccess />} />
 
-        {/* ================= RESIDENT FEATURES ================= */}
-        <Route path="/environment-map" element={<EnvironmentalMap />} />
-        <Route path="/waste-schedule" element={<WasteSchedule />} />
-        <Route path="/announcements" element={<Announcement />} />
-        <Route path="/announcement-detail/:id" element={<AnnouncementDetail />} />
-        <Route path="/health-center" element={<HealthCenter />} />
-        <Route path="/hotline" element={<EmergencyHotline />} />
-        <Route path="/certificate-request" element={<CertificateRequest />} />
-        <Route path="/appointment" element={<Appointment />} />
+          {/* ================= REPORTS ================= */}
+          <Route path="/my-reports" element={<MyReports />} />
+          <Route path="/report-details/:id" element={<ReportDetails />} />
+          <Route path="/report-status/:id" element={<ReportStatus />} />
 
-        {/* ================= NOTIFICATIONS ================= */}
-        <Route path="/notifications" element={<Notifications />} />
-        <Route path="/notification-detail/:id" element={<NotificationDetail />} />
+          {/* ================= RESIDENT FEATURES ================= */}
+          <Route path="/environment-map" element={<EnvironmentalMap />} />
+          <Route path="/waste-schedule" element={<WasteSchedule />} />
+          <Route path="/announcements" element={<Announcement />} />
+          <Route path="/announcement-detail/:id" element={<AnnouncementDetail />} />
+          <Route path="/health-center" element={<HealthCenter />} />
+          <Route path="/hotline" element={<EmergencyHotline />} />
+          <Route path="/certificate-request" element={<CertificateRequest />} />
+          <Route path="/appointment" element={<Appointment />} />
 
-        {/* ================= PROFILE ================= */}
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/qr-code" element={<QRCodePage />} />
-        <Route path="/edit-profile" element={<EditProfile />} />
-        <Route path="/change-password" element={<ChangePassword />} />
-        <Route path="/privacy-settings" element={<PrivacySettings />} />
+          {/* ================= NOTIFICATIONS ================= */}
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/notification-detail/:id" element={<NotificationDetail />} />
+
+          {/* ================= PROFILE ================= */}
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/qr-code" element={<QRCodePage />} />
+          <Route path="/edit-profile" element={<EditProfile />} />
+          <Route path="/change-password" element={<ChangePassword />} />
+          <Route path="/privacy-settings" element={<PrivacySettings />} />
+
+        </Route>
       </Routes>
     </BrowserRouter>
   );

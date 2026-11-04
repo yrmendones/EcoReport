@@ -28,56 +28,45 @@ import AuditLogs from "./pages/auditlogs";
 import Profile from "./pages/profile";
 
 // ============================================================
-// PersistentSidebar
+// AUTH HELPERS
 // ============================================================
-function PersistentSidebar() {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const hideOn = ["/", "/login", "/admin-login", "/forgot-password", "/reset-password"];
-  if (location.pathname.startsWith("/verify-resident/")) return null;
-  if (hideOn.includes(location.pathname)) return null;
-
-  const menuItems = getMenuItems(location.pathname);
-
-  return (
-    <aside className="persistent-sidebar">
-      <img src="/sidebar.png" alt="" className="persistent-sidebar-bg" />
-      <div className="persistent-sidebar-overlay"></div>
-      <div className="persistent-sidebar-content">
-        <div className="persistent-sidebar-brand">
-          <img src="/lightleaf.png" alt="EcoReport" className="persistent-sidebar-brand-img" />
-          <span className="persistent-sidebar-brand-name">EcoReport</span>
-        </div>
-        <div className="persistent-sidebar-barangay">Barangay Sto. Rosario Kanluran</div>
-        <nav className="persistent-sidebar-menu">
-          {menuItems.map((item, index) => (
-            <button
-              key={index}
-              type="button"
-              className={`persistent-menu-item ${item.active ? "active" : ""}`}
-              onClick={() => navigate(item.path)}
-            >
-              <img src={item.icon} alt="" className="persistent-menu-icon" />
-              <span className="persistent-menu-text">{item.name}</span>
-            </button>
-          ))}
-        </nav>
-      </div>
-    </aside>
-  );
+// Single source of truth for "who is logged in right now".
+// Guards and sidebar both call this so they can never disagree.
+function readAuth() {
+  const token = localStorage.getItem("token");
+  if (!token) return { token: null, role: null };
+  try {
+    const admin = JSON.parse(localStorage.getItem("admin") || "{}");
+    return { token, role: admin.role || null };
+  } catch {
+    return { token, role: null };
+  }
 }
 
 // ============================================================
-// Admin-only route guard
+// RequireStaff - admin OR barangay_official
+// ============================================================
+function RequireStaff({ children }) {
+  const { token, role } = readAuth();
+  const isStaff = role === "admin" || role === "barangay_official";
+  if (!token || !isStaff) {
+    return <Navigate to="/admin-login" replace />;
+  }
+  return children;
+}
+
+// ============================================================
+// RequireAdmin - strictly admin
 // ============================================================
 function RequireAdmin({ children }) {
-  let role = "admin";
-  try {
-    const admin = JSON.parse(localStorage.getItem("admin") || "{}");
-    role = admin.role || "admin";
-  } catch { /* ignore */ }
+  const { token, role } = readAuth();
 
+  // Not logged in at all → redirect to login
+  if (!token) {
+    return <Navigate to="/admin-login" replace />;
+  }
+
+  // Logged in but not an admin (i.e. barangay_official) → show denial
   if (role !== "admin") {
     return (
       <div
@@ -117,7 +106,53 @@ function RequireAdmin({ children }) {
       </div>
     );
   }
+
   return children;
+}
+
+// ============================================================
+// PersistentSidebar
+// ============================================================
+function PersistentSidebar() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const hideOn = ["/", "/login", "/admin-login", "/forgot-password", "/reset-password"];
+  if (location.pathname.startsWith("/verify-resident/")) return null;
+  if (hideOn.includes(location.pathname)) return null;
+
+  // Do not render the sidebar for logged-out visitors. Without this, redirected to /admin-login.
+  const { token, role } = readAuth();
+  if (!token || (role !== "admin" && role !== "barangay_official")) return null;
+
+  const menuItems = getMenuItems(location.pathname);
+
+  return (
+    <aside className="persistent-sidebar">
+      <img src="/sidebar.png" alt="" className="persistent-sidebar-bg" />
+      <div className="persistent-sidebar-overlay"></div>
+      <div className="persistent-sidebar-content">
+        <div className="persistent-sidebar-brand">
+          <img src="/lightleaf.png" alt="EcoReport" className="persistent-sidebar-brand-img" />
+          <span className="persistent-sidebar-brand-name">EcoReport</span>
+        </div>
+        <div className="persistent-sidebar-barangay">Barangay Sto. Rosario Kanluran</div>
+        <nav className="persistent-sidebar-menu">
+          {menuItems.map((item, index) => (
+            <button
+              key={index}
+              type="button"
+              className={`persistent-menu-item ${item.active ? "active" : ""}`}
+              onClick={() => navigate(item.path)}
+            >
+              <img src={item.icon} alt="" className="persistent-menu-icon" />
+              <span className="persistent-menu-text">{item.name}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+    </aside>
+  );
 }
 
 // ============================================================
@@ -126,41 +161,43 @@ function RequireAdmin({ children }) {
 export default function App() {
   return (
     <BrowserRouter>
-      {/* Persistent sidebar */}
       <PersistentSidebar />
 
       <Routes>
+        {/* ---------- Public ---------- */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ForgotPassword />} />
-
         <Route path="/verify-resident/:token" element={<VerifyResident />} />
 
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/report" element={<Report />} />
-        <Route path="/allreport" element={<AllReport />} />
-        <Route path="/allreport/:id" element={<AllReport />} />
-        <Route path="/assignment" element={<Assignment />} />
-        <Route path="/announcement" element={<Announcement />} />
-        <Route path="/notification" element={<Notification />} />
-        <Route path="/map" element={<Map />} />
-        <Route path="/waste-schedule" element={<WasteSchedule />} />
-        <Route path="/certificate" element={<Certificate />} />
-        <Route path="/health-center" element={<HealthCenter />} />
-        <Route path="/business" element={<Business />} />
-        <Route path="/inventory" element={<Inventory />} />
-        <Route path="/blotter" element={<Blotter />} />
-        <Route path="/disaster-emergency" element={<DisasterEmergency />} />
-        <Route path="/emergency-hotline" element={<EmergencyHotline />} />
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/profile" element={<Profile />} />
+        {/* ---------- Staff (admin OR barangay_official) ---------- */}
+        <Route path="/dashboard" element={<RequireStaff><Dashboard /></RequireStaff>} />
+        <Route path="/report" element={<RequireStaff><Report /></RequireStaff>} />
+        <Route path="/allreport" element={<RequireStaff><AllReport /></RequireStaff>} />
+        <Route path="/allreport/:id" element={<RequireStaff><AllReport /></RequireStaff>} />
+        <Route path="/assignment" element={<RequireStaff><Assignment /></RequireStaff>} />
+        <Route path="/announcement" element={<RequireStaff><Announcement /></RequireStaff>} />
+        <Route path="/notification" element={<RequireStaff><Notification /></RequireStaff>} />
+        <Route path="/map" element={<RequireStaff><Map /></RequireStaff>} />
+        <Route path="/waste-schedule" element={<RequireStaff><WasteSchedule /></RequireStaff>} />
+        <Route path="/certificate" element={<RequireStaff><Certificate /></RequireStaff>} />
+        <Route path="/health-center" element={<RequireStaff><HealthCenter /></RequireStaff>} />
+        <Route path="/business" element={<RequireStaff><Business /></RequireStaff>} />
+        <Route path="/inventory" element={<RequireStaff><Inventory /></RequireStaff>} />
+        <Route path="/blotter" element={<RequireStaff><Blotter /></RequireStaff>} />
+        <Route path="/disaster-emergency" element={<RequireStaff><DisasterEmergency /></RequireStaff>} />
+        <Route path="/emergency-hotline" element={<RequireStaff><EmergencyHotline /></RequireStaff>} />
+        <Route path="/analytics" element={<RequireStaff><Analytics /></RequireStaff>} />
+        <Route path="/profile" element={<RequireStaff><Profile /></RequireStaff>} />
 
+        {/* ---------- Admin only ---------- */}
         <Route path="/resident" element={<RequireAdmin><Resident /></RequireAdmin>} />
         <Route path="/qr" element={<RequireAdmin><QR /></RequireAdmin>} />
         <Route path="/auditlogs" element={<RequireAdmin><AuditLogs /></RequireAdmin>} />
 
+        {/* ---------- Fallback ---------- */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

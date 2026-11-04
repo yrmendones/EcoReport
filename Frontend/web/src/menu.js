@@ -21,17 +21,28 @@ const ALL_MENU_ITEMS = [
   { name: "Audit Logs", icon: "/icons/auditlogs.png", path: "/auditlogs" },
 ];
 
+/**
+ * Returns the current staff role: "admin" | "barangay_official" | null.
+ * Returns null when there is no token in storage - i.e. nobody is logged in.
+ */
 export function getStaffRole() {
+  const token = localStorage.getItem("token");
+  if (!token) return null;
   try {
     const admin = JSON.parse(localStorage.getItem("admin") || "{}");
-    return admin.role || "admin";
+    return admin.role || null;
   } catch {
-    return "admin";
+    return null;
   }
 }
 
+/**
+ * Menu items filtered for the current role. Returns [] when not authenticated, so callers can't accidentally render admin-only entries to a logged-out visitor.
+ */
 export function getMenuItems(currentPath = "") {
   const role = getStaffRole();
+  if (!role) return [];
+
   const isAdminRole = role === "admin";
 
   return ALL_MENU_ITEMS

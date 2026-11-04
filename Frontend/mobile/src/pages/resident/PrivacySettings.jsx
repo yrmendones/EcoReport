@@ -51,52 +51,46 @@ export default function PrivacySettings() {
     fetchSettings();
   }, []);
 
-  // Persist a settings object to the backend
-  const persistSettings = async (nextSettings) => {
+  const handleToggle = (setting) => {
+    setSettings((prev) => ({
+      ...prev,
+      [setting]: !prev[setting],
+    }));
+    setSuccess(false);
+    setError("");
+  };
+
+  const handleSave = async () => {
     setSaving(true);
     setError("");
     setSuccess(false);
+
     try {
       await apiFetch("/api/users/me/settings", {
         method: "PUT",
-        body: JSON.stringify(nextSettings),
+        body: JSON.stringify(settings),
       });
-      // Keep localStorage in sync so other parts of the app see the new value
+
+      setSuccess(true);
+
       try {
         const user = JSON.parse(localStorage.getItem("user") || "{}");
-        user.settings = nextSettings;
+        user.settings = settings;
         localStorage.setItem("user", JSON.stringify(user));
-      } catch { /* ignore */ }
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 2000);
-      return true;
+      } catch (e) {
+        console.error("Error updating localStorage:", e);
+      }
+
+      setTimeout(() => {
+        setSuccess(false);
+        navigate("/profile");
+      }, 1500);
     } catch (err) {
       console.error("Error saving settings:", err);
       setError("Failed to save privacy settings. Please try again.");
-      return false;
     } finally {
       setSaving(false);
     }
-  };
-
-  // Auto-save on every toggle so users can't forget to press Save.
-  const handleToggle = async (setting) => {
-    const nextSettings = { ...settings, [setting]: !settings[setting] };
-    const previous = settings;
-
-    // Optimistic update for instant UI feedback
-    setSettings(nextSettings);
-
-    const ok = await persistSettings(nextSettings);
-    if (!ok) {
-      // Revert if save failed so UI matches reality
-      setSettings(previous);
-    }
-  };
-
-  // Save button 
-  const handleSave = async () => {
-    await persistSettings(settings);
   };
 
   if (loading) {

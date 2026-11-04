@@ -4,7 +4,7 @@ const reportController = require('../controllers/reportController');
 const { authenticate } = require('../middleware/auth');
 
 // Public routes
-router.get('/nearby', reportController.getNearbyReports);
+router.get('/nearby', authenticate, reportController.getNearbyReports);
 
 // Authenticated routes
 router.get('/',            authenticate, reportController.getReports);
