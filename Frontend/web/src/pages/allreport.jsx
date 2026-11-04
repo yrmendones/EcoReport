@@ -180,11 +180,21 @@ export default function AllReport() {
     if (hasCoords) {
       const lat = parseFloat(report.latitude);
       const lng = parseFloat(report.longitude);
+
+      // Escape user-controlled fields before injecting into innerHTML
+      const esc = (v) =>
+        String(v ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+
       L.marker([lat, lng])
         .addTo(map)
         .bindPopup(`
-          <strong>${report.category || "Report"}</strong><br/>
-          ${report.address || getLocationDisplay()}
+          <strong>${esc(report.category || "Report")}</strong><br/>
+          ${esc(report.address || getLocationDisplay())}
         `)
         .openPopup();
     }

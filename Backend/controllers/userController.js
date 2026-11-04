@@ -1,5 +1,6 @@
 const db = require('../db');
 const bcrypt = require('bcrypt');
+const { sanitizeText } = require('../utils/sanitizeHtml');
 
 exports.getProfile = async (req, res) => {
     try {
@@ -24,14 +25,14 @@ exports.updateProfile = async (req, res) => {
         const { first_name, middle_name, last_name, house_no, contact_number, address, street, permanent_address, profile_picture } = req.body;
         const updates = [];
         const values = [];
-        if (first_name !== undefined) { updates.push('first_name = ?'); values.push(first_name); }
-        if (middle_name !== undefined) { updates.push('middle_name = ?'); values.push(middle_name || null); }
-        if (last_name !== undefined) { updates.push('last_name = ?'); values.push(last_name); }
-        if (contact_number !== undefined) { updates.push('contact_number = ?'); values.push(contact_number || null); }
-        if (address !== undefined) { updates.push('address = ?'); values.push(address || null); }
-        if (house_no !== undefined) { updates.push('house_no = ?'); values.push(house_no || null); }
-        if (street !== undefined) { updates.push('street = ?'); values.push(street || null); }
-        if (permanent_address !== undefined) { updates.push('permanent_address = ?'); values.push(permanent_address || null); }
+        if (first_name !== undefined) { updates.push('first_name = ?'); values.push(sanitizeText(first_name, 100)); }
+        if (middle_name !== undefined) { updates.push('middle_name = ?'); values.push(middle_name ? sanitizeText(middle_name, 100) : null); }
+        if (last_name !== undefined) { updates.push('last_name = ?'); values.push(sanitizeText(last_name, 100)); }
+        if (contact_number !== undefined) { updates.push('contact_number = ?'); values.push(contact_number ? sanitizeText(contact_number, 20) : null); }
+        if (address !== undefined) { updates.push('address = ?'); values.push(address ? sanitizeText(address, 255) : null); }
+        if (house_no !== undefined) { updates.push('house_no = ?'); values.push(house_no ? sanitizeText(house_no, 50) : null); }
+        if (street !== undefined) { updates.push('street = ?'); values.push(street ? sanitizeText(street, 100) : null); }
+        if (permanent_address !== undefined) { updates.push('permanent_address = ?'); values.push(permanent_address ? sanitizeText(permanent_address, 255) : null); }
         if (profile_picture !== undefined) { updates.push('profile_picture = ?'); values.push(profile_picture || null); }
         if (updates.length === 0) return res.status(400).json({ error: 'No fields to update.' });
         values.push(req.user.id);

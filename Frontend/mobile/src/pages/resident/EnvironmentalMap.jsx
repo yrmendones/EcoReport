@@ -172,16 +172,26 @@ export default function EnvironmentalMap() {
       // Reporter name
       const reporter = getReporterName(report);
 
+      // Escape user-controlled fields before interpolating into HTML.
+      // Leaflet's bindPopup() sets innerHTML - unescaped values run as script.
+      const esc = (v) =>
+        String(v ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+
       const marker = L.marker([lat, lng], {
         icon: createPinIcon(report.status),
       })
         .addTo(mapRef.current)
         .bindPopup(`
           <div style="font-family: Arial; padding: 4px; max-width: 220px; line-height: 1.5;">
-            <strong style="font-size: 13px;">${report.category || "Report"}</strong><br/>
-            <span style="font-size: 11px; color: #666;">${report.address || "Location"}</span><br/>
-            <span style="font-size: 11px; color: #666;">Reported by: <strong>${reporter}</strong></span><br/>
-            <span style="font-size: 11px; color: #999;">Status: ${report.status?.toUpperCase()}</span>
+            <strong style="font-size: 13px;">${esc(report.category || "Report")}</strong><br/>
+            <span style="font-size: 11px; color: #666;">${esc(report.address || "Location")}</span><br/>
+            <span style="font-size: 11px; color: #666;">Reported by: <strong>${esc(reporter)}</strong></span><br/>
+            <span style="font-size: 11px; color: #999;">Status: ${esc(report.status?.toUpperCase() || "")}</span>
           </div>
         `);
 

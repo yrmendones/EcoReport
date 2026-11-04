@@ -1,6 +1,7 @@
 const db = require('../db');
 const { logTimeline } = require('../utils/timelineLogger');
 const { formatRow, formatRows } = require('../utils/dateFormatter');
+const { sanitizeText } = require('../utils/sanitizeHtml');
 
 function parseSettings(raw) {
     if (!raw) return {};
@@ -15,15 +16,20 @@ exports.createReport = async (req, res) => {
         const { user_id, category, description, address, latitude, longitude } = req.body;
         if (!user_id || !category) return res.status(400).json({ error: 'User ID and category required.' });
 
+        // Sanitize before insert
+        const safeCategory = sanitizeText(category, 100);
+        const safeDescription = description ? sanitizeText(description, 5000) : null;
+        const safeAddress = address ? sanitizeText(address, 255) : null;
+
         const [result] = await db.query(
             `INSERT INTO environmental_reports 
             (user_id, category, description, address, latitude, longitude, status, submitted_at) 
             VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())`,
             [
                 user_id,
-                category,
-                description || null,
-                address || null,
+                safeCategory,
+                safeDescription,
+                safeAddress,
                 latitude || null,
                 longitude || null,
             ]

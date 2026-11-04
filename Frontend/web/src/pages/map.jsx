@@ -193,15 +193,24 @@ export default function MapPage() {
       const lng = parseFloat(report.longitude);
       const statusClass = report.status?.toLowerCase() || "pending";
 
+      // Escape all user-controlled fields before interpolating into HTML.
+      const esc = (v) =>
+        String(v ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+
       const marker = L.marker([lat, lng], {
         icon: createPinIcon(statusClass),
       })
         .addTo(map)
         .bindPopup(`
           <div style="font-family: Arial, sans-serif; padding: 4px; max-width: 220px;">
-            <strong>${report.category || "Report"}</strong><br/>
-            <span style="font-size: 12px; color: #666;">${report.address || "Location"}</span><br/>
-            <span style="font-size: 11px; color: #999;">Status: <strong>${report.status?.toUpperCase() || "UNKNOWN"}</strong></span><br/>
+            <strong>${esc(report.category || "Report")}</strong><br/>
+            <span style="font-size: 12px; color: #666;">${esc(report.address || "Location")}</span><br/>
+            <span style="font-size: 11px; color: #999;">Status: <strong>${esc(report.status?.toUpperCase() || "UNKNOWN")}</strong></span><br/>
             <span style="font-size: 10px; color: #aaa;">ID: ER-${new Date().getFullYear()}-${String(report.report_id).padStart(4, "0")}</span>
           </div>
         `);

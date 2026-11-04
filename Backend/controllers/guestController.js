@@ -1,4 +1,5 @@
 const db = require('../db');
+const { sanitizeText } = require('../utils/sanitizeHtml');
 
 exports.submitGuestReport = async (req, res) => {
     try {
@@ -9,6 +10,9 @@ exports.submitGuestReport = async (req, res) => {
 
         if (!guest_name || !guest_mobile || !category)
             return res.status(400).json({ error: 'Guest name, mobile, and category required.' });
+
+        if (!sanitizeText(guest_name, 100) || !sanitizeText(category, 100))
+            return res.status(400).json({ error: 'Invalid name or category.' });
 
         const mobileRegex = /^(09)\d{9}$/;
         if (!mobileRegex.test(guest_mobile)) {
@@ -33,11 +37,18 @@ exports.submitGuestReport = async (req, res) => {
             });
         }
 
+        const safeName = sanitizeText(guest_name, 100);
+        const safeMobile = sanitizeText(guest_mobile, 20);
+        const safeCategory = sanitizeText(category, 100);
+        const safeDescription = description
+            ? sanitizeText(description, 5000)
+            : null;
+
         const [result] = await db.query(
             `INSERT INTO environmental_reports 
             (user_id, guest_name, guest_mobile, category, description, latitude, longitude, guest_ip, status, submitted_at) 
             VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())`,
-            [guest_name, guest_mobile, category, description || null, latitude || null, longitude || null, cleanIp]
+            [safeName, safeMobile, safeCategory, safeDescription, latitude || null, longitude || null, cleanIp]
         );
         const reportId = result.insertId;
 

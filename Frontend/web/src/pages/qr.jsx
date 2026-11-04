@@ -126,6 +126,15 @@ export default function QR() {
       return;
     }
 
+    // Escape user-controlled fields before injecting into the print window's HTML
+    const escHtml = (v) =>
+      String(v ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
     printWindow.document.write(`
       <!doctype html>
       <html>
@@ -163,11 +172,11 @@ export default function QR() {
             <div class="print-id">${residentId}</div>
 
             <div class="print-info">
-              <div><strong>Full Name:</strong> ${fullName}</div>
-              <div><strong>Address:</strong> ${address}</div>
-              <div><strong>Contact:</strong> ${contact}</div>
-              <div><strong>Date Registered:</strong> ${dateRegistered}</div>
-              <div><strong>Status:</strong> ${status}</div>
+              <div><strong>Full Name:</strong> ${escHtml(fullName)}</div>
+              <div><strong>Address:</strong> ${escHtml(address)}</div>
+              <div><strong>Contact:</strong> ${escHtml(contact)}</div>
+              <div><strong>Date Registered:</strong> ${escHtml(dateRegistered)}</div>
+              <div><strong>Status:</strong> ${escHtml(status)}</div>
             </div>
           </div>
         </body>

@@ -4,7 +4,7 @@ const notificationController = require('./notificationController');
 const { logAudit } = require('../utils/auditLogger');
 const { logTimeline } = require('../utils/timelineLogger');
 const { formatRow, formatRows } = require('../utils/dateFormatter');
-const { sanitizeDescription } = require('../utils/sanitizeHtml');
+const { sanitizeDescription, sanitizeText } = require('../utils/sanitizeHtml');
 
 async function generateResidentId() {
     const year = new Date().getFullYear();
@@ -505,7 +505,17 @@ exports.addResident = async (req, res) => {
         const [result] = await db.query(
             `INSERT INTO users (resident_id, first_name, middle_name, last_name, address, permanent_address, contact_number, email, password_hash, role, status, is_verified, verification_status, registered_at) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'resident', 'Online', 0, 'Pending Verification', CURDATE())`,
-            [resident_id, first_name, middle_name || null, last_name, fullAddress, permanent_address || null, contact_number || null, email, password_hash]
+            [
+                resident_id,
+                sanitizeText(first_name, 100),
+                middle_name ? sanitizeText(middle_name, 100) : null,
+                sanitizeText(last_name, 100),
+                fullAddress ? sanitizeText(fullAddress, 255) : null,
+                permanent_address ? sanitizeText(permanent_address, 255) : null,
+                contact_number ? sanitizeText(contact_number, 20) : null,
+                email,
+                password_hash
+            ]
         );
 
         await logAudit(req, `Added resident ${resident_id} (${first_name} ${last_name})`);
@@ -558,14 +568,14 @@ exports.updateResident = async (req, res) => {
                 status = ? 
              WHERE user_id = ?`,
             [
-                first_name,
-                middle_name || null,
-                last_name,
-                house_no || null,
-                street || null,
-                finalAddress || null,
+                sanitizeText(first_name, 100),
+                middle_name ? sanitizeText(middle_name, 100) : null,
+                sanitizeText(last_name, 100),
+                house_no ? sanitizeText(house_no, 50) : null,
+                street ? sanitizeText(street, 100) : null,
+                finalAddress ? sanitizeText(finalAddress, 255) : null,
                 updatePermanentAddress,
-                contact_number || null,
+                contact_number ? sanitizeText(contact_number, 20) : null,
                 updateEmail,
                 status || 'Online',
                 req.params.id
