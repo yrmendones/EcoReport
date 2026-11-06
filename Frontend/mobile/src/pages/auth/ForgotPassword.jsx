@@ -14,15 +14,29 @@ import { apiFetch } from "../../api";
 
 const CODE_LENGTH = 6;
 
+const labelClass = "block text-[14px] font-extrabold text-[#0B5D2A]";
+
+const inputClass =
+  "block w-full min-w-0 box-border min-h-[52px] rounded-2xl border border-[#A8C99A] bg-white text-[16px] text-gray-800 placeholder:text-gray-400 placeholder:text-[14px] outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20";
+
+const eyeButtonClass =
+  "absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-[#0B5D2A] text-[18px]";
+
+const mainStyle = {
+  padding: "28px 24px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
+  gap: "24px",
+};
+
+const primaryBtn =
+  "w-full min-h-[54px] rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[16px] flex items-center justify-center shadow-md hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50 shrink-0";
+
 function PhoneFrame({ children, header }) {
   return (
-    <div className="min-h-screen bg-[#E5E7EB] flex justify-center items-center py-6 px-3">
-      <div className="relative w-[390px] h-[844px] bg-[#F8FAF8] rounded-[40px] border-[5px] border-white shadow-2xl overflow-hidden flex flex-col">
+    <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">
+      {/* Full screen on phones, phone frame only on sm and up */}
+      <div className="relative w-full h-[100dvh] sm:w-[390px] sm:h-[844px] bg-[#F8FAF8] sm:rounded-[40px] sm:border-[5px] sm:border-white sm:shadow-2xl overflow-hidden flex flex-col">
         {header}
         {children}
-        <div className="absolute bottom-3 left-0 right-0 flex justify-center pointer-events-none">
-          <div className="w-[70px] h-[5px] rounded-full bg-gray-800 opacity-70" />
-        </div>
       </div>
     </div>
   );
@@ -30,16 +44,19 @@ function PhoneFrame({ children, header }) {
 
 function Header({ title, onBack }) {
   return (
-    <header className="h-[76px] bg-[#0B5D2A] rounded-t-[35px] flex items-center justify-center relative shrink-0">
+    <header
+      className="relative h-[82px] bg-[#0B5D2A] flex items-center justify-center shrink-0"
+      style={{ padding: "0 64px" }}
+    >
       <button
         type="button"
         onClick={onBack}
-        className="absolute left-5 w-[43px] h-[43px] rounded-full bg-white/10 flex items-center justify-center text-white text-[21px] hover:bg-white/20 transition"
         aria-label="Back"
+        className="absolute left-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center text-white text-[20px] bg-white/10 hover:bg-white/20 active:scale-95 transition"
       >
         <FaArrowLeft />
       </button>
-      <h1 className="text-white text-[21px] font-bold">{title}</h1>
+      <h1 className="text-white text-[22px] font-extrabold text-center">{title}</h1>
     </header>
   );
 }
@@ -220,22 +237,29 @@ export default function ForgotPassword() {
   if (step === "success") {
     return (
       <PhoneFrame>
-        <main className="flex-1 flex flex-col items-center justify-center px-8 text-center">
-          <div className="w-[100px] h-[100px] rounded-full bg-[#E5F5E9] flex items-center justify-center">
+        <main
+          className="flex-1 overflow-y-auto no-scrollbar flex flex-col items-center justify-center text-center"
+          style={mainStyle}
+        >
+          <div className="w-[100px] h-[100px] rounded-full bg-[#E5F5E9] flex items-center justify-center shrink-0">
             <FaCheckCircle size={64} className="text-[#0B5D2A]" />
           </div>
-          <h2 className="text-[26px] font-extrabold text-[#0B5D2A] mt-8 leading-tight">
-            Password Reset
-          </h2>
-          <p className="text-[13px] text-gray-600 mt-4 leading-6 max-w-[280px]">
-            Your password has been successfully reset.
-            <br />
-            Click below to log in.
-          </p>
+
+          <div className="flex flex-col items-center shrink-0" style={{ gap: "12px" }}>
+            <h2 className="text-[26px] font-extrabold text-[#0B5D2A] leading-tight">
+              Password Reset
+            </h2>
+            <p className="text-[14px] text-gray-600 leading-6 max-w-[300px]">
+              Your password has been successfully reset.
+              <br />
+              Click below to log in.
+            </p>
+          </div>
+
           <button
             type="button"
             onClick={() => navigate("/resident-login")}
-            className="w-full h-[54px] mt-12 rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[14px] flex items-center justify-center shadow-md hover:bg-[#084A21] active:scale-[0.98] transition"
+            className={primaryBtn}
           >
             Continue
           </button>
@@ -257,46 +281,54 @@ export default function ForgotPassword() {
           />
         }
       >
-        <main className="flex-1 overflow-y-auto px-7 pt-12 pb-8 no-scrollbar">
-          <div className="flex flex-col items-center">
-            <div className="w-[88px] h-[88px] rounded-full bg-[#E5F5E9] flex items-center justify-center">
+        <main
+          className="flex-1 overflow-y-auto no-scrollbar flex flex-col"
+          style={mainStyle}
+        >
+          <div className="flex flex-col items-center shrink-0" style={{ gap: "16px" }}>
+            <div className="w-[88px] h-[88px] rounded-full bg-[#E5F5E9] flex items-center justify-center shrink-0">
               <FaEnvelope size={36} className="text-[#0B5D2A]" />
             </div>
-            <h2 className="text-[22px] font-extrabold text-gray-900 mt-6 text-center leading-tight">
-              Enter Email Address
-            </h2>
-            <p className="text-[13px] text-gray-500 mt-3 text-center leading-6 max-w-[300px]">
-              Enter your email address and we'll send you a 6-digit verification
-              code to reset your password.
-            </p>
+            <div className="flex flex-col items-center text-center" style={{ gap: "8px" }}>
+              <h2 className="text-[22px] font-extrabold text-gray-900 leading-tight">
+                Enter Email Address
+              </h2>
+              <p className="text-[14px] text-gray-600 leading-6 max-w-[320px]">
+                Enter your email address and we'll send you a 6-digit
+                verification code to reset your password.
+              </p>
+            </div>
           </div>
 
-          <form onSubmit={handleSendCode} className="mt-10">
-            <label className="block text-[13px] font-bold text-[#0B5D2A] mb-2">
-              Email Address
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              className="w-full h-[52px] px-4 rounded-xl border border-[#A8C99A] bg-white text-[13px] text-gray-700 outline-none focus:ring-2 focus:ring-[#0B5D2A]/20"
-              required
-            />
+          <form
+            onSubmit={handleSendCode}
+            className="flex flex-col shrink-0"
+            style={{ gap: "24px" }}
+          >
+            <div className="flex flex-col" style={{ gap: "8px" }}>
+              <label className={labelClass}>Email Address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                autoComplete="email"
+                className={inputClass}
+                style={{ padding: "0 16px" }}
+                required
+              />
+            </div>
 
             {error && (
-              <div className="mt-4 p-3 bg-red-100 border border-red-400 rounded-lg text-red-700 text-sm">
+              <div
+                className="bg-red-100 border border-red-400 rounded-xl text-red-700 text-sm leading-6 break-words"
+                style={{ padding: "14px 16px" }}
+              >
                 {error}
               </div>
             )}
 
-            <div className="h-[44px]" />
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full h-[54px] rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[14px] flex items-center justify-center gap-2 shadow-md hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50"
-            >
+            <button type="submit" disabled={loading} className={primaryBtn} style={{ gap: "12px" }}>
               {loading ? (
                 <>
                   <FaSpinner className="animate-spin" />
@@ -320,28 +352,29 @@ export default function ForgotPassword() {
       <PhoneFrame
         header={<Header title="Verification" onBack={() => setStep("email")} />}
       >
-        <main className="flex-1 overflow-y-auto px-6 pt-10 pb-8 no-scrollbar">
-          <div className="flex justify-center">
-            <div className="w-[84px] h-[84px] rounded-full bg-[#E5F5E9] flex items-center justify-center">
+        <main
+          className="flex-1 overflow-y-auto no-scrollbar flex flex-col"
+          style={mainStyle}
+        >
+          <div className="flex flex-col items-center shrink-0" style={{ gap: "16px" }}>
+            <div className="w-[88px] h-[88px] rounded-full bg-[#E5F5E9] flex items-center justify-center shrink-0">
               <FaShieldAlt size={36} className="text-[#0B5D2A]" />
+            </div>
+
+            <div className="flex flex-col items-center text-center" style={{ gap: "8px" }}>
+              <h2 className="text-[24px] font-extrabold text-[#0B5D2A] leading-tight">
+                Enter Verification Code
+              </h2>
+              <p className="text-[14px] text-gray-600 leading-6">
+                We sent a 6-digit code to
+              </p>
+              <p className="text-[15px] font-extrabold text-[#0B5D2A] break-all leading-6">
+                {email}
+              </p>
             </div>
           </div>
 
-          <div className="text-center mt-8">
-            <h2 className="text-[26px] font-extrabold text-[#0B5D2A] leading-tight">
-              Enter Verification Code
-            </h2>
-            <p className="text-[13px] text-gray-500 mt-5 leading-6 px-4">
-              We sent a 6-digit code to
-            </p>
-            <p className="text-[14px] font-bold text-[#0B5D2A] mt-1 break-all px-4">
-              {email}
-            </p>
-          </div>
-
-          <div className="h-[48px]" />
-
-          <div className="flex justify-center gap-2.5">
+          <div className="flex justify-center shrink-0" style={{ gap: "8px" }}>
             {code.map((digit, index) => (
               <input
                 key={index}
@@ -355,65 +388,37 @@ export default function ForgotPassword() {
                 onChange={(e) => handleCodeChange(index, e.target.value)}
                 onKeyDown={(e) => handleCodeKeyDown(index, e)}
                 onPaste={handleCodePaste}
-                className="
-                  w-[46px] h-[58px]
-                  text-center
-                  text-[26px]
-                  font-extrabold
-                  text-[#0B5D2A]
-                  bg-white
-                  border-2
-                  border-[#A8C99A]
-                  rounded-2xl
-                  outline-none
-                  transition-all
-                  focus:border-[#0B5D2A]
-                  focus:ring-4
-                  focus:ring-[#0B5D2A]/10
-                "
+                className="flex-1 min-w-0 max-w-[50px] h-[60px] box-border text-center text-[24px] font-extrabold text-[#0B5D2A] bg-white border-2 border-[#A8C99A] rounded-2xl outline-none transition-all focus:border-[#0B5D2A] focus:ring-4 focus:ring-[#0B5D2A]/10"
                 style={{ caretColor: "transparent" }}
               />
             ))}
           </div>
 
           {error && (
-            <div className="mt-6 p-3 bg-red-100 border border-red-400 rounded-lg text-red-700 text-[12px] text-center">
+            <div
+              className="bg-red-100 border border-red-400 rounded-xl text-red-700 text-[14px] leading-6 text-center break-words shrink-0"
+              style={{ padding: "14px 16px" }}
+            >
               {error}
             </div>
           )}
 
           {resendStatus && !error && (
-            <div className="mt-6 p-3 bg-[#EFFAF2] border border-[#BFE3C8] rounded-lg text-[#0B5D2A] text-[12px] text-center flex items-center justify-center gap-2">
-              <FaCheckCircle size={12} />
-              {resendStatus}
+            <div
+              className="bg-[#EFFAF2] border border-[#BFE3C8] rounded-xl text-[#0B5D2A] text-[14px] leading-6 text-center flex items-center justify-center shrink-0"
+              style={{ padding: "14px 16px", gap: "10px" }}
+            >
+              <FaCheckCircle size={14} className="shrink-0" />
+              <span className="break-words">{resendStatus}</span>
             </div>
           )}
-
-          <div className="h-[40px]" />
 
           <button
             type="button"
             onClick={handleVerifyCode}
             disabled={loading || code.join("").length !== CODE_LENGTH}
-            className="
-              w-full
-              h-[54px]
-              rounded-2xl
-              bg-[#0B5D2A]
-              text-white
-              font-extrabold
-              text-[15px]
-              flex
-              items-center
-              justify-center
-              gap-2
-              shadow-md
-              hover:bg-[#084A21]
-              active:scale-[0.98]
-              transition
-              disabled:opacity-50
-              disabled:cursor-not-allowed
-            "
+            className={`${primaryBtn} disabled:cursor-not-allowed`}
+            style={{ gap: "12px" }}
           >
             {loading ? (
               <>
@@ -425,23 +430,19 @@ export default function ForgotPassword() {
             )}
           </button>
 
-          <div className="h-[36px]" />
-
-          <div className="text-center">
-            <p className="text-[13px] text-gray-600 leading-6">
+          <div className="text-center shrink-0">
+            <p className="text-[14px] text-gray-600 leading-6">
               Didn't receive a code?{" "}
               <button
                 type="button"
                 onClick={handleResend}
                 disabled={resending}
-                className="font-extrabold text-[#0B5D2A] hover:underline disabled:opacity-50"
+                className="min-h-[44px] font-extrabold text-[#0B5D2A] hover:underline disabled:opacity-50"
               >
                 {resending ? "Sending..." : "Click to resend"}
               </button>
             </p>
           </div>
-
-          <div className="h-8" />
         </main>
       </PhoneFrame>
     );
@@ -457,81 +458,87 @@ export default function ForgotPassword() {
           <Header title="Set New Password" onBack={() => setStep("verify")} />
         }
       >
-        <main className="flex-1 overflow-y-auto px-7 pt-12 pb-8 no-scrollbar">
-          <div className="flex flex-col items-center">
-            <div className="w-[88px] h-[88px] rounded-full bg-[#E5F5E9] flex items-center justify-center">
+        <main
+          className="flex-1 overflow-y-auto no-scrollbar flex flex-col"
+          style={mainStyle}
+        >
+          <div className="flex flex-col items-center shrink-0" style={{ gap: "16px" }}>
+            <div className="w-[88px] h-[88px] rounded-full bg-[#E5F5E9] flex items-center justify-center shrink-0">
               <FaLock size={34} className="text-[#0B5D2A]" />
             </div>
-            <h2 className="text-[22px] font-extrabold text-gray-900 mt-6 text-center leading-tight">
-              Set a New Password
-            </h2>
-            <p className="text-[13px] text-gray-500 mt-3 text-center leading-6 max-w-[300px]">
-              Choose a strong password. You'll use this to log in to EcoReport.
-            </p>
+            <div className="flex flex-col items-center text-center" style={{ gap: "8px" }}>
+              <h2 className="text-[22px] font-extrabold text-gray-900 leading-tight">
+                Set a New Password
+              </h2>
+              <p className="text-[14px] text-gray-600 leading-6 max-w-[320px]">
+                Choose a strong password. You'll use this to log in to EcoReport.
+              </p>
+            </div>
           </div>
 
-          <form onSubmit={handleResetPassword} className="mt-10">
-            <div className="mb-5">
-              <label className="block text-[13px] font-bold text-[#0B5D2A] mb-2">
-                New Password
-              </label>
+          <form
+            onSubmit={handleResetPassword}
+            className="flex flex-col shrink-0"
+            style={{ gap: "24px" }}
+          >
+            <div className="flex flex-col" style={{ gap: "8px" }}>
+              <label className={labelClass}>New Password</label>
               <div className="relative">
                 <input
                   type={showNew ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password (8-16 characters)"
-                  maxLength={16}
-                  className="w-full h-[52px] px-4 pr-12 rounded-xl border border-[#A8C99A] bg-white text-[13px] text-gray-700 outline-none focus:ring-2 focus:ring-[#0B5D2A]/20"
+                  placeholder="Enter new password"
+                  autoComplete="new-password"
+                  className={inputClass}
+                  style={{ padding: "0 56px 0 16px" }}
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowNew(!showNew)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#0B5D2A] text-[17px]"
+                  className={eyeButtonClass}
                   aria-label={showNew ? "Hide password" : "Show password"}
                 >
-                  {showNew ? <FaEyeSlash /> : <FaEye />}
+                  {showNew ? <FaEye /> : <FaEyeSlash />}
                 </button>
               </div>
             </div>
 
-            <div>
-              <label className="block text-[13px] font-bold text-[#0B5D2A] mb-2">
-                Confirm Password
-              </label>
+            <div className="flex flex-col" style={{ gap: "8px" }}>
+              <label className={labelClass}>Confirm Password</label>
               <div className="relative">
                 <input
                   type={showConfirm ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm new password"
-                  maxLength={16}
-                  className="w-full h-[52px] px-4 pr-12 rounded-xl border border-[#A8C99A] bg-white text-[13px] text-gray-700 outline-none focus:ring-2 focus:ring-[#0B5D2A]/20"
+                  autoComplete="new-password"
+                  className={inputClass}
+                  style={{ padding: "0 56px 0 16px" }}
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirm(!showConfirm)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#0B5D2A] text-[17px]"
+                  className={eyeButtonClass}
                   aria-label={showConfirm ? "Hide password" : "Show password"}
                 >
-                  {showConfirm ? <FaEyeSlash /> : <FaEye />}
+                  {showConfirm ? <FaEye /> : <FaEyeSlash />}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div className="mt-4 p-3 bg-red-100 border border-red-400 rounded-lg text-red-700 text-sm">
+              <div
+                className="bg-red-100 border border-red-400 rounded-xl text-red-700 text-sm leading-6 break-words"
+                style={{ padding: "14px 16px" }}
+              >
                 {error}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full h-[54px] mt-8 rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[14px] flex items-center justify-center gap-2 shadow-md hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50"
-            >
+            <button type="submit" disabled={loading} className={primaryBtn} style={{ gap: "12px" }}>
               {loading ? (
                 <>
                   <FaSpinner className="animate-spin" />

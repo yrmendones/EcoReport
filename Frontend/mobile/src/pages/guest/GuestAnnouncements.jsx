@@ -25,7 +25,21 @@ export default function GuestAnnouncements() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const tabs = ["All", "Environmental", "Health", "Disaster"];
+  const BASE_CATEGORIES = ["Environmental", "Health", "Disaster", "Community"];
+
+    const tabs = (() => {
+    const seen = new Set(BASE_CATEGORIES.map((c) => c.toLowerCase()));
+    const extras = [];
+    announcements.forEach((a) => {
+      const c = (a.category || "").trim();
+      if (!c) return;
+      const n = c.toLowerCase();
+      if (seen.has(n)) return;
+      seen.add(n);
+      extras.push(c.charAt(0).toUpperCase() + c.slice(1));
+    });
+    return ["All", ...BASE_CATEGORIES, ...extras];
+  })();
 
   useEffect(() => {
     const fetchAnnouncements = async () => {
@@ -46,7 +60,11 @@ export default function GuestAnnouncements() {
   const filtered =
     activeTab === "All"
       ? announcements
-      : announcements.filter((a) => a.category === activeTab);
+      : announcements.filter(
+          (item) =>
+            (item.category || "").trim().toLowerCase() ===
+            activeTab.trim().toLowerCase()
+        );
 
   return (
     <div className="min-h-screen bg-[#E5E7EB] flex items-center justify-center p-4">
@@ -106,9 +124,10 @@ export default function GuestAnnouncements() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="bg-white rounded-2xl border border-[#D5E4D1] p-8 text-center">
-              <FaBullhorn className="mx-auto text-gray-300 mb-3" size={32} />
               <p className="text-[13px] font-semibold text-gray-500">
-                No announcements available.
+                {activeTab === "All"
+                  ? "No announcements available."
+                  : `No ${activeTab} announcements yet.`}
               </p>
             </div>
           ) : (

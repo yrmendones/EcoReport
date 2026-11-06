@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { FaChevronRight } from "react-icons/fa";
+import { FaBullhorn, FaChevronRight } from "react-icons/fa";
 
 export default function AnnouncementCard({ title, subtitle, announcementId }) {
   const navigate = useNavigate();
@@ -21,19 +21,25 @@ export default function AnnouncementCard({ title, subtitle, announcementId }) {
         boxSizing: "border-box",
       }}
     >
-      <div className="flex items-center justify-between" style={{ gap: "16px" }}>
-        <div className="min-w-0 flex flex-col" style={{ gap: "8px" }}>
-          <h3 className="text-[17px] font-extrabold text-gray-900 leading-7 break-words">
-            {title}
-          </h3>
-          <p className="text-[14px] text-gray-500 leading-5 break-words">
-            {subtitle}
-          </p>
+      <div className="flex items-center gap-4 min-w-0 flex-1">
+        <div className="w-12 h-12 rounded-2xl bg-[#E8F5E3] flex items-center justify-center shrink-0">
+          <FaBullhorn className="text-[#0B5D2A] -scale-x-100" size={21} />
         </div>
 
-        {canOpen && (
-          <FaChevronRight className="shrink-0 text-[#0B5D2A]" size={16} />
-        )}
+        <div className="flex items-center justify-between" style={{ gap: "16px" }}>
+          <div className="min-w-0 flex flex-col" style={{ gap: "8px" }}>
+            <h3 className="text-[17px] font-extrabold text-gray-900 leading-7 break-words">
+              {title}
+            </h3>
+            <p className="text-[14px] text-gray-500 leading-5 break-words">
+              {subtitle}
+            </p>
+          </div>
+
+          {canOpen && (
+            <FaChevronRight className="shrink-0 text-[#0B5D2A]" size={16} />
+          )}
+        </div>
       </div>
     </button>
   );

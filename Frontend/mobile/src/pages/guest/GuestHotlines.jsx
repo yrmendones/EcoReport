@@ -20,35 +20,23 @@ export default function GuestHotlines() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Map hotline titles to icons (case-insensitive matching)
   const getIcon = (title = "") => {
-    const t = title.toLowerCase();
-    const size = 22;
-
-    if (t.includes("police") || t.includes("pnp")) return <FaShieldAlt size={size} />;
-    if (t.includes("fire") || t.includes("bfp")) return <FaFireExtinguisher size={size} />;
-    if (
-      t.includes("ambulance") ||
-      t.includes("rescue") ||
-      t.includes("medical") ||
-      t.includes("911")
-    )
-      return <FaAmbulance size={size} />;
-    if (t.includes("health") || t.includes("hospital") || t.includes("clinic"))
-      return <FaHospital size={size} />;
-    if (t.includes("barangay hall") || t.includes("tanod"))
-      return <FaBuilding size={size} />;
-    if (t.includes("mdrrmo") || t.includes("drrmo") || t.includes("disaster"))
-      return <FaExclamationTriangle size={size} />;
-    return <FaPhoneAlt size={size - 3} />;
-  };
+  const t = title.toLowerCase();
+  if (t.includes("police")) return <FaShieldAlt size={22} />;
+  if (t.includes("fire")) return <FaFireExtinguisher size={22} />;
+  if (t.includes("ambulance") || t.includes("911")) return <FaAmbulance size={22} />;
+  if (t.includes("health")) return <FaHospital size={22} />;
+  if (t.includes("barangay hall")) return <FaBuilding size={22} />;
+  if (t.includes("mdrrmo") || t.includes("disaster")) return <FaExclamationTriangle size={22} />;
+  return <FaPhoneAlt size={22} />;
+};
 
   useEffect(() => {
     const fetchHotlines = async () => {
       try {
         setLoading(true);
         const data = await apiFetch("/api/hotlines");
-        setHotlines(data);
+        setHotlines(data || []);
       } catch (err) {
         console.error("Error fetching hotlines:", err);
         setError("Failed to load hotlines.");
@@ -56,7 +44,6 @@ export default function GuestHotlines() {
         setLoading(false);
       }
     };
-
     fetchHotlines();
   }, []);
 
@@ -82,13 +69,15 @@ export default function GuestHotlines() {
         style={{ padding: "0 24px" }}
       >
         <div
-          className="bg-white rounded-3xl border border-red-300 text-center flex flex-col items-center gap-3"
-          style={{ padding: "32px 24px" }}
+          className="bg-white rounded-3xl border border-red-300 text-center flex flex-col items-center"
+          style={{ padding: "32px 24px", gap: "16px" }}
         >
-          <p className="text-[15px] font-bold text-red-600">{error}</p>
+          <p className="text-[15px] font-bold text-red-600 leading-6">{error}</p>
           <button
+            type="button"
             onClick={() => window.location.reload()}
-            className="px-4 py-2 text-[#0B5D2A] font-bold underline"
+            className="min-h-[44px] text-[#0B5D2A] font-bold underline"
+            style={{ padding: "0 16px" }}
           >
             Try Again
           </button>
@@ -102,114 +91,113 @@ export default function GuestHotlines() {
       {/* Full screen on phones, phone frame only on sm and up */}
       <div className="relative w-full h-[100dvh] sm:w-[390px] sm:h-[844px] bg-[#F8FAF8] sm:rounded-[40px] sm:border-[5px] sm:border-white sm:shadow-2xl overflow-hidden flex flex-col">
         {/* HEADER */}
-        <header className="relative h-[82px] bg-[#0B5D2A] flex items-center justify-center shrink-0 px-6">
+        <header
+          className="relative h-[82px] bg-[#0B5D2A] flex items-center justify-center shrink-0"
+          style={{ padding: "0 64px" }}
+        >
           <button
             type="button"
             onClick={() => navigate("/guest-home")}
             aria-label="Back"
-            className="absolute left-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 flex items-center justify-center text-white text-[20px] hover:bg-white/20 active:scale-95 transition"
+            className="absolute left-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center text-white text-[20px] bg-white/10 hover:bg-white/20 active:scale-95 transition"
           >
             <FaArrowLeft />
           </button>
-          <h1 className="text-white text-[21px] font-extrabold">
+          <h1 className="text-white text-[22px] font-extrabold text-center">
             Emergency Hotline
           </h1>
         </header>
 
-        {/* CONTENT */}
+        {/* MAIN CONTENT */}
         <main
-          className="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-6"
-          style={{ padding: "24px 20px 40px" }}
+          className="flex-1 overflow-y-auto no-scrollbar flex flex-col"
+          style={{
+            padding: "28px 24px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
+            gap: "24px",
+          }}
         >
           {/* TITLE */}
-          <div className="flex flex-col gap-1">
-            <h2 className="text-[19px] font-bold text-gray-800 leading-tight">
+          <div className="flex flex-col shrink-0" style={{ gap: "8px" }}>
+            <h2 className="text-[22px] font-extrabold text-gray-900 leading-tight">
               Barangay Sto. Rosario Kanluran
             </h2>
-            <p className="text-[12px] text-gray-500 leading-5">
+            <p className="text-[14px] text-gray-600 leading-6">
               Emergency hotlines for Pateros, Metro Manila
             </p>
           </div>
 
-          {/* HOTLINE CARDS */}
-          <div className="flex flex-col gap-3">
+          {/* HOTLINE LIST */}
+          <div className="flex flex-col shrink-0" style={{ gap: "16px" }}>
             {hotlines.map((item, index) => (
               <div
                 key={index}
-                className="bg-white rounded-[18px] border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
-                style={{ padding: "16px", boxSizing: "border-box" }}
+                className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow flex items-center justify-between shrink-0"
+                style={{ padding: "20px", gap: "16px", boxSizing: "border-box" }}
               >
-                <div className="flex items-center justify-between gap-3">
-                  {/* CONTACT INFO */}
-                  <div className="flex items-center gap-4 min-w-0">
-                    {/* ICON */}
-                    <div
-                      className={`w-[48px] h-[48px] rounded-full flex items-center justify-center shrink-0 ${
-                        item.color_class || "bg-gray-100 text-gray-700"
-                      }`}
-                    >
-                      {getIcon(item.title)}
-                    </div>
-
-                    {/* DETAILS */}
-                    <div className="min-w-0 flex flex-col gap-1">
-                      <h3 className="text-[14px] font-bold text-gray-800 leading-5">
-                        {item.title}
-                      </h3>
-                      <p className="text-[13px] text-gray-500">{item.number}</p>
-                      {item.description && (
-                        <p className="text-[11px] text-gray-400 leading-4">
-                          {item.description}
-                        </p>
-                      )}
-                    </div>
+                {/* CONTACT INFO */}
+                <div className="flex items-center min-w-0 flex-1" style={{ gap: "16px" }}>
+                  {/* ICON */}
+                  <div
+                    className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
+                      item.color_class || "bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    {getIcon(item.title)}
                   </div>
 
-                  {/* CALL BUTTON */}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleCall(
-                        item.clean_number || item.number.replace(/[^0-9]/g, "")
-                      )
-                    }
-                    className="w-[68px] h-[44px] shrink-0 bg-[#0B5D2A] text-white rounded-[12px] font-bold text-[13px] flex items-center justify-center shadow-sm hover:bg-[#084A21] active:scale-95 transition"
-                  >
-                    Call
-                  </button>
+                  {/* TEXT */}
+                  <div className="min-w-0 flex flex-col items-start" style={{ gap: "8px" }}>
+                    <h3 className="text-[16px] font-extrabold text-gray-900 leading-6 break-words">
+                      {item.title}
+                    </h3>
+                    <p className="text-[14px] text-gray-700">{item.number}</p>
+                    {item.description && (
+                      <p className="text-[13px] text-gray-500 leading-6 break-words">
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
                 </div>
+
+                {/* CALL BUTTON */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleCall(item.clean_number || item.number.replace(/[^0-9]/g, ""))
+                  }
+                  className="min-w-[68px] min-h-[44px] shrink-0 bg-[#0B5D2A] text-white rounded-xl font-extrabold text-[14px] flex items-center justify-center shadow-sm hover:bg-[#084A21] active:scale-95 transition"
+                  style={{ padding: "0 14px" }}
+                >
+                  Call
+                </button>
               </div>
             ))}
           </div>
 
-          {/* 911 EMERGENCY */}
+          {/* EMERGENCY BOX */}
           <div
-            className="bg-red-50 border border-red-200 rounded-[20px] flex flex-col gap-3 shrink-0"
-            style={{ padding: "16px", boxSizing: "border-box" }}
+            className="bg-red-50 border border-red-200 rounded-2xl flex flex-col shrink-0"
+            style={{ padding: "20px", gap: "16px", boxSizing: "border-box" }}
           >
-            <p className="text-[13px] text-red-700 font-semibold text-center leading-5">
+            <p className="text-[14px] text-red-700 font-semibold text-center leading-6">
               For immediate life-threatening emergencies
             </p>
 
             <button
               type="button"
               onClick={() => handleCall("911")}
-              className="w-full h-[54px] bg-red-600 hover:bg-red-700 text-white rounded-[15px] font-bold text-[15px] flex items-center justify-center gap-3 shadow-sm active:scale-[0.98] transition"
+              className="w-full min-h-[54px] bg-red-600 hover:bg-red-700 text-white rounded-xl font-extrabold text-[16px] flex items-center justify-center shadow-sm active:scale-[0.98] transition"
+              style={{ gap: "12px" }}
             >
               <FaPhoneAlt size={18} />
               Call 911
             </button>
 
-            <p className="text-[11px] text-red-500 text-center">
+            <p className="text-[12px] text-red-500 text-center">
               National Emergency Hotline - 24/7
             </p>
           </div>
         </main>
-
-        {/* Fake home bar, desktop frame only */}
-        <div className="hidden sm:flex absolute bottom-2 left-0 right-0 justify-center pointer-events-none z-50">
-          <div className="w-[60px] h-[5px] rounded-full bg-gray-700 opacity-80" />
-        </div>
       </div>
     </div>
   );

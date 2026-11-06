@@ -9,10 +9,22 @@ import {
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
 
-const truncate = (text, maxLength = 50) => {
-  if (!text) return "";
-  return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
+// Safe HTML → plain-text conversion for the list preview.
+const stripHtml = (html) => {
+  if (!html) return "";
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.textContent || div.innerText || "";
 };
+
+const truncate = (text, maxLength = 50) => {
+  const plain = stripHtml(text).replace(/\s+/g, " ").trim();
+  if (!plain) return "";
+  return plain.length > maxLength ? plain.substring(0, maxLength) + "..." : plain;
+};
+
+// "1 minute ago", "2 minutes ago", "1 hour ago", ...
+const ago = (value, unit) => `${value} ${unit}${value === 1 ? "" : "s"} ago`;
 
 export default function Notifications() {
   const navigate = useNavigate();
@@ -51,9 +63,9 @@ export default function Notifications() {
     const diffDays = Math.floor(diffMs / 86400000);
 
     if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins} mins ago`;
-    if (diffHours < 24) return `${diffHours} hours ago`;
-    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffMins < 60) return ago(diffMins, "minute");
+    if (diffHours < 24) return ago(diffHours, "hour");
+    if (diffDays < 7) return ago(diffDays, "day");
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
@@ -115,7 +127,7 @@ export default function Notifications() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#E5E7EB] flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
           <p className="text-[#0B5D2A] font-bold">Loading notifications...</p>
@@ -125,43 +137,53 @@ export default function Notifications() {
   }
 
   return (
-    <div className="min-h-screen bg-[#E5E7EB] flex justify-center items-center py-6 px-3">
-      <div className="relative w-[390px] h-[844px] bg-[#F8FAF8] rounded-[40px] border-[5px] border-white shadow-2xl overflow-hidden flex flex-col">
-        <header className="relative h-[82px] bg-[#0B5D2A] flex items-center justify-center shrink-0">
+    <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">
+      {/* Full screen on phones, phone frame only on sm and up */}
+      <div className="relative w-full h-[100dvh] sm:w-[390px] sm:h-[844px] bg-[#F8FAF8] sm:rounded-[40px] sm:border-[5px] sm:border-white sm:shadow-2xl overflow-hidden flex flex-col">
+        {/* HEADER */}
+        <header
+          className="relative h-[82px] bg-[#0B5D2A] flex items-center justify-center shrink-0"
+          style={{ padding: "0 64px" }}
+        >
           <button
             type="button"
             onClick={() => navigate("/resident-dashboard")}
-            className="absolute left-6 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center text-white text-[20px] bg-white/10 hover:bg-white/20 active:scale-95 transition"
+            aria-label="Back"
+            className="absolute left-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center text-white text-[20px] bg-white/10 hover:bg-white/20 active:scale-95 transition"
           >
             <FaArrowLeft />
           </button>
-          <h1 className="text-white text-[21px] font-extrabold">Notifications</h1>
-          {unreadCount > 0 && (
-            <button
-              type="button"
-              onClick={markAllAsRead}
-              className="absolute right-6 top-1/2 -translate-y-1/2 text-xs text-white/70 hover:text-white transition"
-            >
-              Mark all read
-            </button>
-          )}
+          <h1 className="text-white text-[22px] font-extrabold text-center">
+            Notifications
+          </h1>
         </header>
 
-        <div className="shrink-0 bg-white px-5 pt-4 pb-3 border-b border-gray-200">
-          <div className="flex bg-[#F1F5F2] rounded-2xl p-1 gap-1">
+        {/* TABS */}
+        <div
+          className="shrink-0 bg-white border-b border-gray-200"
+          style={{ padding: "20px 24px 16px" }}
+        >
+          <div
+            className="flex bg-[#F1F5F2] rounded-2xl"
+            style={{ padding: "6px", gap: "6px" }}
+          >
             {["All", "Unread", "Read"].map((tab) => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 h-[42px] rounded-xl text-[13px] font-extrabold transition-all ${
+                className={`flex-1 h-[48px] rounded-xl text-[15px] font-extrabold transition-all ${
                   activeTab === tab
                     ? "bg-[#0B5D2A] text-white shadow-sm"
-                    : "text-gray-500 hover:text-[#0B5D2A]"
+                    : "text-gray-600 hover:text-[#0B5D2A]"
                 }`}
               >
-                {tab} {tab === "Unread" && unreadCount > 0 && (
-                  <span className="ml-1 text-[10px] bg-red-500 text-white rounded-full px-1.5 py-0.5">
+                {tab}
+                {tab === "Unread" && unreadCount > 0 && (
+                  <span
+                    className="text-[12px] bg-red-500 text-white rounded-full"
+                    style={{ marginLeft: "8px", padding: "2px 8px" }}
+                  >
                     {unreadCount}
                   </span>
                 )}
@@ -170,23 +192,67 @@ export default function Notifications() {
           </div>
         </div>
 
-        <main className="flex-1 overflow-y-auto px-5 pt-6 pb-8 no-scrollbar">
-          <div className="mb-5">
-            <h2 className="text-[19px] font-extrabold text-gray-900">Your Notifications</h2>
-            <p className="text-[12px] text-gray-500 mt-1.5">Stay updated with your latest activities.</p>
+        {/* CONTENT */}
+        <main
+          className="flex-1 overflow-y-auto no-scrollbar flex flex-col"
+          style={{
+            padding: "28px 24px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
+            gap: "24px",
+          }}
+        >
+          {/* Intro + Mark all read */}
+          <div className="flex items-start justify-between" style={{ gap: "16px" }}>
+            <div className="min-w-0 flex flex-col" style={{ gap: "8px" }}>
+              <h2 className="text-[22px] font-extrabold text-gray-900 leading-tight">
+                Your Notifications
+              </h2>
+              <p className="text-[14px] text-gray-600 leading-6">
+                Stay updated with your latest activities.
+              </p>
+            </div>
+
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={markAllAsRead}
+                className="shrink-0 min-h-[44px] rounded-xl text-[13px] font-extrabold text-[#0B5D2A] border border-[#C8DCC3] bg-white hover:bg-[#F4F8F2] active:scale-95 transition"
+                style={{ padding: "0 14px" }}
+              >
+                Mark all read
+              </button>
+            )}
           </div>
 
-          <div className="space-y-5">
+          {error && (
+            <div
+              className="bg-red-100 border border-red-400 rounded-xl text-red-700 text-sm leading-6 break-words"
+              style={{ padding: "14px 16px" }}
+            >
+              {error}
+            </div>
+          )}
+
+          {/* NOTIFICATION CARDS */}
+          <div className="flex flex-col" style={{ gap: "16px" }}>
             {filtered.length > 0 ? (
               filtered.map((item) => (
                 <div
                   key={item.notification_id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleNotificationClick(item)}
-                  className={`rounded-2xl px-4 py-5 shadow-sm border flex gap-4 cursor-pointer transition-all hover:shadow-md ${
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleNotificationClick(item);
+                    }
+                  }}
+                  className={`rounded-2xl shadow-sm border flex cursor-pointer transition-all hover:shadow-md active:scale-[0.99] ${
                     item.is_read === 0
                       ? "bg-[#F0F8ED] border-[#BFD8B8]"
                       : "bg-white border-gray-200 hover:bg-gray-50"
                   }`}
+                  style={{ padding: "20px", gap: "16px", boxSizing: "border-box" }}
                 >
                   <div
                     className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 text-[19px] ${
@@ -198,21 +264,25 @@ export default function Notifications() {
                     {getIcon(item.type, item.is_read === 1)}
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-3">
-                      <h3 className="font-extrabold text-[14px] text-gray-900 leading-5">
-                        {item.title}
-                      </h3>
-                      <span className="text-[10px] text-gray-500 whitespace-nowrap pt-0.5">
-                        {formatTime(item.created_at)}
-                      </span>
-                    </div>
-                    {/* ✅ Message Preview (truncated) */}
-                    <p className="text-[12px] text-gray-600 leading-5 mt-2">
+                  <div
+                    className="flex-1 min-w-0 flex flex-col items-start"
+                    style={{ gap: "8px" }}
+                  >
+                    <h3 className="font-extrabold text-[16px] text-gray-900 leading-6 break-words">
+                      {item.title}
+                    </h3>
+                    <p className="text-[13px] text-gray-500">
+                      {formatTime(item.created_at)}
+                    </p>
+                    {/* Message preview */}
+                    <p className="text-[14px] text-gray-700 leading-6 break-words">
                       {truncate(item.message, 60)}
                     </p>
                     {item.is_read === 0 && (
-                      <span className="inline-flex mt-3 px-3 py-1.5 bg-[#0B5D2A] text-white rounded-full text-[10px] font-extrabold">
+                      <span
+                        className="inline-flex bg-[#0B5D2A] text-white rounded-full text-[12px] font-extrabold"
+                        style={{ padding: "6px 14px" }}
+                      >
                         New
                       </span>
                     )}
@@ -220,9 +290,16 @@ export default function Notifications() {
                 </div>
               ))
             ) : (
-              <div className="bg-white rounded-2xl border border-gray-200 px-5 py-10 text-center shadow-sm">
-                <FaBell className="mx-auto text-gray-300 mb-3" size={35} />
-                <p className="text-[13px] font-semibold text-gray-500">
+              <div
+                className="bg-white rounded-2xl border border-gray-200 text-center shadow-sm"
+                style={{ padding: "48px 24px" }}
+              >
+                <FaBell
+                  className="text-gray-300"
+                  size={35}
+                  style={{ margin: "0 auto 12px" }}
+                />
+                <p className="text-[14px] font-semibold text-gray-500 leading-6">
                   {activeTab === "All" && "No notifications available."}
                   {activeTab === "Unread" && "No unread notifications."}
                   {activeTab === "Read" && "No read notifications."}
@@ -230,12 +307,7 @@ export default function Notifications() {
               </div>
             )}
           </div>
-          <div className="h-6" />
         </main>
-
-        <div className="absolute bottom-2 left-0 right-0 flex justify-center pointer-events-none z-30">
-          <div className="w-[70px] h-[5px] rounded-full bg-gray-800 opacity-70" />
-        </div>
       </div>
     </div>
   );

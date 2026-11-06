@@ -195,7 +195,7 @@ export default function HealthCenter() {
   const [showAddService, setShowAddService] = useState(false);
   const [showEditService, setShowEditService] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
-  const [serviceForm, setServiceForm] = useState({ service_name: "", status: "Active" });
+  const [serviceForm, setServiceForm] = useState({ service_name: "", description: "", status: "Active" });
 
   const [showViewAppointment, setShowViewAppointment] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
@@ -370,7 +370,7 @@ export default function HealthCenter() {
     try {
       await apiFetch("/api/health-center/services", { method: "POST", body: JSON.stringify(serviceForm) });
       setShowAddService(false);
-      setServiceForm({ service_name: "", status: "Active" });
+      setServiceForm({ service_name: "", description: "", status: "Active" });
       fetchAll();
       alert("Service added!");
     } catch (err) { alert("Failed to add: " + err.message); }
@@ -378,7 +378,11 @@ export default function HealthCenter() {
 
   const handleEditService = (svc) => {
     setSelectedService(svc);
-    setServiceForm({ service_name: svc.service_name, status: svc.status || "Active" });
+    setServiceForm({
+      service_name: svc.service_name,
+      description: svc.description || "",
+      status: svc.status || "Active",
+    });
     setShowEditService(true);
   };
 
@@ -817,7 +821,7 @@ export default function HealthCenter() {
                   <button
                     type="button"
                     className="filter-export-btn"
-                    onClick={() => { setServiceForm({ service_name: "", status: "Active" }); setShowAddService(true); }}
+                    onClick={() => { setServiceForm({ service_name: "", description: "", status: "Active" }); setShowAddService(true); }}
                   >
                     + Add Service
                   </button>
@@ -828,6 +832,7 @@ export default function HealthCenter() {
                     <thead>
                       <tr>
                         <th>Service Name</th>
+                        <th>Description</th>
                         <th>Status</th>
                         <th>Actions</th>
                       </tr>
@@ -837,6 +842,13 @@ export default function HealthCenter() {
                         servicesPaged.items.map((svc) => (
                           <tr key={svc.service_id}>
                             <td>{svc.service_name}</td>
+                            <td title={svc.description || ""}>
+                              {svc.description
+                                ? (svc.description.length > 60
+                                    ? svc.description.substring(0, 60) + "..."
+                                    : svc.description)
+                                : <span style={{ color: "#9ca3af" }}>—</span>}
+                            </td>
                             <td>
                               <span className={`svc-status ${(svc.status || "Active").toLowerCase()}`}>
                                 {svc.status || "Active"}
@@ -852,7 +864,7 @@ export default function HealthCenter() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="3" className="text-center py-4 text-gray-500">
+                          <td colSpan="4" className="text-center py-4 text-gray-500">
                             No services found.
                           </td>
                         </tr>
@@ -1116,6 +1128,16 @@ export default function HealthCenter() {
                 <input type="text" value={serviceForm.service_name} onChange={(e) => setServiceForm({ ...serviceForm, service_name: e.target.value })} required placeholder="e.g., General Consultation" />
               </div>
               <div className="form-group">
+                <label>Description (optional)</label>
+                <textarea
+                  value={serviceForm.description}
+                  onChange={(e) => setServiceForm({ ...serviceForm, description: e.target.value })}
+                  rows="4"
+                  placeholder="Shown to residents when they tap this service on the mobile app."
+                  style={{ width: "100%", padding: "8px 10px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", fontFamily: "Arial", resize: "vertical" }}
+                />
+              </div>
+              <div className="form-group">
                 <label>Status</label>
                 <select value={serviceForm.status} onChange={(e) => setServiceForm({ ...serviceForm, status: e.target.value })}>
                   <option value="Active">Active</option>
@@ -1139,6 +1161,16 @@ export default function HealthCenter() {
               <div className="form-group">
                 <label>Service Name</label>
                 <input type="text" value={serviceForm.service_name} onChange={(e) => setServiceForm({ ...serviceForm, service_name: e.target.value })} required />
+              </div>
+              <div className="form-group">
+                <label>Description (optional)</label>
+                <textarea
+                  value={serviceForm.description}
+                  onChange={(e) => setServiceForm({ ...serviceForm, description: e.target.value })}
+                  rows="4"
+                  placeholder="Shown to residents when they tap this service on the mobile app."
+                  style={{ width: "100%", padding: "8px 10px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", fontFamily: "Arial", resize: "vertical" }}
+                />
               </div>
               <div className="form-group">
                 <label>Status</label>
@@ -1273,11 +1305,18 @@ export default function HealthCenter() {
             <form onSubmit={handleUpdateInfo}>
               <div className="form-group">
                 <label>Location</label>
-                <input type="text" value={infoForm.location} onChange={(e) => setInfoForm({ ...infoForm, location: e.target.value })} required placeholder="Barangay Hall Compound, Sto. Rosario Kanluran, Pateros" />
+                <textarea
+                  value={infoForm.location}
+                  onChange={(e) => setInfoForm({ ...infoForm, location: e.target.value })}
+                  required
+                  rows="3"
+                  placeholder={"Line 1: Health Center Name\nLine 2: Area / Subdivision\nLine 3: Full street address"}
+                  style={{ width: "100%", padding: "8px 10px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", fontFamily: "Arial", resize: "vertical" }}
+                />
               </div>
               <div className="form-group">
-                <label>Contact Number</label>
-                <input type="text" value={infoForm.contact_number} onChange={(e) => setInfoForm({ ...infoForm, contact_number: e.target.value })} required placeholder="(02) 8642-9999" />
+                <label>Contact Number (optional)</label>
+                <input type="text" value={infoForm.contact_number} onChange={(e) => setInfoForm({ ...infoForm, contact_number: e.target.value })} placeholder="Leave blank if the health center has no contact number" /> 
               </div>
               <div className="form-group">
                 <label>Operating Days</label>
@@ -1456,12 +1495,13 @@ export default function HealthCenter() {
 
         /* ─── SERVICES TAB ─── */
         .table-services .reports-table th:nth-child(1),
-        .table-services .reports-table td:nth-child(1) { width: 65%; text-align: left; }
+        .table-services .reports-table td:nth-child(1) { width: 25%; text-align: left; }
         .table-services .reports-table th:nth-child(2),
-        .table-services .reports-table td:nth-child(2) { width: 18%; }
+        .table-services .reports-table td:nth-child(2) { width: 45%; }
         .table-services .reports-table th:nth-child(3),
-        .table-services .reports-table td:nth-child(3) { width: 17%; text-align: center; }
-
+        .table-services .reports-table td:nth-child(3) { width: 13%; }
+        .table-services .reports-table th:nth-child(4),
+        .table-services .reports-table td:nth-child(4) { width: 17%; text-align: center; }
         /* ─── MEDICAL STAFF TAB ─── */
         .table-staff .reports-table th:nth-child(1),
         .table-staff .reports-table td:nth-child(1) { width: 50%; text-align: left; }

@@ -34,7 +34,7 @@ exports.getHealthServices = async (req, res) => {
 
 exports.addHealthService = async (req, res) => {
     try {
-        const { service_name, status } = req.body;
+        const { service_name, description, status } = req.body;
         if (!service_name) {
             return res.status(400).json({ error: 'Service name is required.' });
         }
@@ -44,8 +44,8 @@ exports.addHealthService = async (req, res) => {
         const nextOrder = (rows[0]?.max_order || 0) + 1;
 
         const [result] = await db.query(
-            'INSERT INTO health_services (service_name, status, display_order) VALUES (?, ?, ?)',
-            [service_name, finalStatus, nextOrder]
+            'INSERT INTO health_services (service_name, description, status, display_order) VALUES (?, ?, ?, ?)',
+            [service_name, description || null, finalStatus, nextOrder]
         );
         res.status(201).json({ message: 'Service added!', service_id: result.insertId });
     } catch (error) {
@@ -56,13 +56,13 @@ exports.addHealthService = async (req, res) => {
 
 exports.updateHealthService = async (req, res) => {
     try {
-        const { service_name, status } = req.body;
+        const { service_name, description, status } = req.body;
         if (!service_name) {
             return res.status(400).json({ error: 'Service name is required.' });
         }
         await db.query(
-            'UPDATE health_services SET service_name = ?, status = ? WHERE service_id = ?',
-            [service_name, status || 'Active', req.params.id]
+            'UPDATE health_services SET service_name = ?, description = ?, status = ? WHERE service_id = ?',
+            [service_name, description || null, status || 'Active', req.params.id]
         );
         res.json({ message: 'Service updated!' });
     } catch (error) {
@@ -149,21 +149,26 @@ exports.deleteMedicalStaff = async (req, res) => {
 exports.updateHealthInfo = async (req, res) => {
     try {
         const { location, contact_number, operating_days, operating_hours } = req.body;
-        if (!location || !contact_number || !operating_days || !operating_hours) {
-            return res.status(400).json({ error: 'All fields are required.' });
+        // Location, days, and hours are required.
+        // contact_number is optional — many barangay health centers have none.
+        if (!location || !operating_days || !operating_hours) {
+            return res.status(400).json({
+                error: 'Location, operating days, and operating hours are required.',
+            });
         }
+        const safeContact = contact_number ? String(contact_number).trim() || null : null;
 
         const [rows] = await db.query('SELECT info_id FROM health_center_info ORDER BY info_id LIMIT 1');
 
         if (rows.length === 0) {
             await db.query(
                 'INSERT INTO health_center_info (location, contact_number, operating_days, operating_hours) VALUES (?, ?, ?, ?)',
-                [location, contact_number, operating_days, operating_hours]
+                [location, safeContact, operating_days, operating_hours]
             );
         } else {
             await db.query(
                 'UPDATE health_center_info SET location = ?, contact_number = ?, operating_days = ?, operating_hours = ? WHERE info_id = ?',
-                [location, contact_number, operating_days, operating_hours, rows[0].info_id]
+                [location, safeContact, operating_days, operating_hours, rows[0].info_id]
             );
         }
         res.json({ message: 'Health center info updated!' });

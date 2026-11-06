@@ -4,6 +4,12 @@ import { FaArrowLeft, FaSpinner } from "react-icons/fa";
 import { apiFetch } from "../../api";
 import DOMPurify from "dompurify";
 
+// label style as the announcements list ("community" -> "Community")
+const toLabel = (value) => {
+  const text = String(value ?? "").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "Others";
+};
+
 export default function AnnouncementDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -34,7 +40,7 @@ export default function AnnouncementDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#E5E7EB] flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
         <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
       </div>
     );
@@ -42,12 +48,22 @@ export default function AnnouncementDetail() {
 
   if (error || !announcement) {
     return (
-      <div className="min-h-screen bg-[#E5E7EB] flex items-center justify-center px-6">
-        <div className="bg-white rounded-2xl border border-red-300 p-8 text-center max-w-sm w-full">
-          <p className="text-[15px] font-bold text-red-600">{error || "Announcement not found."}</p>
+      <div
+        className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center"
+        style={{ padding: "0 24px" }}
+      >
+        <div
+          className="bg-white rounded-2xl border border-red-300 text-center max-w-sm w-full flex flex-col items-center"
+          style={{ padding: "32px", gap: "16px" }}
+        >
+          <p className="text-[16px] font-bold text-red-600">
+            {error || "Announcement not found."}
+          </p>
           <button
+            type="button"
             onClick={() => navigate("/resident-dashboard")}
-            className="mt-4 text-[#0B5D2A] font-bold underline"
+            className="text-[#0B5D2A] font-bold underline"
+            style={{ padding: "8px 16px" }}
           >
             Go to Dashboard
           </button>
@@ -57,45 +73,65 @@ export default function AnnouncementDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-[#E5E7EB] flex justify-center items-center py-6 px-3">
-      <div className="relative w-[390px] h-[844px] bg-[#F8FAF8] rounded-[40px] border-[5px] border-white shadow-2xl overflow-hidden flex flex-col">
+    <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">
+      {/* Full screen on phones, phone frame only on sm and up */}
+      <div className="relative w-full h-[100dvh] sm:w-[390px] sm:h-[844px] bg-[#F8FAF8] sm:rounded-[40px] sm:border-[5px] sm:border-white sm:shadow-2xl overflow-hidden flex flex-col">
         {/* HEADER – back arrow goes back to previous page */}
-        <header className="relative h-[82px] bg-[#0B5D2A] flex items-center justify-center shrink-0">
+        <header
+          className="relative h-[82px] bg-[#0B5D2A] flex items-center justify-center shrink-0"
+          style={{ padding: "0 64px" }}
+        >
           <button
             type="button"
-            onClick={() => navigate(-1)} // ← Go back to previous page
-            className="absolute left-6 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center text-white text-[20px] bg-white/10 hover:bg-white/20 active:scale-95 transition"
+            onClick={() => navigate(-1)}
+            aria-label="Back"
+            className="absolute left-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center text-white text-[20px] bg-white/10 hover:bg-white/20 active:scale-95 transition"
           >
             <FaArrowLeft />
           </button>
-          <h1 className="text-white text-[21px] font-extrabold">Announcement</h1>
+          <h1 className="text-white text-[22px] font-extrabold text-center">
+            Announcement
+          </h1>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-6 pt-8 pb-8">
-          <div className="bg-white rounded-2xl border border-[#D5E4D1] p-6 shadow-sm">
-            <div className="mb-4">
-              <span className="inline-flex px-3 py-1 rounded-full bg-[#E8F5E3] text-[#0B5D2A] text-[10px] font-extrabold">
-                {announcement.category}
-              </span>
+        {/* CONTENT */}
+        <main
+          className="flex-1 overflow-y-auto no-scrollbar"
+          style={{
+            padding: "10px 10px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl border border-[#D5E4D1] shadow-sm flex flex-col items-start"
+            style={{ padding: "15px 10px", gap: "15px", boxSizing: "border-box" }}
+          >
+            <span
+              className="inline-flex rounded-full bg-[#E8F5E3] text-[#0B5D2A] text-[12px] font-extrabold"
+              style={{ padding: "6px 16px" }}
+            >
+              {toLabel(announcement.category)}
+            </span>
+
+            <div className="flex flex-col w-full min-w-0" style={{ gap: "14px" }}>
+              <h2 className="text-[24px] font-extrabold text-gray-900 leading-snug break-words">
+                {announcement.title}
+              </h2>
+              <p className="text-[14px] text-gray-500">{announcement.date}</p>
             </div>
-            <h2 className="text-[20px] font-extrabold text-gray-900 leading-tight">
-              {announcement.title}
-            </h2>
-            <p className="text-[12px] text-gray-500 mt-3">{announcement.date}</p>
-            <div className="h-px bg-[#E5E7EB] my-5" />
+
+            <div className="w-full h-px bg-[#E5E7EB]" />
+
+            {/* Rich-text content - sanitized + rendered as HTML so headings */}
             <div
-              className="ql-content text-[14px] text-gray-700 leading-7"
+              className="ql-content w-full min-w-0 text-[16px] text-gray-700 leading-8 break-words"
               onClick={(e) => {
                 const anchor = e.target.closest("a");
                 if (!anchor) return;
 
                 let href = (anchor.getAttribute("href") || "").trim();
                 if (!href) return;
-
-                // Skip pure fragments
                 if (href === "#" || href.startsWith("#")) return;
 
-                // Normalize: prepend https:// if no scheme is present
                 if (!/^(https?:|mailto:|tel:)/i.test(href)) {
                   if (href.startsWith("//")) {
                     href = "https:" + href;
@@ -122,11 +158,6 @@ export default function AnnouncementDetail() {
             />
           </div>
         </main>
-
-        {/* ANDROID HOME BAR */}
-        <div className="absolute bottom-3 left-0 right-0 flex justify-center pointer-events-none">
-          <div className="w-[70px] h-[5px] rounded-full bg-gray-800 opacity-70" />
-        </div>
       </div>
     </div>
   );

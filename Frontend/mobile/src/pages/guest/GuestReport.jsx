@@ -31,11 +31,11 @@ export default function GuestReport() {
 
   const [validationErrors, setValidationErrors] = useState({});
 
-  // ✅ Added new categories and sorted A-Z
+  // Categories and sorted A-Z
   const categories = [
     "Air Pollution",
     "Animal Waste",
-    "Blotter & Incidents",
+    "Blotter & Incident",
     "Clogged Drainage",
     "Crime",
     "Damaged Roads",

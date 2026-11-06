@@ -37,7 +37,7 @@ export default function ReportLocation() {
   const description = location.state?.description || "";
 
   // ============================================================
-  // BARANGAY CENTER AND BOUNDARIES
+  // BARANGAY CENTER, BOUNDS, AND POLYGON
   // ============================================================
   const BARANGAY_CENTER = {
     lat: 14.553353888073685,
@@ -72,7 +72,7 @@ export default function ReportLocation() {
   const [mapInitialized, setMapInitialized] = useState(false);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
-  // Validate if coordinates are within barangay
+  // Ray-casting point-in-polygon test
   const isPointInPolygon = (lat, lng, polygon) => {
     let inside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -86,7 +86,6 @@ export default function ReportLocation() {
     return inside;
   };
 
-  // Validate if coordinates are within barangay
   const isValidLocation = (lat, lng) =>
     isPointInPolygon(lat, lng, BARANGAY_POLYGON);
 
@@ -108,10 +107,10 @@ export default function ReportLocation() {
     });
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; OpenStreetMap contributors',
+      attribution: "&copy; OpenStreetMap contributors",
     }).addTo(mapRef.current);
 
-    // barangay boundary overlay
+    // Barangay boundary polygon (not rectangle)
     L.polygon(BARANGAY_POLYGON, {
       color: "#0B5D2A",
       weight: 2,
@@ -120,20 +119,19 @@ export default function ReportLocation() {
       dashArray: "8, 4",
     }).addTo(mapRef.current);
 
-    // draggable marker at center
+    // Draggable marker at center
     const marker = L.marker([BARANGAY_CENTER.lat, BARANGAY_CENTER.lng], {
       draggable: true,
       icon: createDragMarkerIcon(),
     }).addTo(mapRef.current);
     markerRef.current = marker;
 
-    // Set initial form data to center
     setFormData({
       latitude: BARANGAY_CENTER.lat.toFixed(6),
       longitude: BARANGAY_CENTER.lng.toFixed(6),
     });
 
-    // Constrain marker within bounds
+    // Constrain marker to the bounding box while dragging
     marker.on("drag", () => {
       const pos = marker.getLatLng();
       const lat = Math.max(BARANGAY_BOUNDS.south, Math.min(BARANGAY_BOUNDS.north, pos.lat));
@@ -155,7 +153,24 @@ export default function ReportLocation() {
 
     setMapInitialized(true);
 
+    // Make sure the map measures its container after the layout is ready,
+    // and again whenever the container size changes (e.g. phone rotation)
+    const mapInstance = mapRef.current;
+    const refreshTimer = setTimeout(() => {
+      if (mapInstance) mapInstance.invalidateSize();
+    }, 200);
+
+    let resizeObserver = null;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(() => {
+        if (mapInstance) mapInstance.invalidateSize();
+      });
+      resizeObserver.observe(mapContainerRef.current);
+    }
+
     return () => {
+      clearTimeout(refreshTimer);
+      if (resizeObserver) resizeObserver.disconnect();
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -239,7 +254,7 @@ export default function ReportLocation() {
     const lat = parseFloat(name === "latitude" ? value : formData.latitude);
     const lng = parseFloat(name === "longitude" ? value : formData.longitude);
     if (!isNaN(lat) && !isNaN(lng) && isValidLocation(lat, lng)) {
-      setHasUserInteracted(true); // User typed valid coordinates
+      setHasUserInteracted(true);
       setError("");
     }
   };
@@ -248,9 +263,6 @@ export default function ReportLocation() {
     const lat = parseFloat(formData.latitude);
     const lng = parseFloat(formData.longitude);
 
-    // ============================================================
-    // User must interact with the location first
-    // ============================================================
     if (!hasUserInteracted) {
       setError(
         "Please drag the marker to your exact location on the map\n" +
@@ -333,46 +345,87 @@ export default function ReportLocation() {
     }
   };
 
-  // Check if submit should be disabled
   const isSubmitDisabled = loading || !hasUserInteracted;
 
+  const coordInputClass =
+    "block w-full min-w-0 h-[52px] bg-[#F4F7F3] border border-[#D5E4D1] rounded-xl text-[15px] text-gray-700 outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10";
+  const coordInputStyle = { padding: "0 16px", boxSizing: "border-box" };
+  const coordLabelClass =
+    "block text-[12px] font-bold text-gray-600 uppercase tracking-wide";
+
   return (
-    <div className="min-h-screen bg-[#E5E7EB] flex justify-center items-center py-6 px-3">
-      <div className="relative w-[390px] h-[844px] bg-[#F8FAF8] rounded-[40px] border-[5px] border-white shadow-2xl overflow-hidden flex flex-col">
-        
-        {/* HEADER */}
-        <header className="relative h-[82px] bg-[#0B5D2A] flex items-center justify-center shrink-0">
+    <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">
+      <style>{`
+        .hide-scrollbar {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+          width: 0;
+          height: 0;
+        }
+      `}</style>
+
+      <div className="relative w-full h-[100dvh] sm:w-[390px] sm:h-[844px] bg-[#F8FAF8] sm:rounded-[40px] sm:border-[5px] sm:border-white sm:shadow-2xl overflow-hidden flex flex-col">
+        <header
+          className="relative h-[82px] bg-[#0B5D2A] flex items-center justify-center shrink-0"
+          style={{ padding: "0 64px" }}
+        >
           <button
             type="button"
             onClick={() => navigate("/description-step")}
-            className="absolute left-6 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center text-white text-[20px] bg-white/10 hover:bg-white/20 active:scale-95 transition"
+            aria-label="Back"
+            className="absolute left-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center text-white text-[20px] bg-white/10 hover:bg-white/20 active:scale-95 transition"
           >
             <FaArrowLeft />
           </button>
-          <h1 className="text-white text-[21px] font-extrabold">Report Location</h1>
+          <h1 className="text-white text-[22px] font-extrabold text-center">
+            Report Location
+          </h1>
         </header>
 
-        {/* MAIN CONTENT */}
-        <main className="flex-1 overflow-y-auto px-6 pt-7 pb-4 no-scrollbar">
-          <div className="mb-6">
-            <p className="text-[13px] font-bold text-[#0B5D2A] mb-2">Step 4 of 4</p>
-            <h2 className="text-[21px] font-extrabold text-gray-900 leading-tight">Set Your Location</h2>
-            <p className="text-[12px] text-gray-500 mt-2 leading-5">
+        <main
+          className="hide-scrollbar flex-1 overflow-y-auto flex flex-col"
+          style={{
+            padding:
+              "28px 24px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
+            gap: "28px",
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
+        >
+          <div className="shrink-0 flex flex-col" style={{ gap: "8px" }}>
+            <p className="text-[15px] font-bold text-[#0B5D2A]">Step 4 of 4</p>
+            <h2 className="text-[24px] font-extrabold text-gray-900 leading-tight">
+              Set Your Location
+            </h2>
+            <p className="text-[14px] text-gray-600 leading-6">
               Drag the marker to your exact location within the barangay.
             </p>
             {!hasUserInteracted && (
-              <p className="text-[11px] text-[#D89A00] font-bold mt-1">
+              <p className="text-[14px] text-[#B8791F] font-bold leading-6">
                 ⚠️ Please drag the marker or use GPS to set your location
               </p>
             )}
           </div>
 
-          <section className="bg-white rounded-3xl border border-[#D5E4D1] shadow-sm px-6 py-7">
-            {/* MAP */}
-            <div className="mb-5">
+          <section
+            className="shrink-0 bg-white rounded-3xl border border-[#D5E4D1] shadow-sm flex flex-col"
+            style={{ padding: "24px", gap: "20px", boxSizing: "border-box" }}
+          >
+            <div className="shrink-0" style={{ width: "100%" }}>
               <div
                 ref={mapContainerRef}
-                className="w-full h-[200px] rounded-2xl overflow-hidden border border-[#C8DCC3] bg-[#DCEFD8]"
+                className="rounded-2xl overflow-hidden border border-[#C8DCC3] bg-[#DCEFD8]"
+                style={{
+                  width: "100%",
+                  height: "240px",
+                  minHeight: "240px",
+                  position: "relative",
+                  zIndex: 0,
+                  boxSizing: "border-box",
+                }}
               >
                 {!mapInitialized && (
                   <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
@@ -380,17 +433,19 @@ export default function ReportLocation() {
                   </div>
                 )}
               </div>
-              <p className="text-[9px] text-gray-400 mt-1 text-center">
+              <p
+                className="text-[13px] leading-5 text-gray-500 text-center"
+                style={{ marginTop: "10px" }}
+              >
                 Drag the marker to your location (must be within Barangay Sto. Rosario Kanluran)
               </p>
             </div>
 
-            {/* GET LOCATION BUTTON */}
             <button
               type="button"
               onClick={getLocation}
               disabled={gettingLocation}
-              className="w-full h-[50px] bg-[#0B5D2A] text-white rounded-2xl font-bold text-[13px] flex items-center justify-center gap-2 shadow-sm hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50"
+              className="w-full h-[54px] bg-[#0B5D2A] text-white rounded-2xl font-bold text-[15px] flex items-center justify-center gap-2 shadow-sm hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50"
             >
               {gettingLocation ? (
                 <>
@@ -399,83 +454,79 @@ export default function ReportLocation() {
                 </>
               ) : (
                 <>
-                  <FaMapMarkerAlt size={15} />
+                  <FaMapMarkerAlt size={16} />
                   Get Current Location (GPS)
                 </>
               )}
             </button>
 
-            <div className="h-5" />
-
-            {/* MANUAL INPUT */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2 block">
+              <div className="min-w-0 flex flex-col" style={{ gap: "8px" }}>
+                <label htmlFor="latitude" className={coordLabelClass}>
                   Latitude
                 </label>
                 <input
+                  id="latitude"
                   type="text"
                   name="latitude"
                   value={formData.latitude}
                   onChange={handleManualChange}
                   placeholder="14.552644"
-                  className="w-full h-[48px] bg-[#F4F7F3] border border-[#D5E4D1] rounded-xl px-4 text-[13px] text-gray-700 outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10"
+                  className={coordInputClass}
+                  style={coordInputStyle}
                 />
               </div>
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2 block">
+              <div className="min-w-0 flex flex-col" style={{ gap: "8px" }}>
+                <label htmlFor="longitude" className={coordLabelClass}>
                   Longitude
                 </label>
                 <input
+                  id="longitude"
                   type="text"
                   name="longitude"
                   value={formData.longitude}
                   onChange={handleManualChange}
                   placeholder="121.068783"
-                  className="w-full h-[48px] bg-[#F4F7F3] border border-[#D5E4D1] rounded-xl px-4 text-[13px] text-gray-700 outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10"
+                  className={coordInputClass}
+                  style={coordInputStyle}
                 />
               </div>
             </div>
 
             {error && (
-              <div className="mt-4 p-3 bg-red-100 border border-red-400 rounded-lg text-red-700 text-sm whitespace-pre-line">
+              <div
+                className="bg-red-100 border border-red-400 rounded-xl text-red-700 text-[14px] leading-6 whitespace-pre-line break-words"
+                style={{ padding: "14px 16px" }}
+              >
                 {error}
               </div>
             )}
           </section>
 
-          <div className="h-7" />
-
-          {/* SUBMIT BUTTON */}
-          <div className="px-1">
+          <div className="shrink-0 flex flex-col" style={{ gap: "12px" }}>
             <button
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitDisabled}
               className={`
-                w-full min-h-[56px] px-6 py-4 rounded-2xl font-extrabold text-[14px] shadow-md flex items-center justify-center transition
-                ${isSubmitDisabled 
-                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
-                  : 'bg-[#0B5D2A] text-white hover:bg-[#084A21] active:scale-[0.98]'
+                w-full min-h-[58px] rounded-2xl font-extrabold text-[16px] shadow-md flex items-center justify-center transition
+                ${
+                  isSubmitDisabled
+                    ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                    : "bg-[#0B5D2A] text-white hover:bg-[#084A21] active:scale-[0.98]"
                 }
               `}
+              style={{ padding: "0 24px" }}
             >
               {loading ? "Submitting..." : "Submit Report"}
             </button>
             {!hasUserInteracted && !loading && (
-              <p className="text-[10px] text-gray-400 text-center mt-2">
+              <p className="text-[13px] leading-5 text-gray-500 text-center">
                 Drag the marker on the map to enable submission
               </p>
             )}
           </div>
-
-          <div className="h-[75px]" />
         </main>
-
-        {/* HOME BAR */}
-        <div className="absolute bottom-2 left-0 right-0 flex justify-center pointer-events-none z-30">
-          <div className="w-[70px] h-[5px] rounded-full bg-gray-800 opacity-70" />
-        </div>
       </div>
     </div>
   );

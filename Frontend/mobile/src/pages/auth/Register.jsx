@@ -944,8 +944,8 @@ export default function Register() {
       alert("Please upload a valid image file (JPG, JPEG, PNG).");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      alert("File size must be less than 5MB.");
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File size must be less than 10MB.");
       return;
     }
 
@@ -1489,7 +1489,7 @@ export default function Register() {
                   >
                     <FaUpload size={24} />
                     <span className="font-extrabold text-[13px] leading-5">UPLOAD FILE</span>
-                    <span className="text-[12px] text-gray-500 leading-4">JPG, PNG (5MB)</span>
+                    <span className="text-[12px] text-gray-500 leading-4">JPG, PNG (10MB)</span>
                   </label>
 
                   <button

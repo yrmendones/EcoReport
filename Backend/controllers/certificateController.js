@@ -2,7 +2,7 @@ const db = require('../db');
 
 exports.createCertificateRequest = async (req, res) => {
     try {
-        const { user_id, certificate_type, purpose, preferred_release_date, notes } = req.body;
+        const { user_id, certificate_type, purpose, preferred_release_date, notes, fee } = req.body;
         if (!user_id || !certificate_type || !purpose || !preferred_release_date)
             return res.status(400).json({ error: 'Missing required fields.' });
 
@@ -18,11 +18,17 @@ exports.createCertificateRequest = async (req, res) => {
             });
         }
 
+        const parsedFee =
+            fee !== undefined && fee !== null && fee !== ""
+                ? Number(fee)
+                : null;
+        const safeFee = Number.isFinite(parsedFee) ? parsedFee : null;
+
         const [result] = await db.query(
             `INSERT INTO certificate_requests 
-            (user_id, certificate_type, purpose, preferred_release_date, notes, status, requested_at) 
-            VALUES (?, ?, ?, ?, ?, 'Pending', NOW())`,
-            [user_id, certificate_type, purpose, preferred_release_date, notes || null]
+            (user_id, certificate_type, purpose, preferred_release_date, fee, notes, status, requested_at) 
+            VALUES (?, ?, ?, ?, ?, ?, 'Pending', NOW())`,
+            [user_id, certificate_type, purpose, preferred_release_date, safeFee, notes || null]
         );
         res.status(201).json({ message: 'Certificate requested!', certificate_request_id: result.insertId });
     } catch (error) {

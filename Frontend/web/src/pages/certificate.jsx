@@ -9,10 +9,29 @@ const PAGE_SIZE = 25;
 const CATEGORY_OPTIONS = [
   "All Categories",
   "Barangay Clearance",
+  "Barangay ID",
+  "Cedula",
+  "School Requirement",
+  "Proof of Residency",
+  "Senior Citizen ID Requirement",
   "Certificate of Residency",
   "Certificate of Indigency",
   "Business Clearance",
 ];
+
+const CERT_FEES = {
+  "Barangay Clearance": null,
+  "Barangay ID": 100,
+  "Cedula": 20,
+  "School Requirement": 100,
+  "Proof of Residency": 100,
+  "Senior Citizen ID Requirement": 100,
+};
+
+const formatFee = (fee) => {
+  if (fee === null || fee === undefined || fee === "") return "—";
+  return `₱${Number(fee).toFixed(2)}`;
+};
 
 const STATUS_OPTIONS = [
   "All Status",
@@ -390,6 +409,7 @@ export default function Certificate() {
                       <th>Resident</th>
                       <th>Certificate Type</th>
                       <th>Date Requested</th>
+                      <th>Fee</th>
                       <th>Status</th>
                       <th>Actions</th>
                     </tr>
@@ -404,6 +424,13 @@ export default function Certificate() {
                           <td>{`${cert.first_name} ${cert.last_name}`}</td>
                           <td>{cert.certificate_type}</td>
                           <td>{formatDate(cert.requested_at)}</td>
+                          <td className="fee-cell">
+                            {formatFee(
+                              cert.fee !== null && cert.fee !== undefined
+                                ? cert.fee
+                                : CERT_FEES[cert.certificate_type]
+                            )}
+                          </td>
                           <td>
                             <span className={`status-badge ${cert.status.toLowerCase()}`}>
                               {cert.status}
@@ -438,7 +465,7 @@ export default function Certificate() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="6" className="text-center py-8 text-gray-500">
+                        <td colSpan="7" className="text-center py-8 text-gray-500">
                           No certificates found.
                         </td>
                       </tr>
@@ -536,6 +563,14 @@ export default function Certificate() {
                 <p><strong>Additional Notes:</strong> {selectedCertificate.notes}</p>
               )}
               <p><strong>Preferred Release Date:</strong> {formatDate(selectedCertificate.preferred_release_date)}</p>
+              <p>
+                <strong>Fee:</strong>{" "}
+                {formatFee(
+                  selectedCertificate.fee !== null && selectedCertificate.fee !== undefined
+                    ? selectedCertificate.fee
+                    : CERT_FEES[selectedCertificate.certificate_type]
+                )}
+              </p>
               <p><strong>Status:</strong> {selectedCertificate.status}</p>
             </div>
             <div className="modal-actions">
@@ -618,12 +653,21 @@ export default function Certificate() {
         .reports-table td { height: 43px; padding: 4px 7px; color: #222222; font-size: 9px; vertical-align: middle; border-bottom: 1px solid #9cb1a0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .reports-table tbody tr:hover { background: #f7faf7; }
 
-        .reports-table th:nth-child(1), .reports-table td:nth-child(1) { width: 15%; }
-        .reports-table th:nth-child(2), .reports-table td:nth-child(2) { width: 20%; }
-        .reports-table th:nth-child(3), .reports-table td:nth-child(3) { width: 22%; }
-        .reports-table th:nth-child(4), .reports-table td:nth-child(4) { width: 15%; }
-        .reports-table th:nth-child(5), .reports-table td:nth-child(5) { width: 13%; }
-        .reports-table th:nth-child(6), .reports-table td:nth-child(6) { width: 15%; text-align: center; }
+        reports-table th:nth-child(1), .reports-table td:nth-child(1) { width: 13%; }
+        .reports-table th:nth-child(2), .reports-table td:nth-child(2) { width: 18%; }
+        .reports-table th:nth-child(3), .reports-table td:nth-child(3) { width: 20%; }
+        .reports-table th:nth-child(4), .reports-table td:nth-child(4) { width: 13%; }
+        .reports-table th:nth-child(5), .reports-table td:nth-child(5) { width: 12%; text-align: right; }
+        .reports-table th:nth-child(6), .reports-table td:nth-child(6) { width: 11%; }
+        .reports-table th:nth-child(7), .reports-table td:nth-child(7) { width: 13%; text-align: center; }
+
+        /* Extra breathing room between the Fee and Status columns */
+        .reports-table th:nth-child(5),
+        .reports-table td:nth-child(5) { padding-right: 60px; }
+        .reports-table th:nth-child(6),
+        .reports-table td:nth-child(6) { padding-left: 60px; }
+
+        .fee-cell { font-weight: 700; color: #0B5D2A; }
 
         .request-id { color: #34734b !important; font-size: 8px !important; }
 

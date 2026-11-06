@@ -2,7 +2,9 @@
 -- 1. CREATE DATABASE
 -- ============================================================
 
-CREATE DATABASE IF NOT EXISTS ecoreport;
+CREATE DATABASE IF NOT EXISTS ecoreport
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
 USE ecoreport;
 
 -- ============================================================
@@ -100,6 +102,7 @@ CREATE TABLE IF NOT EXISTS certificate_requests (
     certificate_type VARCHAR(100) NOT NULL,
     purpose TEXT NOT NULL,
     preferred_release_date DATE NOT NULL,
+    fee DECIMAL(10,2) NULL,
     notes TEXT,
     status ENUM('Pending','Approved','Released','Rejected') DEFAULT 'Pending',
     requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -311,6 +314,7 @@ CREATE TABLE IF NOT EXISTS health_center_info (
 CREATE TABLE IF NOT EXISTS health_services (
     service_id INT AUTO_INCREMENT PRIMARY KEY,
     service_name VARCHAR(100) NOT NULL,
+    description TEXT NULL,
     status ENUM('Active', 'Inactive') DEFAULT 'Active',
     icon VARCHAR(50) DEFAULT 'FaHospital',
     display_order INT DEFAULT 0,
@@ -378,20 +382,20 @@ INSERT INTO hotlines (title, number, color_class, description, clean_number) VAL
 ('MDRRMO Pateros', '(02) 8642-7777', 'bg-purple-100 text-purple-700', 'Municipal Disaster Risk Reduction Management Office', '0286427777');
 
 INSERT INTO health_center_info (location, contact_number, operating_days, operating_hours) VALUES
-('Barangay Hall Compound, Sto. Rosario Kanluran, Pateros', '(02) 8642-9999', 'Monday - Friday', '8:00 AM - 4:00 PM');
+('Delfin Salonga Health Center, Emerald Subdivision, M. Lozada St., Sto. Rosario-Kanluran, Pateros, M.M.', '', 'Monday - Friday', '7:00 AM - 4:00 PM');
 
-INSERT INTO health_services (service_name, status, display_order) VALUES
-('General Consultation', 'Active', 1),
-('Vaccination', 'Active', 2),
-('Maternal Care', 'Active', 3),
-('Child Immunization', 'Active', 4),
-('Dental Services', 'Active', 5),
-('Blood Pressure Check', 'Active', 6);
+INSERT INTO health_services (service_name, description, status, display_order) VALUES
+('Dental Check-up', 'Check-up of your teeth and gums. Ask the health center for the schedule of the dentist.', 'Active', 1),
+('Prenatal Check-up', 'Regular check-ups for pregnant mothers to make sure mother and baby are healthy.', 'Active', 2),
+('Resident Health Monitoring', 'BHW staff check on the health of residents, such as blood pressure and other concerns.', 'Active', 3),
+('Operation Timbang Plus', 'Children are weighed and measured house to house to find out if they are underweight or need nutrition help.', 'Active', 4),
+('Health Events and Medical Missions', 'Special health activities in the barangay such as Purong Kalusugan and medical missions with free check-ups and services. Watch for announcements.', 'Active', 5);
 
 INSERT INTO medical_staff (staff_name, role, display_order) VALUES
-('Dr. Maria Santos', 'Municipal Doctor', 1),
-('Nurse John Cruz', 'Registered Nurse', 2),
-('Midwife Ana Reyes', 'Midwife', 3);
+('Rhea Jane Tero', 'BHW', 1),
+('Glaiza Gallano', 'BHW', 2),
+('Ma. Theresa Dela Cruz', 'BHW', 3),
+('Gloria Berame', 'BNS', 4);
 
 -- ============================================================
 -- 24. INDEXES

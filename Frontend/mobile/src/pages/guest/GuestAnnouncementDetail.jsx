@@ -4,6 +4,12 @@ import { FaArrowLeft, FaSpinner } from "react-icons/fa";
 import { apiFetch } from "../../api";
 import DOMPurify from "dompurify";
 
+// Capitalizes the category label
+const toLabel = (value) => {
+  const text = String(value ?? "").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "Others";
+};
+
 export default function GuestAnnouncementDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -77,7 +83,7 @@ export default function GuestAnnouncementDetail() {
           <div className="bg-white rounded-2xl border border-[#D5E4D1] p-6 shadow-sm">
             <div className="mb-4">
               <span className="inline-flex px-3 py-1 rounded-full bg-[#E8F5E3] text-[#0B5D2A] text-[10px] font-extrabold">
-                {announcement.category}
+                {toLabel(announcement.category)}
               </span>
             </div>
             <h2 className="text-[20px] font-extrabold text-gray-900 leading-tight">
