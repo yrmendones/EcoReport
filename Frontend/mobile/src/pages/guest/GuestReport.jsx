@@ -11,8 +11,14 @@ import {
   FaHome,
 } from "react-icons/fa";
 
-// ✅ Use Vite proxy in dev to avoid hardcoded IPs
-const API_BASE = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_URL || "http://localhost:5000");
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const LABEL_CLASS = "block text-[14px] font-extrabold text-gray-900";
+const ERROR_CLASS = "error-text text-red-500 text-[12px] leading-5";
+const fieldClass = (hasError) =>
+  `w-full min-h-[52px] bg-white rounded-2xl border ${
+    hasError ? "border-red-500" : "border-[#C8DCC3]"
+  } text-[14px] outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10 transition`;
 
 export default function GuestReport() {
   const navigate = useNavigate();
@@ -31,20 +37,19 @@ export default function GuestReport() {
 
   const [validationErrors, setValidationErrors] = useState({});
 
-  // Categories and sorted A-Z
   const categories = [
     "Air Pollution",
     "Animal Waste",
-    "Blotter & Incident",
     "Clogged Drainage",
-    "Crime",
     "Damaged Roads",
-    "Fallen Trees",
     "Flooding",
+    "Fallen Trees",
     "Illegal Dumping",
     "Improper Garbage Disposal",
-    "Others Environmental Concerns",
     "Overgrown Grass",
+    "Others Environmental Concerns",
+    "Crime",
+    "Blotter & Incident",
   ];
 
   // ============ CONTACT NUMBER INPUT HANDLER ============
@@ -60,16 +65,26 @@ export default function GuestReport() {
 
   // ============ FILE HANDLERS ============
   const handlePhotoUpload = (e) => {
-    const files = Array.from(e.target.files || []).filter((f) => f.type.startsWith("image/"));
+    const files = Array.from(e.target.files || []).filter((f) =>
+      f.type.startsWith("image/")
+    );
     const previews = files.map((f) => ({ file: f, url: URL.createObjectURL(f) }));
     setPhotos((prev) => [...prev, ...previews].slice(0, 5));
+    if (validationErrors.evidence) {
+      setValidationErrors((prev) => ({ ...prev, evidence: "" }));
+    }
     e.target.value = "";
   };
 
   const handleVideoUpload = (e) => {
-    const files = Array.from(e.target.files || []).filter((f) => f.type.startsWith("video/"));
+    const files = Array.from(e.target.files || []).filter((f) =>
+      f.type.startsWith("video/")
+    );
     const previews = files.map((f) => ({ file: f, url: URL.createObjectURL(f) }));
     setVideos((prev) => [...prev, ...previews].slice(0, 2));
+    if (validationErrors.evidence) {
+      setValidationErrors((prev) => ({ ...prev, evidence: "" }));
+    }
     e.target.value = "";
   };
 
@@ -124,7 +139,10 @@ export default function GuestReport() {
     const errors = {};
     let isValid = true;
 
-    if (!guestName.trim()) { errors.guestName = "Guest name is required."; isValid = false; }
+    if (!guestName.trim()) {
+      errors.guestName = "Guest name is required.";
+      isValid = false;
+    }
 
     const mobileRegex = /^(09)\d{9}$/;
     if (!guestMobile.trim()) {
@@ -135,13 +153,23 @@ export default function GuestReport() {
       isValid = false;
     }
 
-    if (!category) { errors.category = "Please select an environmental concern."; isValid = false; }
-    if (!description.trim()) { errors.description = "Description is required."; isValid = false; }
-    if (!location.lat || !location.lng) { errors.location = "Please capture your GPS location."; isValid = false; }
-    
-    if (photos.length === 0 && videos.length === 0) { 
-      errors.evidence = "Please upload at least one photo or video."; 
-      isValid = false; 
+    if (!category) {
+      errors.category = "Please select an environmental concern.";
+      isValid = false;
+    }
+    if (!description.trim()) {
+      errors.description = "Description is required.";
+      isValid = false;
+    }
+    if (!location.lat || !location.lng) {
+      errors.location = "Please capture your GPS location.";
+      isValid = false;
+    }
+
+    // Evidence is required - at least one photo or video
+    if (photos.length === 0 && videos.length === 0) {
+      errors.evidence = "Please upload at least one photo or video as evidence.";
+      isValid = false;
     }
 
     setValidationErrors(errors);
@@ -152,7 +180,8 @@ export default function GuestReport() {
   const handleSubmit = async () => {
     if (!validateForm()) {
       const firstError = document.querySelector(".error-text");
-      if (firstError) firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (firstError)
+        firstError.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
@@ -172,7 +201,8 @@ export default function GuestReport() {
           body: formData,
         });
         const uploadData = await uploadResponse.json();
-        if (!uploadResponse.ok) throw new Error(uploadData.error || "File upload failed.");
+        if (!uploadResponse.ok)
+          throw new Error(uploadData.error || "File upload failed.");
 
         uploadedMedia = (uploadData.files || []).map((f) => ({
           url: f.url,
@@ -200,7 +230,12 @@ export default function GuestReport() {
       if (!response.ok) throw new Error(data.error || "Submission failed.");
 
       setSubmittedData({
-        reference: data.reference || `ER-${new Date().getFullYear()}-${String(data.report_id).padStart(4, "0")}`,
+        reference:
+          data.reference ||
+          `ER-${new Date().getFullYear()}-${String(data.report_id).padStart(
+            4,
+            "0"
+          )}`,
         guest_name: guestName.trim(),
         guest_mobile: guestMobile.trim(),
         category,
@@ -222,42 +257,63 @@ export default function GuestReport() {
   // ============================================================
   if (submittedData) {
     return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center sm:p-4">
+      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center sm:py-6 sm:px-3">
         <div className="relative w-full h-[100dvh] sm:w-[390px] sm:h-[844px] bg-[#F8FAF8] sm:rounded-[40px] sm:border-[5px] sm:border-white sm:shadow-2xl overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-6 px-5 pt-10 pb-24">
-            <div className="flex flex-col items-center">
+          <div
+            className="flex-1 overflow-y-auto no-scrollbar flex flex-col"
+            style={{
+              padding:
+                "40px 24px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
+              gap: "24px",
+            }}
+          >
+            <div
+              className="flex flex-col items-center shrink-0"
+              style={{ gap: "8px" }}
+            >
               <div className="w-[88px] h-[88px] rounded-full bg-[#E8F5E3] flex items-center justify-center shrink-0">
                 <FaCheckCircle size={68} className="text-[#0B5D2A]" />
               </div>
-              <h1 className="text-[22px] font-extrabold text-[#0B5D2A] text-center mt-6 leading-tight">
-                Report Submitted
-              </h1>
-              <h2 className="text-[22px] font-extrabold text-[#0B5D2A] text-center leading-tight">
-                Successfully!
-              </h2>
-              <p className="text-[12px] text-gray-500 text-center mt-4 leading-6 max-w-[300px]">
-                Thank you for helping keep Barangay Sto. Rosario Kanluran clean and safe.
-                The barangay will review your report soon.
+              <div
+                className="flex flex-col items-center"
+                style={{ marginTop: "8px" }}
+              >
+                <h1 className="text-[22px] font-extrabold text-[#0B5D2A] text-center leading-tight">
+                  Report Submitted
+                </h1>
+                <h2 className="text-[22px] font-extrabold text-[#0B5D2A] text-center leading-tight">
+                  Successfully!
+                </h2>
+              </div>
+              <p className="text-[14px] text-gray-600 text-center leading-6 max-w-[320px]">
+                Thank you for helping keep Barangay Sto. Rosario Kanluran clean
+                and safe. The barangay will review your report soon.
               </p>
             </div>
 
-            <div className="w-full bg-[#F0F8ED] border border-[#A9C9A1] rounded-2xl px-6 py-6 flex flex-col gap-2">
-              <p className="text-center text-gray-500 text-[11px] font-medium">
+            <div
+              className="w-full bg-[#F0F8ED] border border-[#A9C9A1] rounded-2xl flex flex-col shrink-0"
+              style={{ padding: "20px", gap: "8px" }}
+            >
+              <p className="text-center text-gray-500 text-[13px] font-semibold leading-5">
                 Reference Number
               </p>
-              <h3 className="text-center text-[20px] font-extrabold text-[#0B5D2A] break-all">
+              <h3 className="text-center text-[20px] font-extrabold text-[#0B5D2A] break-all leading-7">
                 {submittedData.reference}
               </h3>
             </div>
 
-            <div className="flex flex-col gap-4">
-              <h3 className="text-[16px] font-extrabold text-gray-900">
+            <div className="flex flex-col shrink-0" style={{ gap: "16px" }}>
+              <h3 className="text-[22px] font-extrabold text-gray-900 leading-tight">
                 Submitted Details
               </h3>
 
               <div className="bg-white rounded-2xl border border-[#D5E4D1] shadow-sm overflow-hidden">
                 <ReviewRow label="Reporter Name" value={submittedData.guest_name} />
-                <ReviewRow label="Contact Number" value={submittedData.guest_mobile} />
+                <ReviewRow
+                  label="Contact Number"
+                  value={submittedData.guest_mobile}
+                />
                 <ReviewRow label="Category" value={submittedData.category} />
                 <ReviewRow label="Description" value={submittedData.description} />
                 <ReviewRow
@@ -267,30 +323,37 @@ export default function GuestReport() {
                       ? `${submittedData.latitude}, ${submittedData.longitude}`
                       : "Not provided"
                   }
-                  last={submittedData.photos.length === 0 && submittedData.videos.length === 0}
+                  last={
+                    submittedData.photos.length === 0 &&
+                    submittedData.videos.length === 0
+                  }
                 />
 
-                {(submittedData.photos.length > 0 || submittedData.videos.length > 0) && (
-                  <div className="px-6 py-5 flex flex-col gap-4">
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">
+                {(submittedData.photos.length > 0 ||
+                  submittedData.videos.length > 0) && (
+                  <div
+                    className="flex flex-col"
+                    style={{ padding: "20px", gap: "16px" }}
+                  >
+                    <p className="text-[13px] font-extrabold text-gray-500 uppercase tracking-wide leading-5">
                       Attached Evidence
                     </p>
 
                     {submittedData.photos.length > 0 && (
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-3" style={{ gap: "12px" }}>
                         {submittedData.photos.map((url, i) => (
                           <img
                             key={i}
                             src={url}
                             alt={`Evidence ${i + 1}`}
-                            className="w-full h-[80px] rounded-xl object-cover border border-[#D5E4D1]"
+                            className="w-full h-[88px] rounded-xl object-cover border border-[#D5E4D1]"
                           />
                         ))}
                       </div>
                     )}
 
                     {submittedData.videos.length > 0 && (
-                      <div className="flex flex-col gap-3">
+                      <div className="flex flex-col" style={{ gap: "12px" }}>
                         {submittedData.videos.map((url, i) => (
                           <video
                             key={i}
@@ -306,25 +369,26 @@ export default function GuestReport() {
               </div>
             </div>
 
-            <div className="px-5 py-4 bg-yellow-50 border border-yellow-200 rounded-2xl">
-              <p className="text-[11px] text-yellow-800 leading-5 text-center">
-                <strong>Note:</strong> Guest users can submit <strong>1 report per day</strong>.
-                You can submit another report tomorrow.
+            <div
+              className="bg-yellow-50 border border-yellow-200 rounded-2xl shrink-0"
+              style={{ padding: "20px" }}
+            >
+              <p className="text-[14px] text-yellow-800 leading-6 text-center">
+                <strong>Note:</strong> Guest users can submit{" "}
+                <strong>1 report per day</strong>. You can submit another report
+                tomorrow.
               </p>
             </div>
 
             <button
               type="button"
               onClick={() => navigate("/guest-home")}
-              className="w-full h-[52px] rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[14px] flex items-center justify-center gap-2 shadow-md hover:bg-[#084A21] active:scale-[0.98] transition"
+              className="w-full min-h-[54px] rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[16px] flex items-center justify-center shadow-md hover:bg-[#084A21] active:scale-[0.98] transition shrink-0"
+              style={{ gap: "12px" }}
             >
-              <FaHome size={16} />
+              <FaHome size={18} />
               Back to Guest Home
             </button>
-          </div>
-
-          <div className="hidden sm:flex absolute bottom-3 left-0 right-0 justify-center pointer-events-none z-30">
-            <div className="w-[70px] h-[5px] rounded-full bg-gray-800 opacity-70" />
           </div>
         </div>
       </div>
@@ -335,73 +399,91 @@ export default function GuestReport() {
   // FORM
   // ============================================================
   return (
-    <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center sm:p-4">
+    <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center sm:py-6 sm:px-3">
       <div className="relative w-full h-[100dvh] sm:w-[390px] sm:h-[844px] bg-[#F8FAF8] sm:rounded-[40px] sm:border-[5px] sm:border-white sm:shadow-2xl overflow-hidden flex flex-col">
-        <header className="relative h-[82px] bg-white flex items-center justify-center shrink-0 px-5">
+        {/* HEADER */}
+        <header
+          className="relative h-[82px] bg-[#0B5D2A] flex items-center justify-center shrink-0"
+          style={{ padding: "0 64px" }}
+        >
           <button
             type="button"
             onClick={() => navigate("/guest-home")}
             aria-label="Back"
-            className="absolute left-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-[#F2F8EF] text-[#0B5D2A] flex items-center justify-center text-[20px] shadow-sm hover:bg-[#E6F1E2] active:scale-95 transition"
+            className="absolute left-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center text-white text-[20px] bg-white/10 hover:bg-white/20 active:scale-95 transition"
           >
             <FaArrowLeft />
           </button>
-          <h1 className="text-[#0B5D2A] text-[22px] font-extrabold">Guest Reporting</h1>
+          <h1 className="text-white text-[22px] font-extrabold text-center">
+            Guest Reporting
+          </h1>
         </header>
 
-        <main className="flex-1 overflow-y-auto no-scrollbar px-5 pt-5 pb-24">
-          <div className="w-full bg-white rounded-[28px] border border-[#8FB58A] shadow-[0_4px_12px_rgba(11,93,42,0.10)] px-6 py-6 flex flex-col gap-3">
+        {/* MAIN CONTENT */}
+        <main
+          className="flex-1 overflow-y-auto no-scrollbar flex flex-col"
+          style={{
+            padding: "28px 24px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
+            gap: "24px",
+          }}
+        >
+          <div
+            className="w-full bg-white rounded-2xl border border-[#8FB58A] shadow-[0_4px_12px_rgba(11,93,42,0.10)] flex flex-col shrink-0"
+            style={{ padding: "20px", gap: "24px" }}
+          >
             {/* GUEST INFORMATION */}
-            <div className="flex flex-col gap-4">
-              <h2 className="text-[16px] font-extrabold text-[#0B5D2A]">
+            <div className="flex flex-col" style={{ gap: "16px" }}>
+              <h2 className="text-[22px] font-extrabold text-[#0B5D2A] leading-tight">
                 Guest Information
               </h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-2 min-w-0">
-                  <label className="block text-[12px] font-bold text-gray-700">
-                    Guest Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={guestName}
-                    onChange={(e) => {
-                      setGuestName(e.target.value);
-                      if (validationErrors.guestName) setValidationErrors({ ...validationErrors, guestName: "" });
-                    }}
-                    placeholder="Enter your name"
-                    className={`w-full h-[50px] px-4 rounded-xl border ${validationErrors.guestName ? "border-red-500" : "border-[#9FBA9F]"} bg-white text-[12px] outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10`}
-                  />
-                  {validationErrors.guestName && (
-                    <p className="error-text text-red-500 text-[10px] leading-4">
-                      {validationErrors.guestName}
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-col gap-2 min-w-0">
-                  <label className="block text-[12px] font-bold text-gray-700">
-                    Contact Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={guestMobile}
-                    onChange={(e) => handleContactChange(e.target.value)}
-                    placeholder="Enter Phone Number"
-                    maxLength={11}
-                    inputMode="numeric"
-                    className={`w-full h-[50px] px-4 rounded-xl border ${validationErrors.guestMobile ? "border-red-500" : "border-[#9FBA9F]"} bg-white text-[12px] outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10`}
-                  />
-                  {validationErrors.guestMobile && (
-                    <p className="error-text text-red-500 text-[10px] leading-4">
-                      {validationErrors.guestMobile}
-                    </p>
-                  )}
-                </div>
+
+              <div className="flex flex-col" style={{ gap: "8px" }}>
+                <label className={LABEL_CLASS}>
+                  Guest Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={guestName}
+                  onChange={(e) => {
+                    setGuestName(e.target.value);
+                    if (validationErrors.guestName)
+                      setValidationErrors({
+                        ...validationErrors,
+                        guestName: "",
+                      });
+                  }}
+                  placeholder="Enter your name"
+                  className={fieldClass(validationErrors.guestName)}
+                  style={{ padding: "0 16px" }}
+                />
+                {validationErrors.guestName && (
+                  <p className={ERROR_CLASS}>{validationErrors.guestName}</p>
+                )}
+              </div>
+
+              <div className="flex flex-col" style={{ gap: "8px" }}>
+                <label className={LABEL_CLASS}>
+                  Contact Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={guestMobile}
+                  onChange={(e) => handleContactChange(e.target.value)}
+                  placeholder="Enter Phone Number"
+                  maxLength={11}
+                  inputMode="numeric"
+                  className={fieldClass(validationErrors.guestMobile)}
+                  style={{ padding: "0 16px" }}
+                />
+                {validationErrors.guestMobile && (
+                  <p className={ERROR_CLASS}>{validationErrors.guestMobile}</p>
+                )}
               </div>
             </div>
 
             {/* CATEGORY */}
-            <div className="flex flex-col gap-2">
-              <label className="block text-[12px] font-bold text-gray-700">
+            <div className="flex flex-col" style={{ gap: "8px" }}>
+              <label className={LABEL_CLASS}>
                 Environmental Concern <span className="text-red-500">*</span>
               </label>
               <div className="relative">
@@ -409,59 +491,86 @@ export default function GuestReport() {
                   value={category}
                   onChange={(e) => {
                     setCategory(e.target.value);
-                    if (validationErrors.category) setValidationErrors({ ...validationErrors, category: "" });
+                    if (validationErrors.category)
+                      setValidationErrors({
+                        ...validationErrors,
+                        category: "",
+                      });
                   }}
-                  className={`appearance-none w-full h-[50px] px-4 pr-12 rounded-xl border ${validationErrors.category ? "border-red-500" : "border-[#9FBA9F]"} bg-white text-[12px] text-gray-600 outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10`}
+                  className={`appearance-none text-gray-700 ${fieldClass(
+                    validationErrors.category
+                  )}`}
+                  style={{ padding: "0 48px 0 16px" }}
                 >
                   <option value="">Select category</option>
                   {categories.map((item) => (
-                    <option key={item} value={item}>{item}</option>
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
                   ))}
                 </select>
-                <FaChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#0B5D2A] pointer-events-none" />
+                <FaChevronDown
+                  size={14}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#0B5D2A] pointer-events-none"
+                />
               </div>
               {validationErrors.category && (
-                <p className="error-text text-red-500 text-[10px] leading-4">
-                  {validationErrors.category}
-                </p>
+                <p className={ERROR_CLASS}>{validationErrors.category}</p>
               )}
             </div>
 
             {/* DESCRIPTION */}
-            <div className="flex flex-col gap-2">
-              <label className="block text-[12px] font-bold text-gray-700">
+            <div className="flex flex-col" style={{ gap: "8px" }}>
+              <label className={LABEL_CLASS}>
                 Description <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={description}
                 onChange={(e) => {
                   setDescription(e.target.value);
-                  if (validationErrors.description) setValidationErrors({ ...validationErrors, description: "" });
+                  if (validationErrors.description)
+                    setValidationErrors({
+                      ...validationErrors,
+                      description: "",
+                    });
                 }}
                 placeholder="Describe the environmental issue..."
-                className={`w-full h-[130px] px-4 py-3 rounded-xl border ${validationErrors.description ? "border-red-500" : "border-[#9FBA9F]"} bg-white text-[12px] leading-5 resize-none outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10`}
+                className={`h-[150px] leading-6 resize-none ${fieldClass(
+                  validationErrors.description
+                )}`}
+                style={{ padding: "14px 16px" }}
               />
               {validationErrors.description && (
-                <p className="error-text text-red-500 text-[10px] leading-4">
-                  {validationErrors.description}
-                </p>
+                <p className={ERROR_CLASS}>{validationErrors.description}</p>
               )}
             </div>
 
-            {/* EVIDENCE */}
-            <div className="flex flex-col gap-3">
-              <label className="block text-[12px] font-bold text-gray-700">
-                Evidence <span className="text-red-500">*</span> <span className="text-gray-400 font-normal">(photos or videos)</span>
+            {/* EVIDENCE — REQUIRED */}
+            <div className="flex flex-col" style={{ gap: "16px" }}>
+              <label className={LABEL_CLASS}>
+                Evidence <span className="text-red-500">*</span>{" "}
+                <span className="text-gray-500 font-normal">
+                  (photos or videos)
+                </span>
               </label>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2" style={{ gap: "16px" }}>
                 <label
                   htmlFor="photo-input"
-                  className="h-[100px] px-2 rounded-xl border border-[#9FBA9F] bg-[#FCFEFC] flex flex-col items-center justify-center text-center cursor-pointer hover:bg-[#F3F9F1] transition"
+                  className={`min-h-[120px] rounded-2xl border ${
+                    validationErrors.evidence
+                      ? "border-red-500"
+                      : "border-[#9FBA9F]"
+                  } bg-[#FCFEFC] flex flex-col items-center justify-center text-center cursor-pointer hover:bg-[#F3F9F1] transition`}
+                  style={{ padding: "12px 8px", gap: "6px" }}
                 >
-                  <FaCamera size={24} className="text-[#0B5D2A] mb-2" />
-                  <p className="text-[10px] font-bold text-[#16472C]">ADD PHOTOS</p>
-                  <p className="text-[9px] text-gray-500 mt-1">JPG, PNG (max 5)</p>
+                  <FaCamera size={28} className="text-[#0B5D2A]" />
+                  <p className="text-[13px] font-extrabold text-[#16472C] leading-5">
+                    ADD PHOTOS
+                  </p>
+                  <p className="text-[12px] text-gray-500 leading-4">
+                    JPG, PNG (max 5)
+                  </p>
                   <input
                     id="photo-input"
                     type="file"
@@ -474,11 +583,20 @@ export default function GuestReport() {
 
                 <label
                   htmlFor="video-input"
-                  className="h-[100px] px-2 rounded-xl border border-[#9FBA9F] bg-[#FCFEFC] flex flex-col items-center justify-center text-center cursor-pointer hover:bg-[#F3F9F1] transition"
+                  className={`min-h-[120px] rounded-2xl border ${
+                    validationErrors.evidence
+                      ? "border-red-500"
+                      : "border-[#9FBA9F]"
+                  } bg-[#FCFEFC] flex flex-col items-center justify-center text-center cursor-pointer hover:bg-[#F3F9F1] transition`}
+                  style={{ padding: "12px 8px", gap: "6px" }}
                 >
-                  <FaVideo size={24} className="text-[#0B5D2A] mb-2" />
-                  <p className="text-[10px] font-bold text-[#16472C]">ADD VIDEOS</p>
-                  <p className="text-[9px] text-gray-500 mt-1">MP4, MOV (max 2)</p>
+                  <FaVideo size={28} className="text-[#0B5D2A]" />
+                  <p className="text-[13px] font-extrabold text-[#16472C] leading-5">
+                    ADD VIDEOS
+                  </p>
+                  <p className="text-[12px] text-gray-500 leading-4">
+                    MP4, MOV (max 2)
+                  </p>
                   <input
                     id="video-input"
                     type="file"
@@ -491,19 +609,23 @@ export default function GuestReport() {
               </div>
 
               {photos.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  <p className="text-[10px] font-bold text-gray-500">
+                <div className="flex flex-col" style={{ gap: "12px" }}>
+                  <p className="text-[13px] font-extrabold text-gray-500 leading-5">
                     Photos ({photos.length}/5)
                   </p>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3" style={{ gap: "12px" }}>
                     {photos.map((p, i) => (
                       <div key={i} className="relative">
-                        <img src={p.url} alt={`Photo ${i + 1}`} className="w-full h-[80px] rounded-lg object-cover border border-[#D5E4D1]" />
+                        <img
+                          src={p.url}
+                          alt={`Photo ${i + 1}`}
+                          className="w-full h-[88px] rounded-xl object-cover border border-[#D5E4D1]"
+                        />
                         <button
                           type="button"
                           onClick={() => removePhoto(i)}
                           aria-label={`Remove photo ${i + 1}`}
-                          className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center hover:bg-red-600 transition"
+                          className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center hover:bg-red-600 transition"
                         >
                           ✕
                         </button>
@@ -514,19 +636,23 @@ export default function GuestReport() {
               )}
 
               {videos.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  <p className="text-[10px] font-bold text-gray-500">
+                <div className="flex flex-col" style={{ gap: "12px" }}>
+                  <p className="text-[13px] font-extrabold text-gray-500 leading-5">
                     Videos ({videos.length}/2)
                   </p>
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col" style={{ gap: "16px" }}>
                     {videos.map((v, i) => (
                       <div key={i} className="relative">
-                        <video src={v.url} controls className="w-full rounded-lg border border-[#D5E4D1]" />
+                        <video
+                          src={v.url}
+                          controls
+                          className="w-full rounded-xl border border-[#D5E4D1]"
+                        />
                         <button
                           type="button"
                           onClick={() => removeVideo(i)}
                           aria-label={`Remove video ${i + 1}`}
-                          className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center hover:bg-red-600 transition"
+                          className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center hover:bg-red-600 transition"
                         >
                           ✕
                         </button>
@@ -535,67 +661,73 @@ export default function GuestReport() {
                   </div>
                 </div>
               )}
-              
+
+              {/* Evidence error message */}
               {validationErrors.evidence && (
-                <p className="error-text text-red-500 text-[10px] mt-1">
-                  {validationErrors.evidence}
-                </p>
+                <p className={ERROR_CLASS}>{validationErrors.evidence}</p>
               )}
             </div>
 
             {/* LOCATION */}
-            <div className="flex flex-col gap-3">
-              <label className="block text-[12px] font-bold text-gray-700">
+            <div className="flex flex-col" style={{ gap: "8px" }}>
+              <label className={LABEL_CLASS}>
                 Location <span className="text-red-500">*</span>
               </label>
               <button
                 type="button"
                 onClick={getLocation}
                 disabled={gettingLocation}
-                className={`w-full min-h-[80px] px-4 py-3 rounded-xl border ${validationErrors.location ? "border-red-500" : "border-[#9FBA9F]"} bg-[#FCFEFC] flex flex-col items-center justify-center text-center hover:bg-[#F3F9F1] transition disabled:opacity-50`}
+                className={`w-full min-h-[100px] rounded-2xl border ${
+                  validationErrors.location
+                    ? "border-red-500"
+                    : "border-[#9FBA9F]"
+                } bg-[#FCFEFC] flex flex-col items-center justify-center text-center hover:bg-[#F3F9F1] transition disabled:opacity-50`}
+                style={{ padding: "16px", gap: "6px" }}
               >
                 {gettingLocation ? (
-                  <FaSpinner className="animate-spin text-[#0B5D2A]" size={22} />
+                  <FaSpinner className="animate-spin text-[#0B5D2A]" size={26} />
                 ) : (
-                  <FaMapMarkerAlt size={22} className="text-[#0B5D2A]" />
+                  <FaMapMarkerAlt size={26} className="text-[#0B5D2A]" />
                 )}
-                <p className="text-[10px] font-bold text-[#16472C] mt-1">
+                <p className="text-[13px] font-extrabold text-[#16472C] leading-5">
                   {gettingLocation ? "GETTING..." : "GET GPS LOCATION"}
                 </p>
-                <p className="text-[9px] text-gray-500 mt-1 break-words">
+                <p className="text-[12px] text-gray-500 leading-5 break-words">
                   {location.lat && location.lng
                     ? `📍 ${location.lat}, ${location.lng}`
                     : "Tap to capture your current location"}
                 </p>
               </button>
               {validationErrors.location && (
-                <p className="error-text text-red-500 text-[10px] leading-4">
-                  {validationErrors.location}
-                </p>
+                <p className={ERROR_CLASS}>{validationErrors.location}</p>
               )}
             </div>
 
             {error && (
-              <div className="px-4 py-3 bg-red-100 border border-red-400 rounded-xl text-red-700 text-[12px] leading-5">
+              <div
+                className="bg-red-100 border border-red-400 rounded-xl text-red-700 text-[14px] leading-6 break-words"
+                style={{ padding: "14px 16px" }}
+              >
                 {error}
               </div>
             )}
 
             {/* SUBMIT */}
-            <div className="flex flex-col items-center gap-4 mt-2">
+            <div className="flex flex-col items-center" style={{ gap: "16px" }}>
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={loading}
-                className={`w-full max-w-[240px] h-[52px] rounded-xl font-bold text-[15px] shadow-md transition ${
+                className={`w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] shadow-md transition flex items-center justify-center ${
                   loading
                     ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                    : "bg-[#7EAD55] hover:bg-[#6D9948] text-white hover:scale-[1.02] active:scale-95"
+                    : "bg-[#7EAD55] hover:bg-[#6D9948] text-white active:scale-[0.98]"
                 }`}
+                style={{ gap: "12px" }}
               >
                 {loading ? (
                   <>
-                    <FaSpinner className="animate-spin inline mr-2" />
+                    <FaSpinner className="animate-spin" />
                     Submitting...
                   </>
                 ) : (
@@ -603,32 +735,32 @@ export default function GuestReport() {
                 )}
               </button>
 
-              <p className="text-[10px] text-gray-500 leading-relaxed text-center">
-                Guest Users can submit 1 report per day.<br />Thank You!
+              <p className="text-[13px] text-gray-500 leading-6 text-center">
+                Guest Users can submit 1 report per day.
+                <br />
+                Thank You!
               </p>
             </div>
           </div>
         </main>
-
-        <div className="hidden sm:flex absolute bottom-3 left-0 right-0 justify-center pointer-events-none z-30">
-          <div className="w-[70px] h-[5px] rounded-full bg-gray-700 opacity-70" />
-        </div>
       </div>
     </div>
   );
 }
 
+/* =========================================================
+   REVIEW ROW
+========================================================= */
 function ReviewRow({ label, value, last = false }) {
   return (
     <div
-      className={`px-6 py-4 flex flex-col gap-1.5 ${
-        !last ? "border-b border-gray-200" : ""
-      }`}
+      className={`flex flex-col ${!last ? "border-b border-gray-200" : ""}`}
+      style={{ padding: "20px", gap: "8px" }}
     >
-      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide leading-4">
+      <p className="text-[13px] font-extrabold text-gray-500 uppercase tracking-wide leading-5">
         {label}
       </p>
-      <p className="text-[12px] text-gray-800 leading-5 break-words [overflow-wrap:anywhere] whitespace-pre-wrap">
+      <p className="text-[15px] text-gray-800 leading-6 break-words [overflow-wrap:anywhere] whitespace-pre-wrap">
         {value || "—"}
       </p>
     </div>

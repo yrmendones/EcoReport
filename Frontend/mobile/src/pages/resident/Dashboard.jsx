@@ -140,64 +140,78 @@ export default function Dashboard() {
     : [{ title: "No Announcements", subtitle: "Check back later", announcementId: null }];
 
   return (
-    <div
-      className="
-        min-h-screen
-        bg-[#E5E7EB]
-        flex
-        justify-center
-        items-center
-        py-6
-        px-3
-      "
-    >
-      <div
-        className="
-          relative
-          w-[390px]
-          h-[844px]
-          bg-[#F8FAF8]
-          rounded-[40px]
-          border-[5px]
-          border-white
-          shadow-2xl
-          overflow-hidden
-          flex
-          flex-col
-        "
-      >
-        <div className="shrink-0">
+    <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">
+      {/* Hides the scrollbar but the page can still be scrolled */}
+      <style>{`
+        .hide-scrollbar {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+          width: 0;
+          height: 0;
+        }
+      `}</style>
+
+      {/* Full screen on phones, phone frame only on sm and up */}
+      <div className="relative w-full h-[100dvh] sm:w-[390px] sm:h-[844px] bg-[#F8FAF8] sm:rounded-[40px] sm:border-[5px] sm:border-white sm:shadow-2xl overflow-hidden flex flex-col">
+        {/* HEADER WRAPPER */}
+        <div
+          className="
+            shrink-0
+            bg-[#0B5D2A]
+            [&>*]:!px-7
+            [&_img]:!w-9 [&_img]:!h-9
+            [&_img]:!rounded-full
+            [&_img]:object-cover
+            [&_img]:shrink-0
+          "
+          style={{ padding: "24px 0 16px" }}
+        >
           <Header />
         </div>
 
+        {/* CONTENT */}
         <main
-          className="
-            flex-1
-            overflow-y-auto
-            pb-[130px]
-            no-scrollbar
-          "
+          className="hide-scrollbar flex-1 overflow-y-auto flex flex-col"
+          style={{
+            padding:
+              "36px 24px max(140px, calc(env(safe-area-inset-bottom) + 120px))",
+            gap: "44px",
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
         >
-          <section className="px-5 pt-7">
-            <p className="text-[12px] text-gray-500">Welcome back!</p>
-            <h1 className="text-[22px] font-extrabold text-[#0B5D2A] mt-1">
+          {/* Greeting */}
+          <section className="shrink-0 flex flex-col" style={{ gap: "8px" }}>
+            <p className="text-[20px] font-bold text-gray-700 leading-snug">
+              Welcome back!
+            </p>
+            <h1 className="text-[26px] font-extrabold text-[#0B5D2A] leading-tight">
               Environmental Dashboard
             </h1>
           </section>
 
-          <section className="px-5 mt-7">
+          {/* Stats: same size and gap as the Quick Actions */}
+          <section className="shrink-0">
             {error ? (
-              <div className="bg-red-100 border border-red-400 rounded-xl p-4 text-center">
-                <p className="text-red-700 text-sm">{error}</p>
+              <div
+                className="bg-red-100 border border-red-400 rounded-xl text-center flex flex-col items-center"
+                style={{ padding: "24px", gap: "12px" }}
+              >
+                <p className="text-red-700 text-[15px] leading-6">{error}</p>
                 <button
+                  type="button"
                   onClick={() => window.location.reload()}
-                  className="mt-2 text-[#0B5D2A] font-bold underline"
+                  className="text-[#0B5D2A] font-bold underline"
+                  style={{ padding: "8px 16px" }}
                 >
                   Try Again
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-5">
                 {statsData.map((item, index) => (
                   <StatsCard
                     key={index}
@@ -210,12 +224,11 @@ export default function Dashboard() {
             )}
           </section>
 
-          <section className="px-5 mt-11">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[20px] font-extrabold text-gray-900">
-                Quick Actions
-              </h2>
-            </div>
+          {/* Quick actions */}
+          <section className="shrink-0 flex flex-col" style={{ gap: "24px" }}>
+            <h2 className="text-[22px] font-extrabold text-gray-900">
+              Quick Actions
+            </h2>
             <div className="grid grid-cols-3 gap-5">
               {quickActions.map((item, index) => (
                 <QuickAction
@@ -228,21 +241,23 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="px-5 mt-11 mb-8">
-            <div className="flex justify-between items-center mb-5">
-              <h2 className="text-[20px] font-extrabold text-gray-900">
+          {/* Announcements */}
+          <section className="shrink-0 flex flex-col" style={{ gap: "24px" }}>
+            <div className="flex justify-between items-center" style={{ gap: "12px" }}>
+              <h2 className="text-[22px] font-extrabold text-gray-900">
                 Announcements
               </h2>
               <button
                 type="button"
                 onClick={() => navigate("/announcements")}
-                className="text-[#D89A00] text-[12px] font-bold hover:underline"
+                className="shrink-0 text-[#D89A00] text-[15px] font-bold hover:underline"
+                style={{ padding: "10px 4px" }}
               >
                 View All
               </button>
             </div>
 
-            <div className="space-y-5">
+            <div className="flex flex-col" style={{ gap: "24px" }}>
               {displayAnnouncements.map((item, index) => (
                 <AnnouncementCard
                   key={index}
@@ -255,12 +270,9 @@ export default function Dashboard() {
           </section>
         </main>
 
-        <div className="absolute bottom-7 left-0 right-0 z-30">
+        {/* BOTTOM NAV: nakadikit sa pinakababa, walang puwang at walang guhit */}
+        <div className="absolute bottom-0 left-0 right-0 z-30">
           <BottomNav />
-        </div>
-
-        <div className="absolute bottom-2 left-0 right-0 z-40 flex justify-center pointer-events-none">
-          <div className="w-[70px] h-[5px] rounded-full bg-gray-800 opacity-70" />
         </div>
       </div>
     </div>

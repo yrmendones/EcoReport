@@ -15,6 +15,7 @@ L.Icon.Default.mergeOptions({
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
+// Correct bounds
 const BARANGAY_BOUNDS = {
   north: 14.55769923756584,
   south: 14.549030925901317,
@@ -22,6 +23,7 @@ const BARANGAY_BOUNDS = {
   west: 121.06177492093398,
 };
 
+// Barangay boundary polygon
 const BARANGAY_POLYGON = [
   [14.55769923756584, 121.06629257249703],
   [14.556346053245349, 121.06304747722577],
@@ -33,11 +35,18 @@ const BARANGAY_POLYGON = [
   [14.556455506786161, 121.06931238647843],
 ];
 
+// Status colors
 const STATUS_COLORS = {
   pending: "#eab308",
   ongoing: "#3b82f6",
   resolved: "#22c55e",
   rejected: "#ef4444",
+};
+
+// Merge assigned → ongoing for resident-facing display
+const getDisplayStatus = (status) => {
+  const normalized = String(status || "").toLowerCase();
+  return normalized === "assigned" ? "ongoing" : normalized;
 };
 
 const createPinSvg = (color) => `
@@ -47,10 +56,8 @@ const createPinSvg = (color) => `
 `;
 
 const createPinIcon = (status) => {
-  const normalized = (status || "").toLowerCase();
-  const displayStatus = normalized === "assigned" ? "ongoing" : normalized;
+  const displayStatus = getDisplayStatus(status);
   const color = STATUS_COLORS[displayStatus] || "#6b7280";
-  
   return L.divIcon({
     html: createPinSvg(color),
     className: "custom-pin-icon",
@@ -60,7 +67,15 @@ const createPinIcon = (status) => {
   });
 };
 
-// Reporter name based on privacy settings
+// Escape user-controlled strings before interpolating into popup HTML
+const esc = (v) =>
+  String(v ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 const getReporterName = (report) => {
   if (report.user_id) {
     if (report.first_name && report.last_name)
@@ -107,6 +122,7 @@ export default function EnvironmentalMap() {
       attribution: "&copy; OpenStreetMap",
     }).addTo(mapRef.current);
 
+    // Polygon barangay boundary
     L.polygon(BARANGAY_POLYGON, {
       color: "#0B5D2A",
       weight: 2,
@@ -115,7 +131,7 @@ export default function EnvironmentalMap() {
       dashArray: "5, 5",
     }).addTo(mapRef.current);
 
-    // ✅ Fix Leaflet rendering size in flex containers
+    // Make sure Leaflet measures its container after layout settles
     setTimeout(() => {
       if (mapRef.current) mapRef.current.invalidateSize();
     }, 0);
@@ -134,6 +150,7 @@ export default function EnvironmentalMap() {
       let url = "/api/reports/nearby";
       if (lat && lng) url += `?lat=${lat}&lng=${lng}`;
       const data = await apiFetch(url);
+      // Only exclude deleted reports; assigned shows up (as ongoing)
       const visible = data.filter((r) => r.status?.toLowerCase() !== "deleted");
       setReports(visible);
       renderMarkers(visible);
@@ -169,19 +186,10 @@ export default function EnvironmentalMap() {
       const lat = parseFloat(report.latitude);
       const lng = parseFloat(report.longitude);
 
-      // Reporter name
       const reporter = getReporterName(report);
+      const displayStatus = getDisplayStatus(report.status);
 
-      // Escape user-controlled fields before interpolating into HTML.
-      // Leaflet's bindPopup() sets innerHTML - unescaped values run as script.
-      const esc = (v) =>
-        String(v ?? "")
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#39;");
-
+      // Every user-controlled value wrapped in esc()
       const marker = L.marker([lat, lng], {
         icon: createPinIcon(report.status),
       })
@@ -191,7 +199,7 @@ export default function EnvironmentalMap() {
             <strong style="font-size: 13px;">${esc(report.category || "Report")}</strong><br/>
             <span style="font-size: 11px; color: #666;">${esc(report.address || "Location")}</span><br/>
             <span style="font-size: 11px; color: #666;">Reported by: <strong>${esc(reporter)}</strong></span><br/>
-            <span style="font-size: 11px; color: #999;">Status: ${esc(report.status?.toUpperCase() || "")}</span>
+            <span style="font-size: 11px; color: #999;">Status: ${esc(displayStatus.toUpperCase())}</span>
           </div>
         `);
 
@@ -246,7 +254,10 @@ export default function EnvironmentalMap() {
       {/* Full screen on phones, phone frame only on sm and up */}
       <div className="relative w-full h-[100dvh] sm:w-[390px] sm:h-[844px] bg-[#F8FAF8] sm:rounded-[40px] sm:border-[5px] sm:border-white sm:shadow-2xl overflow-hidden flex flex-col">
         {/* HEADER */}
-        <header className="relative h-[82px] bg-[#0B5D2A] flex items-center justify-center shrink-0 px-6">
+        <header
+          className="relative h-[82px] bg-[#0B5D2A] flex items-center justify-center shrink-0"
+          style={{ padding: "0 64px" }}
+        >
           <button
             type="button"
             onClick={() => navigate("/resident-dashboard")}
@@ -255,15 +266,15 @@ export default function EnvironmentalMap() {
           >
             <FaArrowLeft />
           </button>
-          <h1 className="text-white text-[20px] font-extrabold">
+          <h1 className="text-white text-[22px] font-extrabold text-center">
             Environmental Map
           </h1>
         </header>
 
         {/* MAP + LEGEND */}
         <div
-          className="shrink-0 flex flex-col gap-5"
-          style={{ padding: "16px 20px 4px" }}
+          className="shrink-0 flex flex-col bg-white border-b border-gray-200"
+          style={{ padding: "20px 24px 16px", gap: "16px" }}
         >
           <div
             className="relative rounded-2xl overflow-hidden border border-[#C8DCC3] bg-[#DCEFD8] shadow-sm"
@@ -292,9 +303,12 @@ export default function EnvironmentalMap() {
           </div>
 
           {/* LEGEND: Pending, Ongoing, Resolved, Rejected */}
-          <div className="flex flex-wrap gap-x-4 gap-y-2 text-[11px] font-bold text-gray-700">
+          <div
+            className="flex flex-wrap text-[11px] font-bold text-gray-700"
+            style={{ columnGap: "16px", rowGap: "8px" }}
+          >
             {Object.entries(STATUS_COLORS).map(([key, color]) => (
-              <div key={key} className="flex items-center gap-1.5">
+              <div key={key} className="flex items-center" style={{ gap: "4px" }}>
                 <span
                   className="w-3 h-3 rounded-full"
                   style={{ background: color }}
@@ -307,27 +321,31 @@ export default function EnvironmentalMap() {
 
         {/* NEARBY REPORTS */}
         <main
-          className="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-5"
-          style={{ padding: "24px 20px 40px" }}
+          className="flex-1 overflow-y-auto no-scrollbar flex flex-col"
+          style={{
+            padding: "28px 24px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
+            gap: "24px",
+          }}
         >
-          <div className="flex flex-col gap-1.5">
-            <h2 className="text-[19px] font-extrabold text-gray-900">
+          <div className="flex flex-col" style={{ gap: "8px" }}>
+            <h2 className="text-[22px] font-extrabold text-gray-900 leading-tight">
               Nearby Reports
             </h2>
-            <p className="text-[12px] text-gray-500 leading-5">
+            <p className="text-[14px] text-gray-600 leading-6">
               Environmental issues reported in your area.
             </p>
           </div>
 
           {error && (
             <div
-              className="bg-white rounded-2xl border border-red-300 shadow-sm text-center flex flex-col items-center gap-3"
-              style={{ padding: "28px 20px" }}
+              className="bg-white rounded-2xl border border-red-300 shadow-sm text-center flex flex-col items-center"
+              style={{ padding: "32px 24px", gap: "16px" }}
             >
-              <p className="text-[13px] font-bold text-red-600">{error}</p>
+              <p className="text-[14px] font-bold text-red-600 leading-6">{error}</p>
               <button
                 onClick={() => window.location.reload()}
-                className="px-4 py-2 text-[#0B5D2A] font-bold underline"
+                className="min-h-[44px] text-[#0B5D2A] font-bold underline"
+                style={{ padding: "0 16px" }}
               >
                 Try Again
               </button>
@@ -335,41 +353,44 @@ export default function EnvironmentalMap() {
           )}
 
           {!loading && !error && (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col" style={{ gap: "16px" }}>
               {reports.length > 0 ? (
-                reports.map((report) => (
-                  <div
-                    key={report.report_id}
-                    className="bg-white rounded-2xl border border-[#D5E4D1] shadow-sm"
-                    style={{ padding: "16px", boxSizing: "border-box" }}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1 flex flex-col gap-1">
-                        <h3 className="font-extrabold text-[14px] text-gray-900 leading-5">
+                reports.map((report) => {
+                  const displayStatus = getDisplayStatus(report.status);
+                  return (
+                    <div
+                      key={report.report_id}
+                      className="bg-white rounded-2xl border border-[#D5E4D1] shadow-sm flex items-center justify-between"
+                      style={{ padding: "20px", gap: "16px", boxSizing: "border-box" }}
+                    >
+                      <div
+                        className="min-w-0 flex-1 flex flex-col items-start"
+                        style={{ gap: "8px" }}
+                      >
+                        <h3 className="font-extrabold text-[16px] text-gray-900 leading-6 break-words">
                           {report.category}
                         </h3>
 
-                        {/* Reporter name on card list */}
-                        <p className="text-[11px] text-[#0B5D2A] font-bold">
+                        <p className="text-[13px] text-[#0B5D2A] font-bold leading-5">
                           Reported by: {getReporterName(report)}
                         </p>
 
-                        <p className="text-[12px] text-gray-500 truncate">
-                          {report.address ||
-                            `${report.latitude}, ${report.longitude}`}
+                        <p className="w-full text-[14px] text-gray-600 leading-6 truncate">
+                          {report.address || `${report.latitude}, ${report.longitude}`}
                         </p>
 
-                        <div className="flex items-center gap-2">
-                          <p className="text-[11px] text-gray-400">
-                            ER-2026-
-                            {String(report.report_id).padStart(4, "0")}
+                        <div
+                          className="flex flex-wrap items-center"
+                          style={{ gap: "8px" }}
+                        >
+                          <p className="text-[13px] text-gray-500">
+                            ER-2026-{String(report.report_id).padStart(4, "0")}
                           </p>
                           {report.distance_km != null && (
                             <>
-                              <span className="text-[11px] text-gray-400">•</span>
-                              <p className="text-[11px] text-[#0B5D2A] font-bold">
-                                {parseFloat(report.distance_km).toFixed(2)} km
-                                away
+                              <span className="text-[13px] text-gray-400">•</span>
+                              <p className="text-[13px] text-[#0B5D2A] font-bold">
+                                {parseFloat(report.distance_km).toFixed(2)} km away
                               </p>
                             </>
                           )}
@@ -377,36 +398,26 @@ export default function EnvironmentalMap() {
                       </div>
 
                       <span
-                        className="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-extrabold capitalize"
+                        className="shrink-0 rounded-full text-[12px] font-extrabold capitalize"
                         style={{
+                          padding: "6px 14px",
                           background: `${
-                            STATUS_COLORS[
-                              report.status?.toLowerCase() === "assigned" 
-                                ? "ongoing" 
-                                : report.status?.toLowerCase()
-                            ] || "#6b7280"
+                            STATUS_COLORS[displayStatus] || "#6b7280"
                           }22`,
-                          color:
-                            STATUS_COLORS[
-                              report.status?.toLowerCase() === "assigned" 
-                                ? "ongoing" 
-                                : report.status?.toLowerCase()
-                            ] || "#6b7280",
+                          color: STATUS_COLORS[displayStatus] || "#6b7280",
                         }}
                       >
-                        {report.status?.toLowerCase() === "assigned"
-                          ? "ongoing"
-                          : report.status}
+                        {displayStatus}
                       </span>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div
-                  className="bg-white rounded-2xl border border-[#D5E4D1] text-center"
-                  style={{ padding: "32px 20px" }}
+                  className="bg-white rounded-2xl border border-[#D5E4D1] text-center shadow-sm"
+                  style={{ padding: "48px 24px" }}
                 >
-                  <p className="text-[13px] font-semibold text-gray-500">
+                  <p className="text-[14px] font-semibold text-gray-500 leading-6">
                     No reports available.
                   </p>
                 </div>
@@ -414,11 +425,6 @@ export default function EnvironmentalMap() {
             </div>
           )}
         </main>
-
-        {/* Fake home bar, desktop frame only */}
-        <div className="hidden sm:flex absolute bottom-3 left-0 right-0 justify-center pointer-events-none z-50">
-          <div className="w-[70px] h-[5px] rounded-full bg-gray-800 opacity-70" />
-        </div>
       </div>
     </div>
   );

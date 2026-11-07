@@ -13,11 +13,10 @@ export default function MyReports() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // TABS – "Ongoing" tab now includes both Ongoing and Assigned
   const tabs = [
     "All",
     "Pending",
-    "Ongoing",   // Will show both Ongoing and Assigned
+    "Ongoing",
     "Resolved",
     "Rejected",
   ];
@@ -40,9 +39,13 @@ export default function MyReports() {
           data.map(async (report) => {
             let imageUrl = null;
             try {
-              const mediaData = await apiFetch(`/api/reports/${report.report_id}/media`);
+              const mediaData = await apiFetch(
+                `/api/reports/${report.report_id}/media`
+              );
               if (mediaData && mediaData.length > 0) {
-                const firstImage = mediaData.find((m) => m.file_type === "image");
+                const firstImage = mediaData.find(
+                  (m) => m.file_type === "image"
+                );
                 if (firstImage) {
                   imageUrl = firstImage.file_url;
                 }
@@ -51,8 +54,9 @@ export default function MyReports() {
               // No media found
             }
 
-            // ✅ Map "Assigned" to "Ongoing" for display
-            let displayStatus = report.status.charAt(0).toUpperCase() + report.status.slice(1);
+            // Map "Assigned" to "Ongoing" for display
+            let displayStatus =
+              report.status.charAt(0).toUpperCase() + report.status.slice(1);
             if (displayStatus === "Assigned") {
               displayStatus = "Ongoing";
             }
@@ -66,8 +70,8 @@ export default function MyReports() {
                 month: "short",
                 day: "numeric",
               }),
-              status: displayStatus,      // Display status (Ongoing instead of Assigned)
-              rawStatus: report.status,   // Keep original for filtering
+              status: displayStatus, // Display status (Ongoing instead of Assigned)
+              rawStatus: report.status, // Keep original for filtering
               image: imageUrl,
             };
           })
@@ -85,111 +89,59 @@ export default function MyReports() {
     fetchReports();
   }, []);
 
-  // FILTER: "Ongoing" tab shows both Ongoing AND Assigned (using rawStatus)
+  // FILTER: "Ongoing" tab shows both Ongoing AND Assigned
   const filtered =
     activeTab === "All"
       ? reports
       : activeTab === "Ongoing"
-      ? reports.filter((report) => report.rawStatus === "ongoing" || report.rawStatus === "assigned")
+      ? reports.filter(
+          (report) =>
+            report.rawStatus === "ongoing" || report.rawStatus === "assigned"
+        )
       : reports.filter((report) => report.status === activeTab);
 
   return (
-    <div
-      className="
-        min-h-screen
-        bg-[#E5E7EB]
-        flex
-        justify-center
-        items-center
-        py-6
-        px-3
-      "
-    >
-      <div
-        className="
-          relative
-          w-[390px]
-          h-[844px]
-          bg-[#F8FAF8]
-          rounded-[40px]
-          border-[5px]
-          border-white
-          shadow-2xl
-          overflow-hidden
-          flex
-          flex-col
-        "
-      >
+    <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">
+      {/* Full screen on phones, phone frame only on sm and up */}
+      <div className="relative w-full h-[100dvh] sm:w-[390px] sm:h-[844px] bg-[#F8FAF8] sm:rounded-[40px] sm:border-[5px] sm:border-white sm:shadow-2xl overflow-hidden flex flex-col">
         {/* HEADER */}
         <header
-          className="
-            relative
-            h-[82px]
-            bg-[#0B5D2A]
-            flex
-            items-center
-            justify-center
-            shrink-0
-          "
+          className="relative h-[82px] bg-[#0B5D2A] flex items-center justify-center shrink-0"
+          style={{ padding: "0 64px" }}
         >
           <button
             type="button"
             onClick={() => navigate("/resident-dashboard")}
-            className="
-              absolute
-              left-6
-              top-1/2
-              -translate-y-1/2
-              w-11
-              h-11
-              rounded-full
-              flex
-              items-center
-              justify-center
-              text-white
-              text-[20px]
-              bg-white/10
-              hover:bg-white/20
-              active:scale-95
-              transition
-            "
+            aria-label="Back"
+            className="absolute left-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center text-white text-[20px] bg-white/10 hover:bg-white/20 active:scale-95 transition"
           >
             <FaArrowLeft />
           </button>
-          <h1 className="text-white text-[22px] font-extrabold">My Reports</h1>
+          <h1 className="text-white text-[22px] font-extrabold text-center">
+            My Reports
+          </h1>
         </header>
 
         {/* MAIN CONTENT */}
         <main
-          className="
-            flex-1
-            overflow-y-auto
-            px-5
-            pt-7
-            pb-8
-            no-scrollbar
-          "
+          className="flex-1 overflow-y-auto no-scrollbar flex flex-col"
+          style={{
+            padding: "28px 24px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
+            gap: "24px",
+          }}
         >
-          <div className="mb-6">
-            <h2 className="text-[20px] font-extrabold text-[#0B5D2A]">
+          {/* TITLE */}
+          <div className="flex flex-col shrink-0" style={{ gap: "8px" }}>
+            <h2 className="text-[22px] font-extrabold text-[#0B5D2A] leading-tight">
               My Environmental Reports
             </h2>
-            <p className="text-[11px] text-gray-500 mt-2">
+            <p className="text-[14px] text-gray-600 leading-6">
               View and track the status of your submitted reports.
             </p>
           </div>
 
-          {/* TABS */}
-          <div
-            className="
-              bg-white
-              rounded-2xl
-              border
-              border-[#D5E4D1]
-              p-2
-              shadow-sm
-            "
-          >
+          {/* TABS — old UI (ReportTabs inside white card) */}
+          <div className="bg-white rounded-2xl border border-[#D5E4D1] p-2 shadow-sm shrink-0">
             <ReportTabs
               tabs={tabs}
               activeTab={activeTab}
@@ -198,30 +150,43 @@ export default function MyReports() {
           </div>
 
           {/* REPORT LIST */}
-          <div className="mt-7">
-            <div className="flex items-center justify-between mb-4 px-1">
-              <p className="text-[12px] font-bold text-gray-700">
+          <section className="flex flex-col shrink-0" style={{ gap: "16px" }}>
+            {/* LIST HEADER */}
+            <div
+              className="flex items-center justify-between"
+              style={{ gap: "12px" }}
+            >
+              <p className="text-[16px] font-extrabold text-gray-900 leading-6">
                 {activeTab === "All" ? "All Reports" : `${activeTab} Reports`}
               </p>
-              <p className="text-[11px] text-[#0B5D2A] font-semibold">
+              <p className="shrink-0 text-[14px] text-[#0B5D2A] font-extrabold leading-6">
                 {filtered.length} report{filtered.length !== 1 ? "s" : ""}
               </p>
             </div>
 
             {loading && (
-              <div className="bg-white rounded-2xl border border-[#D5E4D1] shadow-sm px-5 py-12 text-center">
-                <p className="text-[15px] font-bold text-gray-700">
+              <div
+                className="bg-white rounded-2xl border border-[#D5E4D1] shadow-sm text-center"
+                style={{ padding: "48px 24px" }}
+              >
+                <p className="text-[15px] font-bold text-gray-700 leading-6">
                   Loading reports...
                 </p>
               </div>
             )}
 
             {error && (
-              <div className="bg-white rounded-2xl border border-red-300 shadow-sm px-5 py-12 text-center">
-                <p className="text-[15px] font-bold text-red-600">{error}</p>
+              <div
+                className="bg-white rounded-2xl border border-red-300 shadow-sm flex flex-col items-center text-center"
+                style={{ padding: "40px 24px", gap: "16px" }}
+              >
+                <p className="text-[15px] font-bold text-red-600 leading-6">
+                  {error}
+                </p>
                 <button
                   onClick={() => window.location.reload()}
-                  className="mt-4 text-[#0B5D2A] font-bold underline"
+                  className="min-h-[44px] text-[#0B5D2A] font-bold underline"
+                  style={{ padding: "0 16px" }}
                 >
                   Try Again
                 </button>
@@ -229,12 +194,12 @@ export default function MyReports() {
             )}
 
             {!loading && !error && (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col" style={{ gap: "16px" }}>
                 {filtered.length > 0 ? (
                   filtered.map((report) => (
                     <div
                       key={report.id}
-                      className="transition hover:-translate-y-[1px]"
+                      className="transition hover:-translate-y-[1px] shrink-0"
                     >
                       <ReportCard
                         report={report}
@@ -244,21 +209,13 @@ export default function MyReports() {
                   ))
                 ) : (
                   <div
-                    className="
-                      bg-white
-                      rounded-2xl
-                      border
-                      border-[#D5E4D1]
-                      shadow-sm
-                      px-5
-                      py-12
-                      text-center
-                    "
+                    className="bg-white rounded-2xl border border-[#D5E4D1] shadow-sm flex flex-col items-center text-center"
+                    style={{ padding: "48px 24px", gap: "8px" }}
                   >
-                    <p className="text-[15px] font-bold text-gray-700">
+                    <p className="text-[15px] font-bold text-gray-700 leading-6">
                       No reports found
                     </p>
-                    <p className="text-[11px] text-gray-500 mt-2">
+                    <p className="text-[13px] text-gray-500 leading-5">
                       There are no reports under the <br />
                       "{activeTab}" category.
                     </p>
@@ -266,26 +223,8 @@ export default function MyReports() {
                 )}
               </div>
             )}
-
-            <div className="h-8" />
-          </div>
+          </section>
         </main>
-
-        {/* ANDROID HOME BAR */}
-        <div
-          className="
-            absolute
-            bottom-3
-            left-0
-            right-0
-            flex
-            justify-center
-            pointer-events-none
-            z-20
-          "
-        >
-          <div className="w-[70px] h-[5px] rounded-full bg-gray-800 opacity-70" />
-        </div>
       </div>
     </div>
   );

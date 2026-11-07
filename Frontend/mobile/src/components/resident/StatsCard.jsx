@@ -16,8 +16,6 @@ export default function StatsCard({
       }}
       className="
         bg-white
-        rounded-xl
-        p-4
         text-center
         shadow-sm
         cursor-pointer
@@ -29,12 +27,20 @@ export default function StatsCard({
         items-center
         justify-center
       "
+      style={{
+        minHeight: "100px",
+        padding: "16px 8px",
+        gap: "6px",
+        border: "1px solid #D5E4D1",
+        borderRadius: "22px",
+        boxSizing: "border-box",
+      }}
     >
-      <h3 className="text-2xl font-bold text-[#0B5D2A]">
+      <h3 className="text-[28px] font-bold text-[#0B5D2A] leading-none">
         {number}
       </h3>
 
-      <p className="text-[14px] font-semibold text-gray-600">
+      <p className="text-[14px] font-semibold text-gray-600 leading-5">
         {label}
       </p>
     </div>

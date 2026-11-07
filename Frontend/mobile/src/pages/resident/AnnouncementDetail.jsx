@@ -98,7 +98,7 @@ export default function AnnouncementDetail() {
         <main
           className="flex-1 overflow-y-auto no-scrollbar"
           style={{
-            padding: "10px 10px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
+            padding: "32px 24px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
           }}
         >
           <div
