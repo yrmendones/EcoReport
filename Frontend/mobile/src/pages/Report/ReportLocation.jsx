@@ -304,8 +304,7 @@ export default function ReportLocation() {
     setError("");
 
     try {
-      const reportData = {
-        user_id: user.user_id,
+        const reportData = {
         category: reportType,
         description: description,
         address: "Barangay Sto. Rosario Kanluran, Pateros",

@@ -9,6 +9,8 @@ export const CATEGORY_COLORS = {
   "Improper Garbage Disposal":     "#f97316", // orange
   "Overgrown Grass":               "#84cc16", // lime green
   "Others Environmental Concerns": "#a855f7", // purple
+  "Crime":                         "#7c3aed", // violet
+  "Blotter & Incident":            "#475569", // dark slate
 };
 
 // Fallback palette for any category name not in the map above.

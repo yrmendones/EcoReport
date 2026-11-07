@@ -426,7 +426,6 @@ export default function Appointment() {
       await apiFetch("/api/appointments", {
         method: "POST",
         body: JSON.stringify({
-          user_id: user.user_id,
           full_name: formData.full_name,
           age: parseInt(formData.age),
           contact_number: formData.contact_number,

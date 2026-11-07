@@ -13,8 +13,10 @@ function parseSettings(raw) {
 
 exports.createReport = async (req, res) => {
     try {
-        const { user_id, category, description, address, latitude, longitude } = req.body;
-        if (!user_id || !category) return res.status(400).json({ error: 'User ID and category required.' });
+        // user_id is derived from the verified JWT cannot be spoofed
+        const user_id = req.user.id;
+        const { category, description, address, latitude, longitude } = req.body;
+        if (!category) return res.status(400).json({ error: 'Category required.' });
 
         // Sanitize before insert
         const safeCategory = sanitizeText(category, 100);

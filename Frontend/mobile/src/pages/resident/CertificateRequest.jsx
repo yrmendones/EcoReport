@@ -356,7 +356,6 @@ export default function CertificateRequest() {
       await apiFetch("/api/certificates", {
         method: "POST",
         body: JSON.stringify({
-          user_id: user.user_id,
           certificate_type: certificate,
           purpose: purpose,
           preferred_release_date: date,

@@ -2,8 +2,10 @@ const db = require('../db');
 
 exports.createAppointment = async (req, res) => {
     try {
-        const { user_id, full_name, age, contact_number, reason, symptoms, appointment_date, preferred_time } = req.body;
-        if (!user_id || !full_name || !age || !contact_number || !reason || !appointment_date || !preferred_time)
+        // user_id is derived from the verified JWT cannot be spoofed
+        const user_id = req.user.id;
+        const { full_name, age, contact_number, reason, symptoms, appointment_date, preferred_time } = req.body;
+        if (!full_name || !age || !contact_number || !reason || !appointment_date || !preferred_time)
             return res.status(400).json({ error: 'Missing required fields.' });
 
         // Only Verified Residents can request appointments

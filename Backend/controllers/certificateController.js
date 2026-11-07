@@ -2,8 +2,10 @@ const db = require('../db');
 
 exports.createCertificateRequest = async (req, res) => {
     try {
-        const { user_id, certificate_type, purpose, preferred_release_date, notes, fee } = req.body;
-        if (!user_id || !certificate_type || !purpose || !preferred_release_date)
+        // user_id is derived from the verified JWT cannot be spoofed
+        const user_id = req.user.id;
+        const { certificate_type, purpose, preferred_release_date, notes, fee } = req.body;
+        if (!certificate_type || !purpose || !preferred_release_date)
             return res.status(400).json({ error: 'Missing required fields.' });
 
         // Only Verified Residents can request certificates
