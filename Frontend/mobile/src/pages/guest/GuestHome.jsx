@@ -4,7 +4,6 @@ import {
   FaClipboardList,
   FaCalendarAlt,
   FaPhoneAlt,
-  FaBullhorn,
   FaChevronRight,
   FaUserPlus,
   FaArrowLeft,
@@ -120,7 +119,8 @@ export default function GuestHome() {
               Welcome Guest
             </h1>
             <p className="text-[14px] text-gray-600 leading-7">
-              You can submit <strong>1 report per day</strong> without an account.
+              You can submit <strong>1 report per day</strong> without an
+              account.
             </p>
           </section>
 
@@ -136,7 +136,11 @@ export default function GuestHome() {
                   type="button"
                   onClick={item.action}
                   className="w-full aspect-square bg-white border border-[#0B5D2A]/30 rounded-[26px] shadow-sm flex flex-col items-center justify-center hover:shadow-md hover:-translate-y-0.5 transition-all group focus:outline-none cursor-pointer"
-                  style={{ padding: "10px", gap: "10px", boxSizing: "border-box" }}
+                  style={{
+                    padding: "10px",
+                    gap: "10px",
+                    boxSizing: "border-box",
+                  }}
                 >
                   <div className="text-[#0B5D2A] group-hover:scale-105 transition-transform flex items-center justify-center">
                     {item.icon}
@@ -151,7 +155,10 @@ export default function GuestHome() {
 
           {/* Announcements */}
           <section className="shrink-0 flex flex-col" style={{ gap: "24px" }}>
-            <div className="flex justify-between items-center" style={{ gap: "12px" }}>
+            <div
+              className="flex justify-between items-center"
+              style={{ gap: "12px" }}
+            >
               <h2 className="text-[22px] font-extrabold text-gray-900">
                 Announcements
               </h2>
@@ -180,20 +187,15 @@ export default function GuestHome() {
                   }}
                 >
                   <div
-                    className="flex items-center min-w-0 flex-1"
-                    style={{ gap: "16px" }}
+                    className="min-w-0 flex-1 flex flex-col"
+                    style={{ gap: "4px" }}
                   >
-                    <div className="w-12 h-12 rounded-2xl bg-[#E8F5E3] flex items-center justify-center shrink-0">
-                      <FaBullhorn className="text-[#0B5D2A] -scale-x-100" size={21} />
-                    </div>
-                    <div className="min-w-0 flex-1 flex flex-col" style={{ gap: "4px" }}>
-                      <h3 className="text-[16px] font-extrabold text-gray-900 leading-6 break-words">
-                        {item.title}
-                      </h3>
-                      <p className="text-[13px] text-gray-500 font-medium leading-5 break-words">
-                        {item.subtitle}
-                      </p>
-                    </div>
+                    <h3 className="text-[16px] font-extrabold text-gray-900 leading-6 break-words">
+                      {item.title}
+                    </h3>
+                    <p className="text-[13px] text-gray-500 font-medium leading-5 break-words">
+                      {item.subtitle}
+                    </p>
                   </div>
                   <div className="w-9 h-9 rounded-full bg-[#F0F8ED] flex items-center justify-center shrink-0">
                     <FaChevronRight className="text-[#0B5D2A]" size={13} />
@@ -208,7 +210,8 @@ export default function GuestHome() {
         <div
           className="shrink-0 bg-[#F8FAF8] border-t border-[#E2ECDF]"
           style={{
-            padding: "16px 16px max(24px, calc(env(safe-area-inset-bottom) + 16px))",
+            padding:
+              "16px 16px max(24px, calc(env(safe-area-inset-bottom) + 16px))",
           }}
         >
           <div
@@ -219,7 +222,10 @@ export default function GuestHome() {
               <div className="w-10 h-10 rounded-full bg-[#D8F1DE] flex items-center justify-center shrink-0">
                 <FaUserPlus className="text-[#0B5D2A]" size={17} />
               </div>
-              <div className="flex-1 min-w-0 flex flex-col" style={{ gap: "2px" }}>
+              <div
+                className="flex-1 min-w-0 flex flex-col"
+                style={{ gap: "2px" }}
+              >
                 <h4 className="text-[15px] font-extrabold text-[#0B5D2A] leading-tight">
                   Unlock Full Access
                 </h4>

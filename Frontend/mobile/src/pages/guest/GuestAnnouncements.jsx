@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaSpinner } from "react-icons/fa";
 import { apiFetch } from "../../api";
 
-// Strip HTML tags so the list preview shows readable text,
+// Strip HTML so the preview shows clean text
 const stripHtml = (html) => {
   if (!html) return "";
   const div = document.createElement("div");
@@ -22,7 +22,6 @@ const truncate = (text, maxLength = 60) => {
 // Tabs that always appear (more are added automatically from the data)
 const BASE_CATEGORIES = ["Environmental", "Health", "Disaster", "Community"];
 
-// Ignore letter case and extra spaces when matching categories
 const normalize = (value) => String(value ?? "").trim().toLowerCase();
 
 const toLabel = (value) => {
@@ -30,10 +29,8 @@ const toLabel = (value) => {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "Others";
 };
 
-// Announcements without a category go under "others"
 const getCategoryKey = (item) => normalize(item.category) || "others";
 
-// Hides the scrollbar in every browser, scrolling still works
 const hideScrollbarStyle = {
   scrollbarWidth: "none",
   msOverflowStyle: "none",
@@ -62,7 +59,6 @@ export default function GuestAnnouncements() {
     fetchAnnouncements();
   }, []);
 
-  // Build the tabs: fixed categories first, then any other category found in the data
   const tabMap = new Map();
   BASE_CATEGORIES.forEach((category) => tabMap.set(normalize(category), category));
   announcements.forEach((item) => {
@@ -84,7 +80,6 @@ export default function GuestAnnouncements() {
 
   return (
     <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">
-      {/* Hides the scrollbar (Chrome, Safari, Edge) */}
       <style>{`
         .no-bar::-webkit-scrollbar {
           display: none;
@@ -93,7 +88,6 @@ export default function GuestAnnouncements() {
         }
       `}</style>
 
-      {/* Full screen on phones, phone frame only on sm and up */}
       <div className="relative w-full h-[100dvh] sm:w-[390px] sm:h-[844px] bg-[#F8FAF8] sm:rounded-[40px] sm:border-[5px] sm:border-white sm:shadow-2xl overflow-hidden flex flex-col">
         {/* HEADER */}
         <header
@@ -122,7 +116,6 @@ export default function GuestAnnouncements() {
             gap: "28px",
           }}
         >
-          {/* Intro */}
           <div className="shrink-0 flex flex-col" style={{ gap: "12px" }}>
             <h2 className="text-[24px] font-extrabold text-gray-900 leading-tight">
               Latest Announcements
@@ -199,7 +192,6 @@ export default function GuestAnnouncements() {
                         <p className="text-[13px] text-gray-500">{item.date}</p>
                       </div>
 
-                      {/* Description preview - plain text, HTML stripped */}
                       <p className="text-[14px] text-gray-700 leading-7 break-words">
                         {truncate(item.content, 80)}
                       </p>
