@@ -65,21 +65,32 @@ exports.createAnnouncement = async (req, res) => {
         // Audit
         await logAudit(req, `Created announcement "${title}" (category: ${category}, status: ${finalStatus})`);
 
-        // Broadcast to residents only if published
+        // Broadcast to residents only if published AND announcement_alerts is enabled
         if (finalStatus === 'Published') {
             const broadcastType =
                 category === 'Health'   ? 'Health Announcement' :
                 category === 'Disaster' ? 'Disaster Alert' :
                                           'Announcement';
-            try {
-                await notificationController.broadcastToResidents(
-                    `New ${broadcastType}: ${title}`,
-                    cleanContent,
-                    broadcastType,
-                    result.insertId
-                );
-            } catch (notifErr) {
-                console.error('Failed to broadcast announcement:', notifErr);
+
+            // Check the system-wide switch
+            const [settingsRows] = await db.query(
+                'SELECT announcement_alerts FROM system_settings WHERE id = 1'
+            );
+            const alertsEnabled = settingsRows[0]?.announcement_alerts !== 0;
+
+            if (alertsEnabled) {
+                try {
+                    await notificationController.broadcastToResidents(
+                        `New ${broadcastType}: ${title}`,
+                        cleanContent,
+                        broadcastType,
+                        result.insertId
+                    );
+                } catch (notifErr) {
+                    console.error('Failed to broadcast announcement:', notifErr);
+                }
+            } else {
+                console.log('⏭️ Announcement alerts disabled in system settings — skipping broadcast.');
             }
         }
 
@@ -120,21 +131,32 @@ exports.updateAnnouncement = async (req, res) => {
         await logAudit(req, auditMsg);
 
         // Broadcast only on Draft → Published transition
-        const justPublished = existing[0].status !== 'Published' && status === 'Published';
-        if (justPublished) {
+        // Broadcast to residents only if published AND announcement_alerts is enabled
+        if (finalStatus === 'Published') {
             const broadcastType =
                 category === 'Health'   ? 'Health Announcement' :
                 category === 'Disaster' ? 'Disaster Alert' :
                                           'Announcement';
-            try {
-                await notificationController.broadcastToResidents(
-                    `New ${broadcastType}: ${title}`,
-                    cleanContent,
-                    broadcastType,
-                    req.params.id
-                );
-            } catch (notifErr) {
-                console.error('Failed to broadcast announcement:', notifErr);
+
+            // Check the system-wide switch
+            const [settingsRows] = await db.query(
+                'SELECT announcement_alerts FROM system_settings WHERE id = 1'
+            );
+            const alertsEnabled = settingsRows[0]?.announcement_alerts !== 0;
+
+            if (alertsEnabled) {
+                try {
+                    await notificationController.broadcastToResidents(
+                        `New ${broadcastType}: ${title}`,
+                        cleanContent,
+                        broadcastType,
+                        result.insertId
+                    );
+                } catch (notifErr) {
+                    console.error('Failed to broadcast announcement:', notifErr);
+                }
+            } else {
+                console.log('⏭️ Announcement alerts disabled in system settings — skipping broadcast.');
             }
         }
 

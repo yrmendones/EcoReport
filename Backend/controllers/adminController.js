@@ -630,6 +630,123 @@ exports.deleteResident = async (req, res) => {
     }
 };
 
+// ============================================================
+// USER MANAGEMENT (residents + officials)
+// ============================================================
+
+exports.getAllUsers = async (req, res) => {
+    try {
+        const { search, role } = req.query;
+        let sql = `
+            SELECT 
+                user_id, resident_id, first_name, middle_name, last_name,
+                house_no, street, address, permanent_address,
+                contact_number, email, role, is_verified, verification_status,
+                valid_id_url, selfie_image, registered_at, last_active_at,
+                CASE
+                    WHEN status = 'Deactivated' THEN 'Deactivated'
+                    WHEN last_active_at IS NOT NULL
+                         AND TIMESTAMPDIFF(SECOND, last_active_at, NOW()) <= 300 THEN 'Online'
+                    ELSE 'Offline'
+                END AS status
+            FROM users 
+            WHERE role IN ('resident', 'barangay_official')
+        `;
+        const params = [];
+        if (role && ['resident', 'barangay_official'].includes(role)) {
+            sql += ' AND role = ?';
+            params.push(role);
+        }
+        if (search) {
+            sql += ` AND (resident_id LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR address LIKE ?)`;
+            const term = `%${search}%`;
+            params.push(term, term, term, term, term);
+        }
+        sql += ' ORDER BY user_id DESC';
+        const [results] = await db.query(sql, params);
+        res.json(formatRows(results, ["last_active_at"]));
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch users.' });
+    }
+};
+
+exports.updateUserRole = async (req, res) => {
+    try {
+        const { role } = req.body;
+        const allowed = ['resident', 'barangay_official'];
+        if (!allowed.includes(role)) {
+            return res.status(400).json({ error: 'Role must be "resident" or "barangay_official".' });
+        }
+
+        const [user] = await db.query(
+            'SELECT user_id, resident_id, first_name, last_name, role FROM users WHERE user_id = ?',
+            [req.params.id]
+        );
+        if (user.length === 0) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+        if (user[0].role === 'admin') {
+            return res.status(403).json({ error: 'Cannot change admin role.' });
+        }
+        if (user[0].role === role) {
+            return res.status(400).json({ error: `User is already ${role === 'barangay_official' ? 'a Barangay Official' : 'a Resident'}.` });
+        }
+
+        await db.query('UPDATE users SET role = ? WHERE user_id = ?', [role, req.params.id]);
+
+        await logAudit(
+            req,
+            `Changed role of ${user[0].resident_id} (${user[0].first_name} ${user[0].last_name}) from ${user[0].role} to ${role}`
+        );
+
+        try {
+            await notificationController.createNotification(
+                req.params.id,
+                'Account Role Updated',
+                role === 'barangay_official'
+                    ? 'Your account has been upgraded to Barangay Official. Please log out and log in again to access the staff panel.'
+                    : 'Your account has been changed to Resident. Please log out and log in again.',
+                'Account Update'
+            );
+        } catch (notifErr) {
+            console.error('Failed to notify user of role change:', notifErr);
+        }
+
+        res.json({ message: `Role changed to ${role}.` });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to change role.' });
+    }
+};
+
+exports.deleteUser = async (req, res) => {
+    try {
+        const [user] = await db.query(
+            'SELECT user_id, resident_id, first_name, last_name, role FROM users WHERE user_id = ?',
+            [req.params.id]
+        );
+        if (user.length === 0) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+        if (user[0].role === 'admin') {
+            return res.status(403).json({ error: 'Cannot delete admin accounts.' });
+        }
+
+        await db.query('DELETE FROM users WHERE user_id = ?', [req.params.id]);
+
+        await logAudit(
+            req,
+            `Deleted ${user[0].role} ${user[0].resident_id} (${user[0].first_name} ${user[0].last_name})`
+        );
+
+        res.json({ message: 'User deleted.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to delete user.' });
+    }
+};
+
 exports.verifyResident = async (req, res) => {
     try {
         const residentUserId = req.params.id;

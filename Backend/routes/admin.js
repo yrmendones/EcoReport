@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
+const settingsController = require('../controllers/settingsController');
 const announcementController = require('../controllers/announcementController');
 const { authenticate, isAdmin, isStaff } = require('../middleware/auth');
 
@@ -23,13 +24,21 @@ router.post('/assignments', adminController.createAssignment);
 router.put('/assignments/:id', adminController.updateAssignment);
 router.delete('/assignments/:id', adminController.deleteAssignment);
 
-// Residents — ADMIN ONLY (user account management)
-router.get('/residents', isAdmin, adminController.getAllResidents);
+// Users (residents + officials) - ADMIN ONLY
+router.get('/users', isAdmin, adminController.getAllUsers);
+router.put('/users/:id/role', isAdmin, adminController.updateUserRole);
+router.delete('/users/:id', isAdmin, adminController.deleteUser);
+
+// READ — both staff roles (official browses residents for report context)
+router.get('/residents', isStaff, adminController.getAllResidents);
 router.get('/residents/verify/:residentId', isAdmin, adminController.getResidentByResidentId);
-router.get('/residents/:id', isAdmin, adminController.getResidentById);
-router.post('/residents', isAdmin, adminController.addResident);
-router.put('/residents/:id', isAdmin, adminController.updateResident);
-router.delete('/residents/:id', isAdmin, adminController.deleteResident);
+router.get('/residents/:id', isStaff, adminController.getResidentById);
+
+// WRITE — admin only (account management + verification)
+// WRITE — both staff roles (official can manage resident records)
+router.post('/residents', isStaff, adminController.addResident);
+router.put('/residents/:id', isStaff, adminController.updateResident);
+router.delete('/residents/:id', isStaff, adminController.deleteResident);
 router.put('/residents/:id/verify', isAdmin, adminController.verifyResident);
 router.put('/residents/:id/reject', isAdmin, adminController.rejectResident);
 
@@ -87,6 +96,10 @@ router.get('/notification-center', adminController.getNotificationCenter);
 router.post('/notification-center', adminController.createNotificationCenter);
 router.put('/notification-center/:id', adminController.updateNotificationCenter);
 router.delete('/notification-center/:id', adminController.deleteNotificationCenter);
+
+// System Settings (admin only)
+router.get('/settings', isAdmin, settingsController.getSettings);
+router.put('/settings', isAdmin, settingsController.updateSettings);
 
 // Announcements (shared)
 router.get('/announcements', announcementController.getAllAnnouncements);

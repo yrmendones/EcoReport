@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -10,6 +10,7 @@ import {
   FaCheckCircle,
   FaHome,
 } from "react-icons/fa";
+import { apiFetch } from "../../api";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -37,7 +38,7 @@ export default function GuestReport() {
 
   const [validationErrors, setValidationErrors] = useState({});
 
-  const categories = [
+    const FALLBACK_CATEGORIES = [
     "Air Pollution",
     "Animal Waste",
     "Clogged Drainage",
@@ -51,6 +52,25 @@ export default function GuestReport() {
     "Crime",
     "Blotter & Incident",
   ];
+
+  const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadCategories = async () => {
+      try {
+        const data = await apiFetch("/api/public/categories");
+        if (cancelled) return;
+        if (Array.isArray(data) && data.length > 0) {
+          setCategories(data);
+        }
+      } catch (err) {
+        console.error("Failed to load categories:", err);
+      }
+    };
+    loadCategories();
+    return () => { cancelled = true; };
+  }, []);
 
   // ============ CONTACT NUMBER INPUT HANDLER ============
   const handleContactChange = (value) => {

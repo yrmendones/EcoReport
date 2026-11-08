@@ -123,6 +123,14 @@ export default function VerifyResident() {
         <p className="vr-footer">
           This page confirms the resident's identity as registered with Barangay Sto. Rosario Kanluran.
         </p>
+
+        <button
+          type="button"
+          className="vr-print-btn"
+          onClick={() => window.print()}
+        >
+          🖨 Print Resident Info
+        </button>
       </div>
 
       <style>{styles}</style>
@@ -218,6 +226,33 @@ const styles = `
     line-height: 1.6;
     margin: 0;
     padding-top: 6px;
+  }
+
+  .vr-print-btn {
+    margin-top: 20px;
+    width: 100%;
+    height: 44px;
+    background: #0B5D2A;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .vr-print-btn:hover { background: #084A21; }
+
+  @media print {
+    .vr-page { background: #ffffff; padding: 0; }
+    .vr-card {
+      box-shadow: none;
+      border-radius: 0;
+      border: 2px solid #0B5D2A;
+      page-break-inside: avoid;
+    }
+    .vr-print-btn { display: none !important; }
   }
 
   .vr-icon-box {

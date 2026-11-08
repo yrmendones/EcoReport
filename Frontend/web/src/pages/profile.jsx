@@ -5,7 +5,9 @@ import { apiFetch } from "../api";
 import { getMenuItems } from "../menu";
 import ProfileHeaderButton from "../components/ProfileHeaderButton";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE = import.meta.env.DEV
+  ? ""
+  : (import.meta.env.VITE_API_URL || "http://localhost:5000");
 const BARANGAY_ADDRESS = "P. Sto. Rosario Kanluran, Pateros";
 
 export default function Profile() {
@@ -174,13 +176,10 @@ export default function Profile() {
       const fd = new FormData();
       fd.append("files", file);
 
-      const uploadRes = await fetch(`${API_BASE}/api/upload`, {
+      const uploadData = await apiFetch("/api/upload", {
         method: "POST",
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: fd,
       });
-      const uploadData = await uploadRes.json();
-      if (!uploadRes.ok) throw new Error(uploadData.error || "Upload failed.");
 
       const imageUrl = uploadData.files?.[0]?.url;
       if (!imageUrl) throw new Error("No URL returned from upload.");

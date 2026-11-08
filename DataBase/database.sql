@@ -361,8 +361,60 @@ CREATE TABLE IF NOT EXISTS qr_tokens (
 );
 
 -- ============================================================
--- 23. SAMPLE DATA
+-- 24. SYSTEM SETTINGS
 -- ============================================================
+
+CREATE TABLE IF NOT EXISTS system_settings (
+    id INT PRIMARY KEY DEFAULT 1,
+    barangay_name VARCHAR(255) NOT NULL DEFAULT 'Barangay Sto. Rosario Kanluran',
+    contact_email VARCHAR(255) NULL,
+    contact_number VARCHAR(20) NULL,
+    address TEXT NULL,
+    pending_flag_days INT DEFAULT 3,
+    required_id_type VARCHAR(100) DEFAULT 'Barangay ID',
+    covered_zones TEXT NULL,
+    min_password_length INT DEFAULT 8,
+    max_login_attempts INT DEFAULT 5,
+    web_session_timeout INT DEFAULT 30,
+    lockout_duration INT DEFAULT 15,
+    require_strong_password BOOLEAN DEFAULT TRUE,
+    email_notifications BOOLEAN DEFAULT TRUE,
+    announcement_alerts BOOLEAN DEFAULT TRUE,
+    maintenance_mode BOOLEAN DEFAULT FALSE,
+    maintenance_message TEXT DEFAULT 'The app is under maintenance. Please try again later.',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT chk_settings_single_row CHECK (id = 1)
+);
+
+-- ============================================================
+-- 25. REPORT CATEGORIES (admin-managed dropdown options)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS report_categories (
+    category_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    display_order INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- 26. SAMPLE DATA
+-- ============================================================
+
+INSERT IGNORE INTO report_categories (name, display_order) VALUES
+('Air Pollution', 1),
+('Animal Waste', 2),
+('Clogged Drainage', 3),
+('Damaged Roads', 4),
+('Flooding', 5),
+('Fallen Trees', 6),
+('Illegal Dumping', 7),
+('Improper Garbage Disposal', 8),
+('Overgrown Grass', 9),
+('Others Environmental Concerns', 10),
+('Crime', 11),
+('Blotter & Incident', 12);
 
 INSERT INTO waste_schedule (day, type, status) VALUES
 ('Monday', 'Biodegradable', 'Active'),
@@ -398,7 +450,7 @@ INSERT INTO medical_staff (staff_name, role, display_order) VALUES
 ('Gloria Berame', 'BNS', 4);
 
 -- ============================================================
--- 24. INDEXES
+-- 27. INDEXES
 -- ============================================================
 
 CREATE INDEX idx_reports_user_id ON environmental_reports(user_id);

@@ -63,7 +63,10 @@ export default function AdminLogin() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("admin", JSON.stringify(data.user));
 
-      navigate("/dashboard");
+      // Redirect by role
+      const target =
+        data.user.role === "admin" ? "/admindashboard" : "/dashboard";
+      navigate(target);
     } catch (err) {
       setError(err.message || "Login failed. Please try again.");
     } finally {

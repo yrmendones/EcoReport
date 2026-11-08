@@ -1,9 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaCheck, FaChevronDown } from "react-icons/fa";
+import { apiFetch } from "../../api";
 
-// Main report types (shown directly in the list)
-const mainTypes = [
+// Categories that belong in the "Other Concerns" collapsible group.
+// Everything else goes in the main list.
+const OTHER_CATEGORY_KEYS = ["Others Environmental Concerns", "Blotter & Incident", "Crime"];
+
+// Fallback list — used only if the API is unreachable
+const FALLBACK_MAIN = [
   "Air Pollution",
   "Animal Waste",
   "Clogged Drainage",
@@ -14,19 +19,47 @@ const mainTypes = [
   "Improper Garbage Disposal",
   "Overgrown Grass",
 ];
-
-// Types hidden inside the "Other Concerns" dropdown
-const otherTypes = [
-  "Others Environmental Concerns",
-  "Blotter & Incident",
-  "Crime",
-];
+const FALLBACK_OTHER = ["Others Environmental Concerns", "Blotter & Incident", "Crime"];
 
 export default function CreateReport() {
   const navigate = useNavigate();
 
   const [selected, setSelected] = useState("");
   const [othersOpen, setOthersOpen] = useState(false);
+
+  const [mainTypes, setMainTypes] = useState(FALLBACK_MAIN);
+  const [otherTypes, setOtherTypes] = useState(FALLBACK_OTHER);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+
+  // Fetch live categories from admin-managed list
+  useEffect(() => {
+    let cancelled = false;
+    const loadCategories = async () => {
+      try {
+        const data = await apiFetch("/api/public/categories");
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : [];
+        if (list.length === 0) return;
+
+        const main = [];
+        const other = [];
+        list.forEach((c) => {
+          if (OTHER_CATEGORY_KEYS.includes(c)) other.push(c);
+          else main.push(c);
+        });
+
+        setMainTypes(main);
+        setOtherTypes(other);
+      } catch (err) {
+        console.error("Failed to load categories:", err);
+        // silently fall back to hardcoded list
+      } finally {
+        if (!cancelled) setCategoriesLoading(false);
+      }
+    };
+    loadCategories();
+    return () => { cancelled = true; };
+  }, []);
 
   const isOtherSelected = otherTypes.includes(selected);
   // Stay open while one of the other options is selected
