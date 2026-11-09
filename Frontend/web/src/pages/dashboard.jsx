@@ -19,6 +19,17 @@ export default function Dashboard() {
   const [adminName, setAdminName] = useState("Admin");
   const [selectedYear, setSelectedYear] = useState("this");
 
+  // Overdue/locked-staff alerts - fetched once on mount
+  const [alerts, setAlerts] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch("/api/admin/check-pending-alerts")
+      .then((data) => { if (!cancelled) setAlerts(data); })
+      .catch(() => { if (!cancelled) setAlerts(null); });
+    return () => { cancelled = true; };
+  }, []);
+
     const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
@@ -131,6 +142,71 @@ export default function Dashboard() {
             <h2>Dashboard Overview</h2>
             <ProfileHeaderButton />
           </header>
+
+          {/* ─── SYSTEM ALERTS BANNER ─── */}
+          {alerts && (alerts.overdue_count > 0 || alerts.locked_staff_count > 0) && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+                background: "#FEF3C7",
+                border: "1px solid #FCD34D",
+                borderRadius: "6px",
+                padding: "10px 14px",
+                margin: "10px 0 8px 0",
+                fontSize: "12px",
+                color: "#92400E",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "18px" }}>⚠️</span>
+                {alerts.overdue_count > 0 && (
+                  <span>
+                    <strong>{alerts.overdue_count}</strong> pending resident account
+                    {alerts.overdue_count === 1 ? "" : "s"} waiting for verification
+                    {alerts.overdue_count === 1 ? "" : " (some overdue)"}.
+                  </span>
+                )}
+                {alerts.locked_staff_count > 0 && (
+                  <span>
+                    <strong>{alerts.locked_staff_count}</strong> staff account
+                    {alerts.locked_staff_count === 1 ? "" : "s"} locked
+                    {alerts.locked_staff_count === 1 ? "" : " — check User Management"}.
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {alerts.overdue_count > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/account-verification")}
+                    style={{
+                      height: "26px", padding: "0 12px", border: "none",
+                      borderRadius: "4px", background: "#92400E", color: "#fff",
+                      fontSize: "10px", fontWeight: 700, cursor: "pointer",
+                    }}
+                  >
+                    Review Pending
+                  </button>
+                )}
+                {alerts.locked_staff_count > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/usermanagement")}
+                    style={{
+                      height: "26px", padding: "0 12px", border: "none",
+                      borderRadius: "4px", background: "#B83232", color: "#fff",
+                      fontSize: "10px", fontWeight: 700, cursor: "pointer",
+                    }}
+                  >
+                    Open User Management
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           <section className="welcome-section">
             <img

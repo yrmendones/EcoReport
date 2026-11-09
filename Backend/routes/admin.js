@@ -11,6 +11,9 @@ router.use(authenticate, isStaff);
 // Dashboard
 router.get('/stats', adminController.getAdminStats);
 
+// System alerts (checked on dashboard load)
+router.get('/check-pending-alerts', adminController.checkPendingAlerts);
+
 // Reports (shared)
 router.get('/reports', adminController.getAllReports);
 router.get('/reports/:id', adminController.getReportDetails);

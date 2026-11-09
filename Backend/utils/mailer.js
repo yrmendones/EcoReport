@@ -163,4 +163,49 @@ async function sendVerificationCodeEmail(to, code, fullName) {
     }
 }
 
-module.exports = { sendPasswordResetEmail, sendNotificationEmail, sendVerificationCodeEmail };
+// ─── ADMIN ALERT EMAIL ───
+// Generic wrapper for system-generated alerts to staff (lockouts, pending account reminders).
+async function sendAdminAlertEmail(to, subject, htmlBody) {
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #333;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h1 style="color: #0B5D2A; font-size: 24px; margin: 0;">EcoReport</h1>
+                <p style="color: #666; font-size: 12px; margin: 4px 0 0 0;">System Alert</p>
+            </div>
+            ${htmlBody}
+            <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 24px 0;" />
+            <p style="font-size: 11px; color: #999; line-height: 1.6; text-align: center;">
+                This alert was sent because <strong>Email notifications</strong> are enabled in
+                System Settings. To disable these alerts, turn off Email notifications.
+            </p>
+            <p style="font-size: 11px; color: #999; line-height: 1.6; text-align: center; margin-top: 12px;">
+                — The EcoReport Team
+            </p>
+        </div>
+    `;
+
+    if (!resend) {
+        console.error(`❌ Cannot send admin alert to ${to}: RESEND_API_KEY is not configured.`);
+        return;
+    }
+
+    try {
+        const { data, error } = await resend.emails.send({
+            from: FROM_EMAIL,
+            to: [to],
+            subject: `EcoReport — ${subject}`,
+            html: html,
+        });
+        if (error) throw new Error(error.message);
+        console.log(`✅ Admin alert sent to ${to}: ${subject}`);
+    } catch (err) {
+        console.error(`❌ Failed to send admin alert to ${to}:`, err.message);
+    }
+}
+
+module.exports = {
+    sendPasswordResetEmail,
+    sendNotificationEmail,
+    sendVerificationCodeEmail,
+    sendAdminAlertEmail,
+};

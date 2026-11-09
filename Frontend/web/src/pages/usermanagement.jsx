@@ -4,6 +4,8 @@ import { apiFetch } from "../api";
 import { getMenuItems } from "../menu";
 import ProfileHeaderButton from "../components/ProfileHeaderButton";
 
+const PAGE_SIZE = 25;
+
 const isNoMiddleName = (mid) => {
   if (!mid) return true;
   const n = String(mid).trim().toUpperCase();
@@ -40,6 +42,7 @@ export default function UserManagement() {
 
   const [openMenuId, setOpenMenuId] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [page, setPage] = useState(1)
 
   const fetchUsers = async () => {
     try {
@@ -89,6 +92,38 @@ export default function UserManagement() {
     resident: users.filter((u) => u.role === "resident").length,
     barangay_official: users.filter((u) => u.role === "barangay_official").length,
   };
+
+  // ─────────────────────────────────────────────
+  // PAGINATION
+  // ─────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginatedUsers = filteredUsers.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  );
+
+  const pageNumbers = () => {
+    const pages = [];
+    const maxButtons = 5;
+    if (totalPages <= maxButtons + 2) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      const start = Math.max(2, safePage - 1);
+      const end = Math.min(totalPages - 1, safePage + 1);
+      if (start > 2) pages.push("...");
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (end < totalPages - 1) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  };
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, roleFilter]);
 
   // ─────────────────────────────────────────────
   // ACTIONS
@@ -308,8 +343,8 @@ export default function UserManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredUsers.length > 0 ? (
-                      filteredUsers.map((u) => {
+                    {paginatedUsers.length > 0 ? (
+                      paginatedUsers.map((u) => {
                         const isBusy = busyId === u.user_id;
                         return (
                           <tr key={u.user_id}>
@@ -431,6 +466,50 @@ export default function UserManagement() {
                 </table>
               )}
             </div>
+
+            {/* ─── PAGINATION ─── */}
+            {!loading && !error && totalPages > 1 && (
+              <div className="rp-pagination-bar">
+                <div className="rp-page-info">
+                  Page <strong>{safePage}</strong> of <strong>{totalPages}</strong>
+                </div>
+
+                <div className="rp-pagination-controls">
+                  <button
+                    type="button"
+                    className="rp-page-btn rp-page-nav"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={safePage === 1}
+                  >
+                    ‹ Prev
+                  </button>
+
+                  {pageNumbers().map((p, i) =>
+                    p === "..." ? (
+                      <span key={`ellipsis-${i}`} className="rp-page-ellipsis">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        type="button"
+                        className={`rp-page-btn ${p === safePage ? "active" : ""}`}
+                        onClick={() => setPage(p)}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    type="button"
+                    className="rp-page-btn rp-page-nav"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safePage === totalPages}
+                  >
+                    Next ›
+                  </button>
+                </div>
+              </div>
+            )}
           </section>
         </main>
       </div>
@@ -665,6 +744,54 @@ export default function UserManagement() {
           background: #0B5D2A; color: #fff; border: none;
           padding: 6px 16px; border-radius: 4px;
           cursor: pointer; font-weight: 600;
+        }
+
+        /* ─── PAGINATION BAR ─── */
+        .rp-pagination-bar {
+          width: 100%;
+          height: 44px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 0 2px;
+          margin-bottom: 8px;
+          flex-shrink: 0;
+          background: #ffffff;
+          border-top: 1px solid #d4dcd4;
+        }
+        .rp-page-info { color: #4b5563; font-size: 11px; font-weight: 500; }
+        .rp-page-info strong { color: #0B5D2A; font-weight: 800; }
+        .rp-pagination-controls { display: flex; align-items: center; gap: 3px; }
+        .rp-page-btn {
+          min-width: 28px;
+          height: 28px;
+          padding: 0 8px;
+          border: 1px solid #d4dcd4;
+          border-radius: 4px;
+          background: #ffffff;
+          color: #374151;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.15s ease, border-color 0.15s ease;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .rp-page-btn.rp-page-nav { padding: 0 10px; gap: 4px; }
+        .rp-page-btn:hover:not(:disabled):not(.active) { background: #f0f7f0; border-color: #b8c9b8; }
+        .rp-page-btn.active { background: #0B5D2A; color: #ffffff; border-color: #0B5D2A; font-weight: 800; }
+        .rp-page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .rp-page-ellipsis {
+          padding: 0 4px;
+          color: #9ca3af;
+          font-size: 12px;
+          user-select: none;
+          display: inline-flex;
+          align-items: center;
+          height: 28px;
         }
 
         .text-center { text-align: center; color: #888; }

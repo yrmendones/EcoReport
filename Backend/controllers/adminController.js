@@ -7,6 +7,7 @@ const { formatRow, formatRows } = require('../utils/dateFormatter');
 const { sanitizeDescription, sanitizeText } = require('../utils/sanitizeHtml');
 const loginLimiter = require('../utils/loginLimiter');
 const { reportReference, certificateReference } = require('../utils/referenceFormatter');
+const adminAlerts = require('../utils/adminAlerts');
 
 async function generateResidentId() {
     const year = new Date().getFullYear();
@@ -69,6 +70,33 @@ exports.getAdminStats = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch stats.' });
+    }
+};
+
+// ============================================================
+// SYSTEM ALERTS
+// ============================================================
+
+/**
+ * Dashboard calls this on mount. Returns overdue pending counts + locked
+ * staff count, AND sends a summary email to staff if:
+ *   - email_notifications is ON
+ *   - there are overdue residents
+ *   - no pending alert has been sent in the last 24h
+ */
+exports.checkPendingAlerts = async (req, res) => {
+    try {
+        const result = await adminAlerts.checkAndSendPendingAlerts();
+        res.json(result);
+    } catch (error) {
+        console.error(error);
+        // Fail-open - dashboard still renders even if alert check fails
+        res.json({
+            overdue_count: 0,
+            overdue_residents: [],
+            locked_staff_count: 0,
+            alert_sent: false,
+        });
     }
 };
 

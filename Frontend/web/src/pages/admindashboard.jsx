@@ -27,6 +27,17 @@ export default function AdminDashboard() {
   const [statsError, setStatsError] = useState("");
   const [activityError, setActivityError] = useState("");
 
+  // Overdue/locked-staff alerts - fetched once on mount
+  const [alerts, setAlerts] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch("/api/admin/check-pending-alerts")
+      .then((data) => { if (!cancelled) setAlerts(data); })
+      .catch(() => { if (!cancelled) setAlerts(null); });
+    return () => { cancelled = true; };
+  }, []);
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -149,6 +160,69 @@ export default function AdminDashboard() {
           </header>
 
           <section className="admin-content">
+            {/* ─── SYSTEM ALERTS BANNER ─── */}
+            {alerts && (alerts.overdue_count > 0 || alerts.locked_staff_count > 0) && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                  background: "#FEF3C7",
+                  border: "1px solid #FCD34D",
+                  borderRadius: "6px",
+                  padding: "10px 14px",
+                  margin: "0 0 12px 0",
+                  fontSize: "12px",
+                  color: "#92400E",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "18px" }}>⚠️</span>
+                  {alerts.overdue_count > 0 && (
+                    <span>
+                      <strong>{alerts.overdue_count}</strong> pending resident account
+                      {alerts.overdue_count === 1 ? "" : "s"} waiting for verification.
+                    </span>
+                  )}
+                  {alerts.locked_staff_count > 0 && (
+                    <span>
+                      <strong>{alerts.locked_staff_count}</strong> staff account
+                      {alerts.locked_staff_count === 1 ? "" : "s"} locked.
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  {alerts.overdue_count > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => navigate("/account-verification")}
+                      style={{
+                        height: "26px", padding: "0 12px", border: "none",
+                        borderRadius: "4px", background: "#92400E", color: "#fff",
+                        fontSize: "10px", fontWeight: 700, cursor: "pointer",
+                      }}
+                    >
+                      Review Pending
+                    </button>
+                  )}
+                  {alerts.locked_staff_count > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => navigate("/usermanagement")}
+                      style={{
+                        height: "26px", padding: "0 12px", border: "none",
+                        borderRadius: "4px", background: "#B83232", color: "#fff",
+                        fontSize: "10px", fontWeight: 700, cursor: "pointer",
+                      }}
+                    >
+                      Open User Management
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <p className="admin-subtitle">
               Overview of accounts and system activity. Select an action below to get started.
             </p>

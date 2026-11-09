@@ -94,10 +94,22 @@ async function recordFailure(email) {
             'UPDATE login_attempts SET locked_until = ? WHERE email = ?',
             [lockedUntil, email]
         );
+
+        // Fire-and-forget alert - don't block the login response on Resend
+        const isPermanent = lockoutMinutes === 0;
+        try {
+            const adminAlerts = require('./adminAlerts');
+            adminAlerts
+                .sendLockoutAlert(email, isPermanent, lockoutMinutes)
+                .catch((err) => console.error('sendLockoutAlert error:', err));
+        } catch (err) {
+            console.error('Failed to load adminAlerts:', err);
+        }
+
         return {
             justLocked: true,
-            minutesLeft: lockoutMinutes === 0 ? null : lockoutMinutes,
-            isPermanent: lockoutMinutes === 0,
+            minutesLeft: isPermanent ? null : lockoutMinutes,
+            isPermanent,
         };
     }
 
