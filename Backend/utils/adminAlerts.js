@@ -36,11 +36,11 @@ async function getAlertRecipients() {
         console.error('Failed to read contact_email:', err);
     }
 
-    // All active staff
+    // Admins only
     try {
         const [staff] = await db.query(
             `SELECT email FROM users 
-             WHERE role IN ('admin', 'barangay_official') 
+             WHERE role = 'admin' 
                AND email IS NOT NULL 
                AND status != 'Deactivated'`
         );
@@ -48,7 +48,7 @@ async function getAlertRecipients() {
             if (s.email && String(s.email).trim()) emails.add(String(s.email).trim());
         });
     } catch (err) {
-        console.error('Failed to read staff emails:', err);
+        console.error('Failed to read admin emails:', err);
     }
 
     return Array.from(emails);

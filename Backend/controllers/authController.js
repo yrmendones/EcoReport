@@ -79,16 +79,6 @@ exports.register = async (req, res) => {
         // Sanitize resident-supplied text. first_name/last_name/address are
         // rendered as HTML in the admin QR print view and can also reach
         // Leaflet popups via map tooltips - strip injection attempts at rest.
-        const safeFirst = sanitizeText(first_name, 100);
-        const safeMiddle = middle_name ? sanitizeText(middle_name, 100) : null;
-        const safeLast = sanitizeText(last_name, 100);
-        const safeHouse = house_no ? sanitizeText(house_no, 50) : null;
-        const safeStreet = street ? sanitizeText(street, 100) : null;
-        const safeAddress = fullAddress ? sanitizeText(fullAddress, 255) : null;
-        const safePermAddr = permanent_address ? sanitizeText(permanent_address, 255) : null;
-        const safeContact = contact_number ? sanitizeText(contact_number, 20) : null;
-        const safeIdType = id_type ? sanitizeText(id_type, 50) : null;
-
         let permHouse = permanent_house_no;
         let permStreet = permanent_street;
         let permBrgy = permanent_barangay;
@@ -114,6 +104,19 @@ exports.register = async (req, res) => {
                   .join(", ")
             : (legacy_permanent_address || null);
 
+        // Sanitize resident-supplied text. first_name/last_name/address are
+        // rendered as HTML in the admin QR print view and can also reach
+        // Leaflet popups via map tooltips — strip injection attempts at rest.
+        const safeFirst = sanitizeText(first_name, 100);
+        const safeMiddle = middle_name ? sanitizeText(middle_name, 100) : null;
+        const safeLast = sanitizeText(last_name, 100);
+        const safeHouse = house_no ? sanitizeText(house_no, 50) : null;
+        const safeStreet = street ? sanitizeText(street, 100) : null;
+        const safeAddress = fullAddress ? sanitizeText(fullAddress, 255) : null;
+        const safePermAddr = permanent_address ? sanitizeText(permanent_address, 255) : null;
+        const safeContact = contact_number ? sanitizeText(contact_number, 20) : null;
+        const safeIdType = id_type ? sanitizeText(id_type, 50) : null;
+
         const [result] = await db.query(
             `INSERT INTO users 
             (resident_id, first_name, middle_name, last_name, house_no, street, address,
@@ -122,15 +125,15 @@ exports.register = async (req, res) => {
              role, status, is_verified, verification_status, registered_at) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'resident', 'Online', 0, 'Pending Verification', CURDATE())`,
             [
-                resident_id, first_name, middle_name || null, last_name,
-                house_no || null, street || null, fullAddress,
+                resident_id, safeFirst, safeMiddle, safeLast,
+                safeHouse, safeStreet, safeAddress,
                 permHouse || null,
                 permStreet || null,
                 permBrgy || null,
                 permCity || null,
-                permanent_address,
-                contact_number || null, email, password_hash,
-                id_type || null,
+                safePermAddr,
+                safeContact, email, password_hash,
+                safeIdType,
                 valid_id_url || null,
                 selfie_image || null
             ]

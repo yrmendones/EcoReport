@@ -11,8 +11,8 @@ router.use(authenticate, isStaff);
 // Dashboard
 router.get('/stats', adminController.getAdminStats);
 
-// System alerts (checked on dashboard load)
-router.get('/check-pending-alerts', adminController.checkPendingAlerts);
+// System alerts — admin only
+router.get('/check-pending-alerts', isAdmin, adminController.checkPendingAlerts);
 
 // Reports (shared)
 router.get('/reports', adminController.getAllReports);
