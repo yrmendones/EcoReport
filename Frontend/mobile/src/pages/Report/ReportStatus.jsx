@@ -70,7 +70,12 @@ export default function ReportStatus() {
     );
   };
 
-  const formattedRef = `ER-2026-${String(id || "").padStart(4, "0")}`;
+  // Prefer the backend-provided reference (has the correct year even for
+  // reports submitted last year). Fall back to URL-id-derived ref only if
+  // the timeline has no entries (blank report) or an old backend is running.
+  const formattedRef =
+    timeline[0]?.reference ||
+    `ER-${new Date().getFullYear()}-${String(id || "").padStart(4, "0")}`;
 
   return (
     <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">

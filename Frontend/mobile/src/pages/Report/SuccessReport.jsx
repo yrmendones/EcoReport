@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../api";
 
 // Same format as the Report Details page: ER-2026-0012
-const formatRef = (id) => `ER-2026-${String(id).padStart(4, "0")}`;
-
 export default function ReportSuccess() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -14,14 +12,20 @@ export default function ReportSuccess() {
 
   useEffect(() => {
     if (reportId) {
-      // Fetch the report details to get the reference number
+      // Fetch the report details to get the backend-computed reference.
+      // The backend uses the report's submitted_at year
       const fetchReport = async () => {
         try {
           const data = await apiFetch(`/api/reports/${reportId}`);
-          setReportRef(formatRef(data.report_id || reportId));
+          setReportRef(
+            data.reference ||
+              `ER-${new Date().getFullYear()}-${String(reportId).padStart(4, "0")}`
+          );
         } catch (error) {
           console.error("Failed to fetch report:", error);
-          setReportRef(formatRef(reportId));
+          setReportRef(
+            `ER-${new Date().getFullYear()}-${String(reportId).padStart(4, "0")}`
+          );
         }
       };
       fetchReport();

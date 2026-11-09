@@ -371,8 +371,6 @@ CREATE TABLE IF NOT EXISTS system_settings (
     contact_number VARCHAR(20) NULL,
     address TEXT NULL,
     pending_flag_days INT DEFAULT 3,
-    required_id_type VARCHAR(100) DEFAULT 'Barangay ID',
-    covered_zones TEXT NULL,
     min_password_length INT DEFAULT 8,
     max_login_attempts INT DEFAULT 5,
     web_session_timeout INT DEFAULT 30,
@@ -399,7 +397,7 @@ CREATE TABLE IF NOT EXISTS report_categories (
 );
 
 -- ============================================================
--- 28. LOGIN ATTEMPTS (rate limiting for failed logins)
+-- 26. LOGIN ATTEMPTS (rate limiting for failed logins)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS login_attempts (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -412,7 +410,7 @@ CREATE TABLE IF NOT EXISTS login_attempts (
 );
 
 -- ============================================================
--- 26. SAMPLE DATA
+-- 27. SAMPLE DATA
 -- ============================================================
 
 INSERT IGNORE INTO system_settings (id) VALUES (1);
@@ -465,7 +463,7 @@ INSERT INTO medical_staff (staff_name, role, display_order) VALUES
 ('Gloria Berame', 'BNS', 4);
 
 -- ============================================================
--- 27. INDEXES
+-- 28. INDEXES
 -- ============================================================
 
 CREATE INDEX idx_reports_user_id ON environmental_reports(user_id);

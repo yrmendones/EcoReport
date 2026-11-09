@@ -419,7 +419,8 @@ export default function Certificate() {
                       paginatedCertificates.map((cert) => (
                         <tr key={cert.certificate_request_id}>
                           <td className="request-id">
-                            ER-{new Date().getFullYear()}-{String(cert.certificate_request_id).padStart(4, "0")}
+                            {cert.reference ||
+                              `ER-${new Date().getFullYear()}-${String(cert.certificate_request_id).padStart(4, "0")}`}
                           </td>
                           <td>{`${cert.first_name} ${cert.last_name}`}</td>
                           <td>{cert.certificate_type}</td>

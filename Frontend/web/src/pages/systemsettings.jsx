@@ -4,18 +4,6 @@ import { apiFetch } from "../api";
 import { getMenuItems } from "../menu";
 import ProfileHeaderButton from "../components/ProfileHeaderButton";
 
-const ID_TYPE_OPTIONS = [
-  "Barangay ID",
-  "Driver's License",
-  "ePhilID / Digital National ID",
-  "National ID (PhilID)",
-  "National Police Clearance",
-  "PWD ID",
-  "Postal ID",
-  "Senior Citizen ID",
-  "Unified Multi-purpose ID (UMID)",
-];
-
 const LOCKOUT_OPTIONS = [
   { value: "5", label: "5 minutes" },
   { value: "15", label: "15 minutes" },
@@ -30,8 +18,6 @@ const DEFAULT_FORM = {
   contact_number: "",
   address: "",
   pending_flag_days: "3",
-  required_id_type: "Barangay ID",
-  covered_zones: "",
   min_password_length: "8",
   max_login_attempts: "5",
   web_session_timeout: "30",
@@ -78,8 +64,6 @@ export default function SystemSettings() {
         contact_number: data.contact_number || "",
         address: data.address || "",
         pending_flag_days: String(data.pending_flag_days ?? "3"),
-        required_id_type: data.required_id_type || "Barangay ID",
-        covered_zones: data.covered_zones || "",
         min_password_length: String(data.min_password_length ?? "8"),
         max_login_attempts: String(data.max_login_attempts ?? "5"),
         web_session_timeout: String(data.web_session_timeout ?? "30"),
@@ -313,24 +297,12 @@ export default function SystemSettings() {
                   <div className="form-grid">
                     <div className="field">
                       <label htmlFor="pendingFlagDays">Flag pending accounts after (days)</label>
-                      <input id="pendingFlagDays" type="number" min="1"
+                      <input id="pendingFlagDays" type="number" min="1" max="365"
                         value={settings.pending_flag_days}
                         onChange={(e) => handleChange("pending_flag_days", e.target.value)} />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="requiredIdType">Required ID type</label>
-                      <select id="requiredIdType"
-                        value={settings.required_id_type}
-                        onChange={(e) => handleChange("required_id_type", e.target.value)}>
-                        {ID_TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                    </div>
-                    <div className="field field-full">
-                      <label htmlFor="coveredZones">Covered purok / zones</label>
-                      <input id="coveredZones" type="text"
-                        placeholder="Purok 1, Purok 2, Purok 3"
-                        value={settings.covered_zones}
-                        onChange={(e) => handleChange("covered_zones", e.target.value)} />
+                      <span style={{ fontSize: "8px", color: "#9ca3af" }}>
+                        Pending residents older than this are highlighted in Account Verification
+                      </span>
                     </div>
                   </div>
                 </div>

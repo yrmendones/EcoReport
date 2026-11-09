@@ -35,7 +35,7 @@ exports.updateSettings = async (req, res) => {
 
         const {
             barangay_name, contact_email, contact_number, address,
-            pending_flag_days, required_id_type, covered_zones,
+            pending_flag_days,
             min_password_length, max_login_attempts, web_session_timeout,
             lockout_duration, require_strong_password,
             email_notifications, announcement_alerts,
@@ -70,8 +70,6 @@ exports.updateSettings = async (req, res) => {
                 contact_number = ?,
                 address = ?,
                 pending_flag_days = COALESCE(?, pending_flag_days),
-                required_id_type = COALESCE(?, required_id_type),
-                covered_zones = ?,
                 min_password_length = COALESCE(?, min_password_length),
                 max_login_attempts = COALESCE(?, max_login_attempts),
                 web_session_timeout = COALESCE(?, web_session_timeout),
@@ -89,8 +87,6 @@ exports.updateSettings = async (req, res) => {
                 contact_number ?? null,
                 address ?? null,
                 pending_flag_days !== undefined ? parseInt(pending_flag_days, 10) : null,
-                required_id_type ?? null,
-                covered_zones ?? null,
                 min_password_length !== undefined ? parseInt(min_password_length, 10) : null,
                 max_login_attempts !== undefined ? parseInt(max_login_attempts, 10) : null,
                 web_session_timeout !== undefined ? parseInt(web_session_timeout, 10) : null,
@@ -153,7 +149,9 @@ exports.getPublicStatus = async (req, res) => {
     try {
         const [rows] = await db.query(
             `SELECT maintenance_mode, maintenance_message,
-                    min_password_length, require_strong_password
+                    min_password_length, require_strong_password,
+                    barangay_name, address, contact_email, contact_number,
+                    web_session_timeout
              FROM system_settings WHERE id = 1`
         );
         const s = rows[0] || {};
@@ -162,6 +160,11 @@ exports.getPublicStatus = async (req, res) => {
             maintenance_message: s.maintenance_message || 'The app is under maintenance. Please try again later.',
             min_password_length: Number(s.min_password_length) || 8,
             require_strong_password: s.require_strong_password !== 0,
+            barangay_name: s.barangay_name || 'Barangay Sto. Rosario Kanluran',
+            address: s.address || '',
+            contact_email: s.contact_email || '',
+            contact_number: s.contact_number || '',
+            web_session_timeout_minutes: Math.max(5, Number(s.web_session_timeout) || 30),
         });
     } catch (error) {
         console.error(error);
@@ -171,6 +174,11 @@ exports.getPublicStatus = async (req, res) => {
             maintenance_message: '',
             min_password_length: 8,
             require_strong_password: true,
+            barangay_name: 'Barangay Sto. Rosario Kanluran',
+            address: '',
+            contact_email: '',
+            contact_number: '',
+            web_session_timeout_minutes: 30,
         });
     }
 };

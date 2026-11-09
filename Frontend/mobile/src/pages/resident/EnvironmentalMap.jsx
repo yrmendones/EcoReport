@@ -388,7 +388,8 @@ export default function EnvironmentalMap() {
                           style={{ gap: "8px" }}
                         >
                           <p className="text-[13px] text-gray-500">
-                            ER-2026-{String(report.report_id).padStart(4, "0")}
+                            {report.reference ||
+                              `ER-${new Date().getFullYear()}-${String(report.report_id).padStart(4, "0")}`}
                           </p>
                           {report.distance_km != null && (
                             <>

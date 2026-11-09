@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaUser, FaUsers, FaTools } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { DEFAULT_BARANGAY, fetchBarangayInfo } from "../../utils/barangay";
 
 import background from "../../assets/images/background.png";
 import ecoLogo from "../../assets/images/leaf.png";
@@ -10,6 +11,15 @@ import barangayLogo from "../../assets/images/blogo.png";
 export default function Welcome() {
   const navigate = useNavigate();
   const [maintenance, setMaintenance] = useState(null); // null = checking, false = normal, true = maintenance on
+  const [barangay, setBarangay] = useState(DEFAULT_BARANGAY);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchBarangayInfo(apiFetch).then((info) => {
+      if (!cancelled) setBarangay(info);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,7 +128,7 @@ export default function Welcome() {
                 Environmental Reporting System
               </p>
               <p className="text-[15px] text-white leading-6">
-                Barangay Sto. Rosario Kanluran
+                {barangay.name}
               </p>
             </div>
           </div>

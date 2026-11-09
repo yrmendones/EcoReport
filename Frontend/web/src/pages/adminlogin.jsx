@@ -62,6 +62,8 @@ export default function AdminLogin() {
 
       localStorage.setItem("token", data.token);
       localStorage.setItem("admin", JSON.stringify(data.user));
+      // Start the idle-timer window — every apiFetch() will refresh this.
+      localStorage.setItem("session_last_active", String(Date.now()));
 
       // Redirect by role
       const target =

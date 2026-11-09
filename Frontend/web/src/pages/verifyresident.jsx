@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api";
+import { DEFAULT_BARANGAY, fetchBarangayInfo } from "../utils/barangay";
 
 const isNoMiddleName = (mid) => {
   if (!mid) return true;
@@ -32,6 +33,15 @@ export default function VerifyResident() {
   const [resident, setResident] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [barangay, setBarangay] = useState(DEFAULT_BARANGAY);
+  useEffect(() => {
+    let cancelled = false;
+    fetchBarangayInfo(apiFetch).then((info) => {
+      if (!cancelled) setBarangay(info);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const fetchResident = async () => {
@@ -100,7 +110,7 @@ export default function VerifyResident() {
           <span>EcoReport</span>
         </div>
 
-        <p className="vr-subtitle">Barangay Sto. Rosario Kanluran</p>
+        <p className="vr-subtitle">{barangay.name}</p>
         <h1 className="vr-title">Resident Verification</h1>
 
         {/* Status badge */}
@@ -121,8 +131,13 @@ export default function VerifyResident() {
         </div>
 
         <p className="vr-footer">
-          This page confirms the resident's identity as registered with Barangay Sto. Rosario Kanluran.
+          This page confirms the resident's identity as registered with {barangay.name}.
         </p>
+        {barangay.address && (
+          <p className="vr-footer" style={{ marginTop: "4px" }}>
+            {barangay.address}
+          </p>
+        )}
 
         <button
           type="button"

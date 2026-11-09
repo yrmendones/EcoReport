@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { apiFetch } from "./api";
 import { getMenuItems } from "./menu";
+import { DEFAULT_BARANGAY, fetchBarangayInfo } from "./utils/barangay";
 
 // Public
 import LoginPage from "./pages/loginpage";
@@ -145,11 +147,23 @@ function AccessDenied({ title, message, backHref, backLabel }) {
 }
 
 // ============================================================
-// PersistentSidebar — renders the role-filtered menu
+// PersistentSidebar - renders the role-filtered menu
 // ============================================================
 function PersistentSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Fetch barangay name once on mount. Hooks must run before the early
+  // returns below (rules of hooks). The helper caches, so even when the
+  // sidebar is hidden the cost is one request per full page load.
+  const [barangay, setBarangay] = useState(DEFAULT_BARANGAY);
+  useEffect(() => {
+    let cancelled = false;
+    fetchBarangayInfo(apiFetch).then((info) => {
+      if (!cancelled) setBarangay(info);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const hideOn = ["/", "/login", "/admin-login", "/forgot-password", "/reset-password"];
   if (location.pathname.startsWith("/verify-resident/")) return null;
@@ -170,7 +184,7 @@ function PersistentSidebar() {
           <img src="/lightleaf.png" alt="EcoReport" className="persistent-sidebar-brand-img" />
           <span className="persistent-sidebar-brand-name">EcoReport</span>
         </div>
-        <div className="persistent-sidebar-barangay">Barangay Sto. Rosario Kanluran</div>
+        <div className="persistent-sidebar-barangay">{barangay.name}</div>
         <nav className="persistent-sidebar-menu">
           {menuItems.map((item, index) => (
             <button

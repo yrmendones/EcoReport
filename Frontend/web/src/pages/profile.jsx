@@ -317,6 +317,7 @@ export default function Profile() {
     }
     localStorage.removeItem("token");
     localStorage.removeItem("admin");
+    localStorage.removeItem("session_last_active");
     navigate("/admin-login");
   };
 

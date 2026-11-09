@@ -144,7 +144,7 @@ export default function ReportDetails() {
   const severity = getSeverity(report.category);
 
   const formattedReport = {
-    ref: `ER-2026-${String(report.report_id).padStart(4, "0")}`,
+    ref: report.reference || `ER-2026-${String(report.report_id).padStart(4, "0")}`,
     category: report.category || "Environmental Concern",
     description: report.description || "No description provided.",
     date:

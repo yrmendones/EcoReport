@@ -86,6 +86,19 @@ export default function AccountVerification() {
   const [rejecting, setRejecting] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
 
+  // System Settings → Verification. Defaults to 3 if the fetch fails.
+  const [pendingFlagDays, setPendingFlagDays] = useState(3);
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch("/api/admin/settings")
+      .then((data) => {
+        const n = Number(data.pending_flag_days);
+        if (!cancelled && Number.isFinite(n) && n > 0) setPendingFlagDays(n);
+      })
+      .catch(() => { /* keep default 3 */ });
+    return () => { cancelled = true; };
+  }, []);
+
   const fetchResidents = async () => {
     try {
       setLoading(true);
@@ -414,6 +427,18 @@ export default function AccountVerification() {
                                   >
                                     {status}
                                   </span>
+                                  {/* Overdue pending badge — shown when the resident has
+                                      been pending longer than the admin's threshold.
+                                      Only applies to "Pending Verification" rows. */}
+                                  {status === "Pending Verification" &&
+                                    Number(r.days_pending) >= pendingFlagDays && (
+                                      <span
+                                        className="vstatus overdue"
+                                        title={`Registered ${r.days_pending} day${r.days_pending === 1 ? "" : "s"} ago — flagged after ${pendingFlagDays} day${pendingFlagDays === 1 ? "" : "s"}`}
+                                      >
+                                        ⏰ {r.days_pending}d overdue
+                                      </span>
+                                    )}
                                   {r.status === "Deactivated" && (
                                     <span
                                       style={{
@@ -764,6 +789,12 @@ export default function AccountVerification() {
           background: #FDECEC;
           color: #B83232;
           border: 1px solid #E5B5B5;
+        }
+        .vstatus.overdue {
+          background: #FEF3C7;
+          color: #92400E;
+          border: 1px solid #FCD34D;
+          font-variant-numeric: tabular-nums;
         }
 
         /* ── REVIEW BUTTON ── */

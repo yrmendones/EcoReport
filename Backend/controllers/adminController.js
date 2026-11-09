@@ -6,6 +6,7 @@ const { logTimeline } = require('../utils/timelineLogger');
 const { formatRow, formatRows } = require('../utils/dateFormatter');
 const { sanitizeDescription, sanitizeText } = require('../utils/sanitizeHtml');
 const loginLimiter = require('../utils/loginLimiter');
+const { reportReference, certificateReference } = require('../utils/referenceFormatter');
 
 async function generateResidentId() {
     const year = new Date().getFullYear();
@@ -144,6 +145,11 @@ exports.getAllReports = async (req, res) => {
             });
         }
 
+        // Attach backend-computed reference
+        results.forEach((r) => {
+            r.reference = reportReference(r.report_id, r.submitted_at);
+        });
+
         res.json(formatRows(results, ["submitted_at", "updated_at"]));
     } catch (error) {
         console.error(error);
@@ -177,6 +183,7 @@ exports.getReportDetails = async (req, res) => {
             [req.params.id]
         );
         results[0].media = mediaRows || [];
+        results[0].reference = reportReference(results[0].report_id, results[0].submitted_at);
 
         res.json(formatRow(results[0], ["submitted_at", "updated_at"]));
     } catch (error) {
@@ -298,15 +305,26 @@ exports.deleteReport = async (req, res) => {
 exports.getAssignments = async (req, res) => {
     try {
         const { status } = req.query;
-        let sql = 'SELECT * FROM assignments';
+        // JOIN environmental_reports to get the report's submitted_at so we
+        // can compute its ER-{year}-{id} reference with the correct year
+        let sql = `
+            SELECT a.*, r.submitted_at AS report_submitted_at
+            FROM assignments a
+            LEFT JOIN environmental_reports r ON a.report_id = r.report_id
+        `;
         const params = [];
         if (status && status !== 'All Assignments') {
-            sql += ' WHERE status = ?';
+            sql += ' WHERE a.status = ?';
             params.push(status);
         }
-        sql += ' ORDER BY assignment_id DESC';
+        sql += ' ORDER BY a.assignment_id DESC';
         const [results] = await db.query(sql, params);
-        res.json(formatRows(results, ["created_at", "updated_at"]));
+
+        const processed = results.map((row) => ({
+            ...row,
+            reference: reportReference(row.report_id, row.report_submitted_at),
+        }));
+        res.json(formatRows(processed, ["created_at", "updated_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch assignments.' });
@@ -461,7 +479,11 @@ exports.getAllResidents = async (req, res) => {
                     WHEN last_active_at IS NOT NULL
                          AND TIMESTAMPDIFF(SECOND, last_active_at, NOW()) <= 300 THEN 'Online'
                     ELSE 'Offline'
-                END AS status
+                END AS status,
+                CASE
+                    WHEN registered_at IS NULL THEN 0
+                    ELSE GREATEST(0, DATEDIFF(CURDATE(), registered_at))
+                END AS days_pending
             FROM users WHERE role = 'resident'
         `;
         const params = [];
@@ -877,7 +899,11 @@ exports.getCertificates = async (req, res) => {
         if (status && status !== 'All') { sql += ' WHERE c.status = ?'; params.push(status); }
         sql += ' ORDER BY c.requested_at DESC';
         const [results] = await db.query(sql, params);
-        res.json(formatRows(results, ["requested_at"]));
+        const processed = results.map((cert) => ({
+            ...cert,
+            reference: certificateReference(cert.certificate_request_id, cert.requested_at),
+        }));
+        res.json(formatRows(processed, ["requested_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch certificates.' });

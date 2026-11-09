@@ -1,4 +1,5 @@
 const { Resend } = require('resend');
+const db = require('../db');
 
 // Initialize Resend safely so the server doesn't crash if the key is missing
 let resend = null;
@@ -8,16 +9,44 @@ if (process.env.RESEND_API_KEY) {
     console.warn("⚠️ WARNING: RESEND_API_KEY is missing. Emails will not be sent.");
 }
 
-// change to verified domain later
+// Verified domain
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'EcoReport <noreply@notifications.ecoreportkanluran.com>';
+
+// ─── Barangay name (cached 5 min) ───
+// Announcements can broadcast to hundreds of residents, each triggering
+// one email. Querying the DB per-recipient would be wasteful, so we cache
+// the name for 5 minutes. If an admin renames the barangay, emails sent
+// within the next 5 min will still show the old name.
+let cachedBarangayName = null;
+let cachedBarangayNameAt = 0;
+const BARANGAY_NAME_CACHE_MS = 5 * 60 * 1000;
+
+async function getBarangayName() {
+    const now = Date.now();
+    if (cachedBarangayName && now - cachedBarangayNameAt < BARANGAY_NAME_CACHE_MS) {
+        return cachedBarangayName;
+    }
+    try {
+        const [rows] = await db.query(
+            'SELECT barangay_name FROM system_settings WHERE id = 1'
+        );
+        cachedBarangayName = rows[0]?.barangay_name || 'Barangay Sto. Rosario Kanluran';
+        cachedBarangayNameAt = now;
+        return cachedBarangayName;
+    } catch (err) {
+        console.error('Failed to read barangay name for email:', err);
+        return cachedBarangayName || 'Barangay Sto. Rosario Kanluran';
+    }
+}
 
 // ─── PASSWORD RESET EMAIL ───
 async function sendPasswordResetEmail(to, resetLink, fullName) {
+    const barangayName = await getBarangayName();
     const html = `
         <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #333;">
             <div style="text-align: center; margin-bottom: 24px;">
                 <h1 style="color: #0B5D2A; font-size: 26px; margin: 0;">EcoReport</h1>
-                <p style="color: #666; font-size: 13px; margin: 4px 0 0 0;">Barangay Sto. Rosario Kanluran</p>
+                <p style="color: #666; font-size: 13px; margin: 4px 0 0 0;">${barangayName}</p>
             </div>
             <h2 style="color: #0B5D2A; font-size: 20px; margin-top: 0;">Password Reset Request</h2>
             <p style="font-size: 14px; line-height: 1.6;">Hi ${fullName || 'there'},</p>
@@ -54,11 +83,12 @@ async function sendPasswordResetEmail(to, resetLink, fullName) {
 
 // ─── NOTIFICATION EMAIL ───
 async function sendNotificationEmail(to, title, message, type = 'Notification') {
+    const barangayName = await getBarangayName();
     const html = `
         <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #333;">
             <div style="text-align: center; margin-bottom: 24px;">
                 <h1 style="color: #0B5D2A; font-size: 26px; margin: 0;">EcoReport</h1>
-                <p style="color: #666; font-size: 13px; margin: 4px 0 0 0;">Barangay Sto. Rosario Kanluran</p>
+                <p style="color: #666; font-size: 13px; margin: 4px 0 0 0;">${barangayName}</p>
             </div>
             <div style="background: #F0F8ED; border: 1px solid #A9C9A1; border-radius: 12px; padding: 20px 22px; margin-bottom: 24px;">
                 <p style="margin: 0 0 6px 0; color: #0B5D2A; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;">${type}</p>
@@ -95,11 +125,12 @@ async function sendNotificationEmail(to, title, message, type = 'Notification') 
 
 // ─── VERIFICATION CODE EMAIL ───
 async function sendVerificationCodeEmail(to, code, fullName) {
+    const barangayName = await getBarangayName();
     const html = `
         <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #333;">
             <div style="text-align: center; margin-bottom: 24px;">
                 <h1 style="color: #0B5D2A; font-size: 26px; margin: 0;">EcoReport</h1>
-                <p style="color: #666; font-size: 13px; margin: 4px 0 0 0;">Barangay Sto. Rosario Kanluran</p>
+                <p style="color: #666; font-size: 13px; margin: 4px 0 0 0;">${barangayName}</p>
             </div>
             <h2 style="color: #0B5D2A; font-size: 20px; margin-top: 0;">Password Reset Code</h2>
             <p style="font-size: 14px; line-height: 1.6;">Hi ${fullName || "there"},</p>

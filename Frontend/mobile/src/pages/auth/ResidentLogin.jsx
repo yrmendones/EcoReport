@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaEye, FaEyeSlash } from "react-icons/fa";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { apiFetch } from "../../api";
+import { DEFAULT_BARANGAY, fetchBarangayInfo } from "../../utils/barangay";
 
 import background from "../../assets/images/bg.png";
 import ecoLogo from "../../assets/images/eco-logo.png";
@@ -14,6 +15,15 @@ export default function ResidentLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [barangay, setBarangay] = useState(DEFAULT_BARANGAY);
+  useEffect(() => {
+    let cancelled = false;
+    fetchBarangayInfo(apiFetch).then((info) => {
+      if (!cancelled) setBarangay(info);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -90,8 +100,8 @@ export default function ResidentLogin() {
                 Protect Our Environment
               </h3>
               <p className="text-[14px] leading-6 text-gray-700 max-w-[320px]">
-                Report environmental concerns quickly and help keep Barangay Sto.
-                Rosario Kanluran clean, safe, and sustainable for everyone.
+                Report environmental concerns quickly and help keep{" "}
+                {barangay.name} clean, safe, and sustainable for everyone.
               </p>
             </div>
           </div>

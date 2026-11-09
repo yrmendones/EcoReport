@@ -412,7 +412,8 @@ export default function Report() {
                         return (
                           <tr key={index}>
                             <td className="report-id">
-                              ER-{new Date().getFullYear()}-{String(report.report_id).padStart(4, "0")}
+                              {report.reference ||
+                                `ER-${new Date().getFullYear()}-${String(report.report_id).padStart(4, "0")}`}
                             </td>
                             <td>{report.category}</td>
                             <td>{getReporterName(report)}</td>

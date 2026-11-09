@@ -402,7 +402,8 @@ export default function Assignment() {
                         <tr key={assignment.assignment_id}>
                           <td className="assignment-id">{assignment.assignment_code}</td>
                           <td className="report-id">
-                            ER-{new Date().getFullYear()}-{String(assignment.report_id).padStart(4, "0")}
+                            {assignment.reference ||
+                              `ER-${new Date().getFullYear()}-${String(assignment.report_id).padStart(4, "0")}`}
                           </td>
                           <td>{assignment.worker}</td>
                           <td>

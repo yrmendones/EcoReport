@@ -2,6 +2,7 @@ const db = require('../db');
 const { logTimeline } = require('../utils/timelineLogger');
 const { formatRow, formatRows } = require('../utils/dateFormatter');
 const { sanitizeText } = require('../utils/sanitizeHtml');
+const { reportReference } = require('../utils/referenceFormatter');
 
 function parseSettings(raw) {
     if (!raw) return {};
@@ -40,7 +41,8 @@ exports.createReport = async (req, res) => {
         // Log the initial "submitted" step in the timeline
         await logTimeline(result.insertId, 'pending', 'Report submitted');
 
-        res.status(201).json({ message: 'Report submitted!', report_id: result.insertId });
+        const reference = reportReference(result.insertId, new Date());
+        res.status(201).json({ message: 'Report submitted!', report_id: result.insertId, reference });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to submit report.' });
@@ -80,11 +82,15 @@ exports.getReports = async (req, res) => {
         const [results] = await db.query(sql, params);
         const processed = results.map((report) => {
             const settings = parseSettings(report.settings);
-            if (settings.publicProfile === false) {
+            // Only mask when someone OTHER than the owner is looking.
+            // Owners always see their own name
+            const isOwner = report.user_id === req.user.id;
+            if (!isOwner && settings.publicProfile === false) {
                 report.first_name = null;
                 report.last_name = null;
             }
             delete report.settings;
+            report.reference = reportReference(report.report_id, report.submitted_at);
             return report;
         });
         res.json(formatRows(processed, ["submitted_at", "updated_at"]));
@@ -96,8 +102,9 @@ exports.getReports = async (req, res) => {
 
 exports.getReportById = async (req, res) => {
     try {
+        // Include u.settings so we can apply the publicProfile mask below.
         const [results] = await db.query(
-            `SELECT r.*, u.first_name, u.last_name 
+            `SELECT r.*, u.first_name, u.last_name, u.settings
              FROM environmental_reports r 
              LEFT JOIN users u ON r.user_id = u.user_id 
              WHERE r.report_id = ?`,
@@ -107,11 +114,23 @@ exports.getReportById = async (req, res) => {
 
         const report = results[0];
         const isStaff = req.user.role === 'admin' || req.user.role === 'barangay_official';
-        if (!isStaff && report.user_id !== req.user.id) {
+        const isOwner = report.user_id !== null && report.user_id === req.user.id;
+
+        if (!isStaff && !isOwner) {
             return res.status(403).json({
                 error: 'Access denied. You can only view your own reports.'
             });
         }
+
+        if (!isOwner) {
+            const settings = parseSettings(report.settings);
+            if (settings.publicProfile === false) {
+                report.first_name = null;
+                report.last_name = null;
+            }
+        }
+        delete report.settings;
+        report.reference = reportReference(report.report_id, report.submitted_at);
 
         res.json(formatRow(report, ["submitted_at", "updated_at"]));
     } catch (error) {
@@ -189,6 +208,7 @@ exports.getNearbyReports = async (req, res) => {
                 report.last_name = null;
             }
             delete report.settings;
+            report.reference = reportReference(report.report_id, report.submitted_at);
             return report;
         });
 
@@ -235,21 +255,21 @@ exports.getReportTimeline = async (req, res) => {
     try {
         const isStaff = req.user.role === 'admin' || req.user.role === 'barangay_official';
 
-        // Ownership check only if not staff
-        if (!isStaff) {
-            const [report] = await db.query(
-                'SELECT user_id FROM environmental_reports WHERE report_id = ?',
-                [req.params.id]
-            );
-            if (report.length === 0) {
-                return res.status(404).json({ error: 'Report not found.' });
-            }
-            if (report[0].user_id !== req.user.id) {
-                return res.status(403).json({
-                    error: 'Access denied. You can only view your own reports.'
-                });
-            }
+        // Fetch report once - used for both the ownership check and the reference
+        const [report] = await db.query(
+            'SELECT user_id, report_id, submitted_at FROM environmental_reports WHERE report_id = ?',
+            [req.params.id]
+        );
+        if (report.length === 0) {
+            return res.status(404).json({ error: 'Report not found.' });
         }
+        if (!isStaff && report[0].user_id !== req.user.id) {
+            return res.status(403).json({
+                error: 'Access denied. You can only view your own reports.'
+            });
+        }
+
+        const reference = reportReference(report[0].report_id, report[0].submitted_at);
 
         const [results] = await db.query(
             `SELECT timeline_id, status, note, created_at 
@@ -258,7 +278,11 @@ exports.getReportTimeline = async (req, res) => {
              ORDER BY created_at ASC, timeline_id ASC`,
             [req.params.id]
         );
-        res.json(formatRows(results, ["created_at"]));
+
+        // Attach the same reference to every row so the frontend can read
+        // timeline[0].reference without an extra report fetch.
+        const processed = results.map((row) => ({ ...row, reference }));
+        res.json(formatRows(processed, ["created_at"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch timeline.' });

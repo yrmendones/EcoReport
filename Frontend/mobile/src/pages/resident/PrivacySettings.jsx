@@ -12,6 +12,7 @@ import {
   FaUser,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { DEFAULT_BARANGAY, fetchBarangayInfo } from "../../utils/barangay";
 
 export default function PrivacySettings() {
   const navigate = useNavigate();
@@ -27,6 +28,15 @@ export default function PrivacySettings() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+
+  const [barangay, setBarangay] = useState(DEFAULT_BARANGAY);
+  useEffect(() => {
+    let cancelled = false;
+    fetchBarangayInfo(apiFetch).then((info) => {
+      if (!cancelled) setBarangay(info);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -221,6 +231,28 @@ export default function PrivacySettings() {
                   Your personal information is used only to provide EcoReport
                   services and improve your reporting experience.
                 </p>
+                {(barangay.contactEmail || barangay.contactNumber || barangay.address) && (
+                  <div className="flex flex-col" style={{ gap: "4px", marginTop: "4px" }}>
+                    <p className="text-[13px] text-gray-700 leading-5 font-semibold">
+                      Need to reach us?
+                    </p>
+                    {barangay.address && (
+                      <p className="text-[13px] text-gray-600 leading-5">
+                        📍 {barangay.address}
+                      </p>
+                    )}
+                    {barangay.contactEmail && (
+                      <p className="text-[13px] text-gray-600 leading-5 break-all">
+                        ✉️ {barangay.contactEmail}
+                      </p>
+                    )}
+                    {barangay.contactNumber && (
+                      <p className="text-[13px] text-gray-600 leading-5">
+                        📞 {barangay.contactNumber}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

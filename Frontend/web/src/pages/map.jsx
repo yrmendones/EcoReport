@@ -202,6 +202,11 @@ export default function MapPage() {
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#39;");
 
+      // Use the backend-computed reference
+      const refDisplay =
+        report.reference ||
+        `ER-${new Date().getFullYear()}-${String(report.report_id).padStart(4, "0")}`;
+
       const marker = L.marker([lat, lng], {
         icon: createPinIcon(statusClass),
       })
@@ -211,7 +216,7 @@ export default function MapPage() {
             <strong>${esc(report.category || "Report")}</strong><br/>
             <span style="font-size: 12px; color: #666;">${esc(report.address || "Location")}</span><br/>
             <span style="font-size: 11px; color: #999;">Status: <strong>${esc(report.status?.toUpperCase() || "UNKNOWN")}</strong></span><br/>
-            <span style="font-size: 10px; color: #aaa;">ID: ER-${new Date().getFullYear()}-${String(report.report_id).padStart(4, "0")}</span>
+            <span style="font-size: 10px; color: #aaa;">ID: ${esc(refDisplay)}</span>
           </div>
         `);
 
