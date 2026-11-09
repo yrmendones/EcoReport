@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../api";
 import { getMenuItems } from "../menu";
@@ -228,6 +228,8 @@ export default function GenerateReports() {
   const [residents, setResidents] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const reportRef = useRef(null);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState("");
 
   // Fetch raw data once
@@ -275,8 +277,41 @@ export default function GenerateReports() {
   // ─────────────────────────────────────────────
   // EXPORT
   // ─────────────────────────────────────────────
-  const handlePrint = () => window.print();
-  const handleDownloadPDF = () => window.print();
+  const handlePrint = () => {
+    window.print();
+  };
+
+    const handleDownloadPDF = async () => {
+    if (!reportRef.current || isExporting) return;
+
+    setIsExporting(true);
+
+    // Lazy-load html2pdf.js only when the user clicks Download.
+    const html2pdf = (await import("html2pdf.js")).default;
+
+    const slug = `${selectedType}-${period}`
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase();
+
+    const opt = {
+      margin: [10, 10, 10, 10], // top, left, bottom, right
+      filename: `EcoReport-${slug}.pdf`,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      pagebreak: { mode: ["css", "legacy"] },
+    };
+
+    try {
+      await html2pdf().set(opt).from(reportRef.current).save();
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      alert("Failed to generate PDF. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleDownloadCSV = () => {
     if (!report) return;
@@ -372,7 +407,7 @@ export default function GenerateReports() {
             </div>
 
             {/* 2. PREVIEW */}
-            <div className="panel" id="print-area">
+            <div className="panel" id="print-area" ref={reportRef}>
               <div className="panel-title">2. Preview Report</div>
 
               {loading ? (
@@ -430,22 +465,39 @@ export default function GenerateReports() {
               <div className="panel-title">3. Download / Print</div>
 
               <div className="download-row">
-                <button type="button" className="primary-button" onClick={handleDownloadPDF}
-                  disabled={!report || loading}>
-                  Download PDF
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={handleDownloadPDF}
+                  disabled={!report || loading || isExporting}
+                  title="Downloads a PDF file directly"
+                >
+                  {isExporting ? "Generating PDF..." : "Download PDF"}
                 </button>
-                <button type="button" className="outline-button" onClick={handleDownloadCSV}
-                  disabled={!report || loading}>
+                <button
+                  type="button"
+                  className="outline-button"
+                  onClick={handleDownloadCSV}
+                  disabled={!report || loading}
+                  title="Download the report as a spreadsheet"
+                >
                   Download CSV
                 </button>
-                <button type="button" className="outline-button" onClick={handlePrint}
-                  disabled={!report || loading}>
+                <button
+                  type="button"
+                  className="outline-button"
+                  onClick={handlePrint}
+                  disabled={!report || loading}
+                  title="Opens the print dialog"
+                >
                   Print
                 </button>
               </div>
 
               <p className="download-note">
-                For PDF, choose "Save as PDF" in the print window.
+                <strong>Download PDF</strong> opens the print dialog with
+                {" "}<em>"Save as PDF"</em> as the destination — the file is
+                named automatically from the report type and period.
               </p>
             </div>
           </section>
@@ -664,14 +716,51 @@ export default function GenerateReports() {
 
         /* PRINT */
         @media print {
-          body { overflow: visible; }
-          .sidebar, .top-header, .page-title, .page-subtitle,
-          .no-print, .panel:not(#print-area) { display: none !important; }
-          .generate-page, .main-content, .generate-content {
-            display: block; width: 100%; height: auto;
-            overflow: visible; padding: 0; background: #ffffff;
+          /* 1. Reset viewport-based sizing. */
+          html, body, #root {
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+            background: #ffffff !important;
           }
-          #print-area { border: none; }
+
+          /* 2. Hide all app chrome */
+          .persistent-sidebar,
+          .sidebar,
+          .top-header,
+          .page-title,
+          .page-subtitle,
+          .no-print,
+          .panel:not(#print-area) {
+            display: none !important;
+          }
+
+          /* 3. Collapse the layout so content fills the page. */
+          .generate-page,
+          .main-content,
+          .generate-content {
+            display: block !important;
+            width: 100% !important;
+            height: auto !important;
+            margin: 0 !important;
+            margin-left: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+          }
+
+          /* 4. Print-friendly preview panel */
+          #print-area {
+            border: none !important;
+            box-shadow: none !important;
+          }
+
+          /* 5. Keep cards / chart / title from splitting across pages */
+          .chart-card,
+          .stat-card,
+          .preview-title {
+            page-break-inside: avoid;
+          }
         }
       `}</style>
     </>
