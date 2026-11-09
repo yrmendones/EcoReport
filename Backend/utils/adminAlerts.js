@@ -194,7 +194,8 @@ exports.checkAndSendPendingAlerts = async () => {
         // Currently locked staff
         const [locked] = await db.query(
             `SELECT COUNT(*) AS n FROM login_attempts la
-             JOIN users u ON u.email = la.email
+             JOIN users u 
+                ON u.email COLLATE utf8mb4_unicode_ci = la.email COLLATE utf8mb4_unicode_ci
              WHERE la.locked_until IS NOT NULL 
                AND la.locked_until > NOW()
                AND u.role IN ('admin', 'barangay_official')`

@@ -719,7 +719,8 @@ exports.getAllUsers = async (req, res) => {
                     ELSE 0
                 END AS is_locked
             FROM users u
-            LEFT JOIN login_attempts la ON la.email = u.email
+            LEFT JOIN login_attempts la 
+                ON la.email COLLATE utf8mb4_unicode_ci = u.email COLLATE utf8mb4_unicode_ci
             WHERE u.role IN ('resident', 'barangay_official')
         `;
         const params = [];

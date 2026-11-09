@@ -407,7 +407,9 @@ CREATE TABLE IF NOT EXISTS login_attempts (
     last_attempt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_locked_until (locked_until),
     INDEX idx_last_attempt (last_attempt_at)
-);
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
 -- 27. SAMPLE DATA

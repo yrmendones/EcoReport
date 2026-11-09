@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaUser, FaUsers, FaTools } from "react-icons/fa";
+import { apiFetch } from "../../api";
 import { DEFAULT_BARANGAY, fetchBarangayInfo } from "../../utils/barangay";
 
 import background from "../../assets/images/background.png";
@@ -9,6 +10,16 @@ import barangayLogo from "../../assets/images/blogo.png";
 
 export default function Welcome() {
   const navigate = useNavigate();
+
+  // Maintenance is handled by MaintenanceGate at the router level (which
+  const [barangay, setBarangay] = useState(DEFAULT_BARANGAY);
+  useEffect(() => {
+    let cancelled = false;
+    fetchBarangayInfo(apiFetch).then((info) => {
+      if (!cancelled) setBarangay(info);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleResidentLogin = () => {
     navigate("/resident-login");
