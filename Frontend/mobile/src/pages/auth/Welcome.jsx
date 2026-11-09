@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaUser, FaUsers, FaTools } from "react-icons/fa";
-import { apiFetch } from "../../api";
 import { DEFAULT_BARANGAY, fetchBarangayInfo } from "../../utils/barangay";
 
 import background from "../../assets/images/background.png";
@@ -10,36 +9,6 @@ import barangayLogo from "../../assets/images/blogo.png";
 
 export default function Welcome() {
   const navigate = useNavigate();
-  const [maintenance, setMaintenance] = useState(null); // null = checking, false = normal, true = maintenance on
-  const [barangay, setBarangay] = useState(DEFAULT_BARANGAY);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchBarangayInfo(apiFetch).then((info) => {
-      if (!cancelled) setBarangay(info);
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const check = async () => {
-      try {
-        const data = await apiFetch("/api/public/status");
-        if (!cancelled) {
-          setMaintenance({
-            on: !!data.maintenance_mode,
-            message: data.maintenance_message || "",
-          });
-        }
-      } catch {
-        // Fail-open - if the check fails, show the normal screen
-        if (!cancelled) setMaintenance({ on: false, message: "" });
-      }
-    };
-    check();
-    return () => { cancelled = true; };
-  }, []);
 
   const handleResidentLogin = () => {
     navigate("/resident-login");
@@ -49,48 +18,6 @@ export default function Welcome() {
   const handleGuest = () => {
     navigate("/guest-home");
   };
-
-    // While checking status, show a brief loading screen
-  if (maintenance === null) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <p className="text-[#0B5D2A] font-bold">Loading…</p>
-      </div>
-    );
-  }
-
-  // Maintenance mode - block all access except admin/official login
-  if (maintenance.on) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center px-6">
-        <div className="bg-white rounded-2xl border border-yellow-300 shadow-md max-w-sm w-full flex flex-col items-center text-center p-8 gap-4">
-          <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center">
-            <FaTools size={28} className="text-yellow-600" />
-          </div>
-          <h1 className="text-[20px] font-extrabold text-gray-900">
-            Under Maintenance
-          </h1>
-          <p className="text-[14px] text-gray-600 leading-6">
-            {maintenance.message}
-          </p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="mt-2 w-full min-h-[48px] rounded-xl bg-[#0B5D2A] text-white font-extrabold text-[14px]"
-          >
-            Try Again
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate("/admin-login")}
-            className="w-full min-h-[44px] rounded-xl border border-[#0B5D2A] text-[#0B5D2A] font-bold text-[13px]"
-          >
-            Staff Login
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center sm:py-6 sm:px-3">

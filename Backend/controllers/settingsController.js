@@ -1,5 +1,6 @@
 const db = require('../db');
 const { logAudit } = require('../utils/auditLogger');
+const { invalidateMaintenanceCache } = require('../middleware/maintenance');
 
 // ─────────────────────────────────────────────
 // GET settings (admin)
@@ -120,6 +121,7 @@ exports.updateSettings = async (req, res) => {
         }
 
         await logAudit(req, 'Updated system settings');
+        invalidateMaintenanceCache();
         res.json({ message: 'Settings saved successfully.' });
     } catch (error) {
         console.error(error);

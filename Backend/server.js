@@ -48,6 +48,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // IMPORT ROUTES
 const authController = require('./controllers/authController');
+const { maintenanceGuard } = require('./middleware/maintenance');
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -65,29 +66,42 @@ const hotlineRoutes = require('./routes/hotlines');
 
 // DIRECT ROUTES
 
-// Admin login
-app.post('/api/admin/login', authController.adminLogin);
+// ============================================================
+// ROUTE MOUNTS - ORDER MATTERS FOR MAINTENANCE MODE
+// ============================================================
 
-// Guest report submission
-const guestController = require('./controllers/guestController');
-app.post('/api/reports/guest', guestController.submitGuestReport);
-
-// USE ROUTES
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/guest', guestRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/announcements', announcementRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/health-center', healthRoutes);
-app.use('/api/appointments', appointmentRoutes);
-app.use('/api/certificates', certificateRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/waste-schedule', wasteRoutes);
-app.use('/api/hotlines', hotlineRoutes);
+// Public status endpoint
 const publicRoutes = require('./routes/public');
 app.use('/api/public', publicRoutes);
+
+// Staff login - admins need this to log in and turn maintenance OFF
+app.post('/api/admin/login', authController.adminLogin);
+
+// Logout - allow all roles to end their session cleanly even during maintenance
+app.post('/api/auth/logout', require('./middleware/auth').authenticate, authController.logout);
+
+// ─── GUARDED (blocked during maintenance unless staff) ───
+
+app.use('/api/auth', maintenanceGuard, authRoutes);
+app.use('/api/users', maintenanceGuard, userRoutes);
+app.use('/api/reports', maintenanceGuard, reportRoutes);
+app.use('/api/guest', maintenanceGuard, guestRoutes);
+app.use('/api/announcements', maintenanceGuard, announcementRoutes);
+app.use('/api/notifications', maintenanceGuard, notificationRoutes);
+app.use('/api/health-center', maintenanceGuard, healthRoutes);
+app.use('/api/appointments', maintenanceGuard, appointmentRoutes);
+app.use('/api/certificates', maintenanceGuard, certificateRoutes);
+app.use('/api/upload', maintenanceGuard, uploadRoutes);
+app.use('/api/waste-schedule', maintenanceGuard, wasteRoutes);
+app.use('/api/hotlines', maintenanceGuard, hotlineRoutes);
+
+// Guest report submission (direct route, not in a router)
+const guestController = require('./controllers/guestController');
+app.post('/api/reports/guest', maintenanceGuard, guestController.submitGuestReport);
+
+// ─── STAFF ONLY (exempt from maintenance) ───
+
+app.use('/api/admin', adminRoutes);
 
 // ROOT
 app.get('/', (req, res) => {

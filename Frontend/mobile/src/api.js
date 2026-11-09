@@ -39,6 +39,15 @@ export const apiFetch = async (endpoint, options = {}) => {
         return {};
     }
 
+    // Maintenance mode active — the backend blocked a resident/guest call.
+    if (response.status === 503) {
+        const data = await response.json().catch(() => ({}));
+        if (data.error === 'maintenance') {
+            window.location.href = '/';
+            throw new Error('Maintenance mode active');
+        }
+    }
+
     const data = await response.json();
     if (!response.ok) {
         throw new Error(data.error || "Something went wrong");

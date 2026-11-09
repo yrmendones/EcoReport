@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { apiFetch } from "./api";
 import { getMenuItems } from "./menu";
+import MaintenanceGate from "./components/MaintenanceGate";
 import { DEFAULT_BARANGAY, fetchBarangayInfo } from "./utils/barangay";
 
 // Public
@@ -212,48 +213,53 @@ export default function App() {
       <PersistentSidebar />
 
       <Routes>
-        {/* ---------- Public ---------- */}
-        <Route path="/" element={<LoginPage />} />
-        <Route path="/login" element={<LoginPage />} />
+        {/* ---------- ESCAPE HATCHES (always accessible) ---------- */}
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ForgotPassword />} />
         <Route path="/verify-resident/:token" element={<VerifyResident />} />
 
-        {/* ---------- ADMIN ONLY ---------- */}
-        <Route path="/admindashboard" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
-        <Route path="/usermanagement" element={<RequireAdmin><UserManagement /></RequireAdmin>} />
-        <Route path="/account-verification" element={<RequireAdmin><AccountVerification /></RequireAdmin>} />
-        <Route path="/monitoractivities" element={<RequireAdmin><MonitorActivities /></RequireAdmin>} />
-        <Route path="/generatereports" element={<RequireAdmin><GenerateReports /></RequireAdmin>} />
-        <Route path="/systemsettings" element={<RequireAdmin><SystemSettings /></RequireAdmin>} />
-        <Route path="/auditlogs" element={<RequireAdmin><AuditLogs /></RequireAdmin>} />
+        {/* ---------- MAINTENANCE-GATED (blocked unless staff) ---------- */}
+        <Route element={<MaintenanceGate><Outlet /></MaintenanceGate>}>
+          {/* Public landing */}
+          <Route path="/" element={<LoginPage />} />
+          <Route path="/login" element={<LoginPage />} />
 
-        {/* ---------- BARANGAY OFFICIAL ONLY ---------- */}
-        <Route path="/dashboard" element={<RequireOfficial><Dashboard /></RequireOfficial>} />
-        <Route path="/report" element={<RequireOfficial><Report /></RequireOfficial>} />
-        <Route path="/allreport" element={<RequireOfficial><AllReport /></RequireOfficial>} />
-        <Route path="/allreport/:id" element={<RequireOfficial><AllReport /></RequireOfficial>} />
-        <Route path="/assignment" element={<RequireOfficial><Assignment /></RequireOfficial>} />
-        <Route path="/resident" element={<RequireOfficial><Resident /></RequireOfficial>} />
-        <Route path="/qr-verification" element={<RequireOfficial><QRVerification /></RequireOfficial>} />
-        <Route path="/announcement" element={<RequireOfficial><Announcement /></RequireOfficial>} />
-        <Route path="/notification" element={<RequireOfficial><Notification /></RequireOfficial>} />
-        <Route path="/map" element={<RequireOfficial><MapPage /></RequireOfficial>} />
-        <Route path="/waste-schedule" element={<RequireOfficial><WasteSchedule /></RequireOfficial>} />
-        <Route path="/certificate" element={<RequireOfficial><Certificate /></RequireOfficial>} />
-        <Route path="/health-center" element={<RequireOfficial><HealthCenter /></RequireOfficial>} />
-        <Route path="/emergency-hotline" element={<RequireOfficial><EmergencyHotline /></RequireOfficial>} />
-        <Route path="/inventory" element={<RequireOfficial><Inventory /></RequireOfficial>} />
-        <Route path="/blotter" element={<RequireOfficial><Blotter /></RequireOfficial>} />
-        <Route path="/disaster-emergency" element={<RequireOfficial><DisasterEmergency /></RequireOfficial>} />
-        <Route path="/analytics" element={<RequireOfficial><Analytics /></RequireOfficial>} />
+          {/* ADMIN ONLY */}
+          <Route path="/admindashboard" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
+          <Route path="/usermanagement" element={<RequireAdmin><UserManagement /></RequireAdmin>} />
+          <Route path="/account-verification" element={<RequireAdmin><AccountVerification /></RequireAdmin>} />
+          <Route path="/monitoractivities" element={<RequireAdmin><MonitorActivities /></RequireAdmin>} />
+          <Route path="/generatereports" element={<RequireAdmin><GenerateReports /></RequireAdmin>} />
+          <Route path="/systemsettings" element={<RequireAdmin><SystemSettings /></RequireAdmin>} />
+          <Route path="/auditlogs" element={<RequireAdmin><AuditLogs /></RequireAdmin>} />
 
-        {/* ---------- SHARED (both roles) ---------- */}
-        <Route path="/profile" element={<RequireStaff><Profile /></RequireStaff>} />
+          {/* BARANGAY OFFICIAL ONLY */}
+          <Route path="/dashboard" element={<RequireOfficial><Dashboard /></RequireOfficial>} />
+          <Route path="/report" element={<RequireOfficial><Report /></RequireOfficial>} />
+          <Route path="/allreport" element={<RequireOfficial><AllReport /></RequireOfficial>} />
+          <Route path="/allreport/:id" element={<RequireOfficial><AllReport /></RequireOfficial>} />
+          <Route path="/assignment" element={<RequireOfficial><Assignment /></RequireOfficial>} />
+          <Route path="/resident" element={<RequireOfficial><Resident /></RequireOfficial>} />
+          <Route path="/qr-verification" element={<RequireOfficial><QRVerification /></RequireOfficial>} />
+          <Route path="/announcement" element={<RequireOfficial><Announcement /></RequireOfficial>} />
+          <Route path="/notification" element={<RequireOfficial><Notification /></RequireOfficial>} />
+          <Route path="/map" element={<RequireOfficial><MapPage /></RequireOfficial>} />
+          <Route path="/waste-schedule" element={<RequireOfficial><WasteSchedule /></RequireOfficial>} />
+          <Route path="/certificate" element={<RequireOfficial><Certificate /></RequireOfficial>} />
+          <Route path="/health-center" element={<RequireOfficial><HealthCenter /></RequireOfficial>} />
+          <Route path="/emergency-hotline" element={<RequireOfficial><EmergencyHotline /></RequireOfficial>} />
+          <Route path="/inventory" element={<RequireOfficial><Inventory /></RequireOfficial>} />
+          <Route path="/blotter" element={<RequireOfficial><Blotter /></RequireOfficial>} />
+          <Route path="/disaster-emergency" element={<RequireOfficial><DisasterEmergency /></RequireOfficial>} />
+          <Route path="/analytics" element={<RequireOfficial><Analytics /></RequireOfficial>} />
 
-        {/* ---------- Fallback ---------- */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+          {/* SHARED (both roles) */}
+          <Route path="/profile" element={<RequireStaff><Profile /></RequireStaff>} />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );
