@@ -28,6 +28,7 @@ router.delete('/assignments/:id', adminController.deleteAssignment);
 router.get('/users', isAdmin, adminController.getAllUsers);
 router.put('/users/:id/role', isAdmin, adminController.updateUserRole);
 router.delete('/users/:id', isAdmin, adminController.deleteUser);
+router.put('/users/:id/unlock', isAdmin, adminController.unlockLogin);
 
 // READ — both staff roles (official browses residents for report context)
 router.get('/residents', isStaff, adminController.getAllResidents);

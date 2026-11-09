@@ -5,6 +5,8 @@ const crypto = require('crypto');
 const { logAudit } = require('../utils/auditLogger');
 const { sendVerificationCodeEmail } = require('../utils/mailer');
 const { sanitizeText } = require('../utils/sanitizeHtml');
+const { validatePassword } = require('../utils/passwordPolicy');
+const loginLimiter = require('../utils/loginLimiter');
 
 async function generateResidentId() {
     const year = new Date().getFullYear();
@@ -46,8 +48,11 @@ exports.register = async (req, res) => {
             return res.status(400).json({ error: 'All fields required.' });
         if (password !== confirm_password)
             return res.status(400).json({ error: 'Passwords do not match.' });
-        if (password.length < 8 || password.length > 16)
-            return res.status(400).json({ error: 'Password must be between 8 and 16 characters.' });
+
+        const passwordCheck = await validatePassword(password);
+        if (!passwordCheck.ok) {
+            return res.status(400).json({ error: passwordCheck.error });
+        }
 
         if (contact_number) {
             const mobileRegex = /^(09)\d{9}$/;
@@ -152,8 +157,25 @@ exports.login = async (req, res) => {
         const { email, password } = req.body;
         if (!email || !password) return res.status(400).json({ error: 'Email and password required.' });
 
+        // Reject early if the account is currently locked out
+        const lock = await loginLimiter.checkLock(email);
+        if (lock.locked) {
+            if (lock.isPermanent) {
+                return res.status(423).json({
+                    error: 'Account locked due to too many failed login attempts. Please contact the barangay admin to unlock.',
+                });
+            }
+            return res.status(423).json({
+                error: `Account locked due to too many failed login attempts. Try again in ${lock.minutesLeft} minute${lock.minutesLeft === 1 ? '' : 's'}.`,
+            });
+        }
+
         const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
-        if (users.length === 0) return res.status(401).json({ error: 'Invalid credentials.' });
+        if (users.length === 0) {
+            // Record the failure even for unknown emails to prevent enumeration/hammering
+            await loginLimiter.recordFailure(email);
+            return res.status(401).json({ error: 'Invalid credentials.' });
+        }
 
         const user = users[0];
 
@@ -162,7 +184,29 @@ exports.login = async (req, res) => {
         }
 
         const match = await bcrypt.compare(password, user.password_hash);
-        if (!match) return res.status(401).json({ error: 'Invalid credentials.' });
+        if (!match) {
+            const result = await loginLimiter.recordFailure(email);
+            if (result.justLocked) {
+                if (result.isPermanent) {
+                    return res.status(423).json({
+                        error: 'Too many failed attempts. Account locked. Please contact the barangay admin to unlock.',
+                    });
+                }
+                return res.status(423).json({
+                    error: `Too many failed attempts. Account locked for ${result.minutesLeft} minute${result.minutesLeft === 1 ? '' : 's'}.`,
+                });
+            }
+            const tail =
+                result.attemptsLeft === 1
+                    ? ' 1 attempt remaining before lockout.'
+                    : result.attemptsLeft !== undefined && result.attemptsLeft <= 2
+                        ? ` ${result.attemptsLeft} attempts remaining.`
+                        : '';
+            return res.status(401).json({ error: `Invalid credentials.${tail}` });
+        }
+
+        // Success - clear failure history
+        await loginLimiter.clearFailures(email);
 
         await db.query(
             'UPDATE users SET status = ?, last_active_at = NOW() WHERE user_id = ?',
@@ -197,8 +241,24 @@ exports.adminLogin = async (req, res) => {
         const { email, password } = req.body;
         if (!email || !password) return res.status(400).json({ error: 'Email and password required.' });
 
+        // Reject early if the staff account is currently locked out
+        const lock = await loginLimiter.checkLock(email);
+        if (lock.locked) {
+            if (lock.isPermanent) {
+                return res.status(423).json({
+                    error: 'Account locked due to too many failed login attempts. Please contact another administrator to unlock.',
+                });
+            }
+            return res.status(423).json({
+                error: `Account locked due to too many failed login attempts. Try again in ${lock.minutesLeft} minute${lock.minutesLeft === 1 ? '' : 's'}.`,
+            });
+        }
+
         const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
-        if (users.length === 0) return res.status(401).json({ error: 'Invalid credentials.' });
+        if (users.length === 0) {
+            await loginLimiter.recordFailure(email);
+            return res.status(401).json({ error: 'Invalid credentials.' });
+        }
 
         const user = users[0];
         if (user.status === 'Deactivated') {
@@ -209,7 +269,29 @@ exports.adminLogin = async (req, res) => {
         }
 
         const match = await bcrypt.compare(password, user.password_hash);
-        if (!match) return res.status(401).json({ error: 'Invalid credentials.' });
+        if (!match) {
+            const result = await loginLimiter.recordFailure(email);
+            if (result.justLocked) {
+                if (result.isPermanent) {
+                    return res.status(423).json({
+                        error: 'Too many failed attempts. Account locked. Please contact another administrator to unlock.',
+                    });
+                }
+                return res.status(423).json({
+                    error: `Too many failed attempts. Account locked for ${result.minutesLeft} minute${result.minutesLeft === 1 ? '' : 's'}.`,
+                });
+            }
+            const tail =
+                result.attemptsLeft === 1
+                    ? ' 1 attempt remaining before lockout.'
+                    : result.attemptsLeft !== undefined && result.attemptsLeft <= 2
+                        ? ` ${result.attemptsLeft} attempts remaining.`
+                        : '';
+            return res.status(401).json({ error: `Invalid credentials.${tail}` });
+        }
+
+        // Success - clear failure history
+        await loginLimiter.clearFailures(email);
 
         await db.query(
             'UPDATE users SET status = ?, last_active_at = NOW() WHERE user_id = ?',
@@ -328,8 +410,11 @@ exports.resetPassword = async (req, res) => {
             return res.status(400).json({ error: 'All fields required.' });
         if (new_password !== confirm_password)
             return res.status(400).json({ error: 'Passwords do not match.' });
-        if (new_password.length < 8 || new_password.length > 16)
-            return res.status(400).json({ error: 'Password must be between 8 and 16 characters.' });
+
+        const passwordCheck = await validatePassword(new_password);
+        if (!passwordCheck.ok) {
+            return res.status(400).json({ error: passwordCheck.error });
+        }
 
         const [rows] = await db.query(
             `SELECT t.token_id, t.user_id

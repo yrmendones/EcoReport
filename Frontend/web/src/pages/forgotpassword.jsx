@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../api";
+import {
+  DEFAULT_PASSWORD_POLICY,
+  fetchPasswordPolicy,
+  validatePassword as validatePasswordPolicy,
+} from "../utils/passwordPolicy";
 
 const CODE_LENGTH = 6;
 
@@ -60,6 +65,16 @@ export default function ForgotPassword() {
   const [resendStatus, setResendStatus] = useState("");
 
   const inputRefs = useRef([]);
+
+  const [passwordPolicy, setPasswordPolicy] = useState(DEFAULT_PASSWORD_POLICY);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPasswordPolicy(apiFetch).then((policy) => {
+      if (!cancelled) setPasswordPolicy(policy);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (step === "verify") {
@@ -185,8 +200,9 @@ export default function ForgotPassword() {
       setError("Please fill in both fields.");
       return;
     }
-    if (newPassword.length < 8 || newPassword.length > 16) {
-      setError("Password must be between 8 and 16 characters.");
+    const pwCheck = validatePasswordPolicy(newPassword, passwordPolicy);
+    if (!pwCheck.ok) {
+      setError(pwCheck.error);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -346,7 +362,7 @@ export default function ForgotPassword() {
                   type={showNew ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password (8-16 characters)"
+                  placeholder={`Enter new password (${passwordPolicy.min}-${passwordPolicy.max} characters)`}
                   maxLength={16}
                   required
                   autoFocus

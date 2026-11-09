@@ -5,6 +5,7 @@ const { logAudit } = require('../utils/auditLogger');
 const { logTimeline } = require('../utils/timelineLogger');
 const { formatRow, formatRows } = require('../utils/dateFormatter');
 const { sanitizeDescription, sanitizeText } = require('../utils/sanitizeHtml');
+const loginLimiter = require('../utils/loginLimiter');
 
 async function generateResidentId() {
     const year = new Date().getFullYear();
@@ -318,7 +319,7 @@ exports.createAssignment = async (req, res) => {
         const { report_id, worker, status } = req.body;
         if (!report_id || !worker) return res.status(400).json({ error: 'Report ID and worker required.' });
 
-        const allowedStatus = ['Assigned', 'Resolved'];
+        const allowedStatus = ['Assigned', 'Resolved', 'Rejected'];
         const finalStatus = (status && allowedStatus.includes(status)) ? status : 'Assigned';
 
         // Insert with a temporary unique placeholder
@@ -336,21 +337,27 @@ exports.createAssignment = async (req, res) => {
             [assignmentCode, assignmentId]
         );
 
-        let reportStatus = (finalStatus === 'Resolved') ? 'resolved' : 'assigned';
+        const reportStatus =
+            finalStatus === 'Resolved' ? 'resolved' :
+            finalStatus === 'Rejected' ? 'rejected' :
+                                         'assigned';
         await db.query('UPDATE environmental_reports SET status = ? WHERE report_id = ?', [reportStatus, report_id]);
 
-        await logTimeline(
-            report_id,
-            reportStatus,
-            finalStatus === 'Resolved' ? `Resolved by ${worker}` : `Assigned to ${worker}`
-        );
+        const timelineNote =
+            finalStatus === 'Resolved' ? `Resolved by ${worker}` :
+            finalStatus === 'Rejected' ? `Rejected by ${worker}` :
+                                         `Assigned to ${worker}`;
+        await logTimeline(report_id, reportStatus, timelineNote);
 
         const [report] = await db.query('SELECT user_id, category FROM environmental_reports WHERE report_id = ?', [report_id]);
-        if (report.length > 0 && report[0].user_id && finalStatus === 'Resolved') {
+        if (report.length > 0 && report[0].user_id && (finalStatus === 'Resolved' || finalStatus === 'Rejected')) {
+            const isRejected = finalStatus === 'Rejected';
             await notificationController.createNotification(
                 report[0].user_id,
                 'Report Status Updated',
-                `Your report "${report[0].category}" has been resolved.`,
+                isRejected
+                    ? `Your report "${report[0].category}" has been rejected. Please contact the barangay office for more information.`
+                    : `Your report "${report[0].category}" has been resolved.`,
                 'Report Update',
                 report_id
             );
@@ -369,9 +376,9 @@ exports.createAssignment = async (req, res) => {
 exports.updateAssignment = async (req, res) => {
     try {
         const { worker, status } = req.body;
-        const allowedStatus = ['Assigned', 'Resolved'];
+        const allowedStatus = ['Assigned', 'Resolved', 'Rejected'];
         if (!status || !allowedStatus.includes(status)) {
-            return res.status(400).json({ error: 'Status must be Assigned or Resolved.' });
+            return res.status(400).json({ error: 'Status must be Assigned, Resolved, or Rejected.' });
         }
 
         const [assignment] = await db.query(
@@ -382,21 +389,27 @@ exports.updateAssignment = async (req, res) => {
 
         await db.query('UPDATE assignments SET worker = ?, status = ? WHERE assignment_id = ?', [worker, status, req.params.id]);
 
-        let reportStatus = (status === 'Resolved') ? 'resolved' : 'assigned';
+        const reportStatus =
+            status === 'Resolved' ? 'resolved' :
+            status === 'Rejected' ? 'rejected' :
+                                    'assigned';
         await db.query('UPDATE environmental_reports SET status = ? WHERE report_id = ?', [reportStatus, assignment[0].report_id]);
 
-        await logTimeline(
-            assignment[0].report_id,
-            reportStatus,
-            status === 'Resolved' ? `Resolved by ${worker}` : `Reassigned to ${worker}`
-        );
+        const timelineNote =
+            status === 'Resolved' ? `Resolved by ${worker}` :
+            status === 'Rejected' ? `Rejected by ${worker}` :
+                                    `Reassigned to ${worker}`;
+        await logTimeline(assignment[0].report_id, reportStatus, timelineNote);
 
         const [report] = await db.query('SELECT user_id, category FROM environmental_reports WHERE report_id = ?', [assignment[0].report_id]);
-        if (report.length > 0 && report[0].user_id && status === 'Resolved') {
+        if (report.length > 0 && report[0].user_id && (status === 'Resolved' || status === 'Rejected')) {
+            const isRejected = status === 'Rejected';
             await notificationController.createNotification(
                 report[0].user_id,
                 'Report Status Updated',
-                `Your report "${report[0].category}" has been resolved.`,
+                isRejected
+                    ? `Your report "${report[0].category}" has been rejected. Please contact the barangay office for more information.`
+                    : `Your report "${report[0].category}" has been resolved.`,
                 'Report Update',
                 assignment[0].report_id
             );
@@ -639,32 +652,39 @@ exports.getAllUsers = async (req, res) => {
         const { search, role } = req.query;
         let sql = `
             SELECT 
-                user_id, resident_id, first_name, middle_name, last_name,
-                house_no, street, address, permanent_address,
-                contact_number, email, role, is_verified, verification_status,
-                valid_id_url, selfie_image, registered_at, last_active_at,
+                u.user_id, u.resident_id, u.first_name, u.middle_name, u.last_name,
+                u.house_no, u.street, u.address, u.permanent_address,
+                u.contact_number, u.email, u.role, u.is_verified, u.verification_status,
+                u.valid_id_url, u.selfie_image, u.registered_at, u.last_active_at,
                 CASE
-                    WHEN status = 'Deactivated' THEN 'Deactivated'
-                    WHEN last_active_at IS NOT NULL
-                         AND TIMESTAMPDIFF(SECOND, last_active_at, NOW()) <= 300 THEN 'Online'
+                    WHEN u.status = 'Deactivated' THEN 'Deactivated'
+                    WHEN u.last_active_at IS NOT NULL
+                         AND TIMESTAMPDIFF(SECOND, u.last_active_at, NOW()) <= 300 THEN 'Online'
                     ELSE 'Offline'
-                END AS status
-            FROM users 
-            WHERE role IN ('resident', 'barangay_official')
+                END AS status,
+                la.attempts AS failed_login_attempts,
+                la.locked_until,
+                CASE
+                    WHEN la.locked_until IS NOT NULL AND la.locked_until > NOW() THEN 1
+                    ELSE 0
+                END AS is_locked
+            FROM users u
+            LEFT JOIN login_attempts la ON la.email = u.email
+            WHERE u.role IN ('resident', 'barangay_official')
         `;
         const params = [];
         if (role && ['resident', 'barangay_official'].includes(role)) {
-            sql += ' AND role = ?';
+            sql += ' AND u.role = ?';
             params.push(role);
         }
         if (search) {
-            sql += ` AND (resident_id LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR address LIKE ?)`;
+            sql += ` AND (u.resident_id LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR u.address LIKE ?)`;
             const term = `%${search}%`;
             params.push(term, term, term, term, term);
         }
-        sql += ' ORDER BY user_id DESC';
+        sql += ' ORDER BY u.user_id DESC';
         const [results] = await db.query(sql, params);
-        res.json(formatRows(results, ["last_active_at"]));
+        res.json(formatRows(results, ["last_active_at", "locked_until"]));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch users.' });
@@ -744,6 +764,35 @@ exports.deleteUser = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to delete user.' });
+    }
+};
+
+/**
+ * Reset failed login attempts and clear the lock for a user.
+ * Used by the "Reset failed logins" action in User Management.
+ */
+exports.unlockLogin = async (req, res) => {
+    try {
+        const [user] = await db.query(
+            'SELECT user_id, resident_id, first_name, last_name, email FROM users WHERE user_id = ?',
+            [req.params.id]
+        );
+        if (user.length === 0) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        const { email, first_name, last_name, resident_id } = user[0];
+        await loginLimiter.clearFailures(email);
+
+        await logAudit(
+            req,
+            `Reset failed login attempts for ${resident_id || '#' + req.params.id} (${first_name} ${last_name})`
+        );
+
+        res.json({ message: 'Account unlocked. The user can log in again.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to unlock account.' });
     }
 };
 

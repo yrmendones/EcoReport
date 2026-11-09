@@ -366,7 +366,7 @@ CREATE TABLE IF NOT EXISTS qr_tokens (
 
 CREATE TABLE IF NOT EXISTS system_settings (
     id INT PRIMARY KEY DEFAULT 1,
-    barangay_name VARCHAR(255) NOT NULL DEFAULT 'Barangay Sto. Rosario Kanluran',
+    barangay_name VARCHAR(255) NOT NULL DEFAULT 'Barangay Sto. Rosario Kanlungan',
     contact_email VARCHAR(255) NULL,
     contact_number VARCHAR(20) NULL,
     address TEXT NULL,
@@ -381,7 +381,7 @@ CREATE TABLE IF NOT EXISTS system_settings (
     email_notifications BOOLEAN DEFAULT TRUE,
     announcement_alerts BOOLEAN DEFAULT TRUE,
     maintenance_mode BOOLEAN DEFAULT FALSE,
-    maintenance_message TEXT DEFAULT 'The app is under maintenance. Please try again later.',
+    maintenance_message VARCHAR(255) DEFAULT 'The app is under maintenance. Please try again later.',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT chk_settings_single_row CHECK (id = 1)
 );
@@ -399,8 +399,23 @@ CREATE TABLE IF NOT EXISTS report_categories (
 );
 
 -- ============================================================
+-- 28. LOGIN ATTEMPTS (rate limiting for failed logins)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS login_attempts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    attempts INT NOT NULL DEFAULT 0,
+    locked_until DATETIME NULL DEFAULT NULL,
+    last_attempt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_locked_until (locked_until),
+    INDEX idx_last_attempt (last_attempt_at)
+);
+
+-- ============================================================
 -- 26. SAMPLE DATA
 -- ============================================================
+
+INSERT IGNORE INTO system_settings (id) VALUES (1);
 
 INSERT IGNORE INTO report_categories (name, display_order) VALUES
 ('Air Pollution', 1),

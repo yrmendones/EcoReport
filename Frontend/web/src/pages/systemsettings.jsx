@@ -66,6 +66,12 @@ export default function SystemSettings() {
       setError("");
       const data = await apiFetch("/api/admin/settings");
 
+      const boolOr = (v, fallback) => {
+        if (v === true || v === 1) return true;
+        if (v === false || v === 0) return false;
+        return fallback;
+      };
+
       const normalized = {
         barangay_name: data.barangay_name || "",
         contact_email: data.contact_email || "",
@@ -78,10 +84,10 @@ export default function SystemSettings() {
         max_login_attempts: String(data.max_login_attempts ?? "5"),
         web_session_timeout: String(data.web_session_timeout ?? "30"),
         lockout_duration: String(data.lockout_duration ?? "15"),
-        require_strong_password: data.require_strong_password !== false,
-        email_notifications: data.email_notifications !== false,
-        announcement_alerts: data.announcement_alerts !== false,
-        maintenance_mode: data.maintenance_mode === true,
+        require_strong_password: boolOr(data.require_strong_password, true),
+        email_notifications: boolOr(data.email_notifications, true),
+        announcement_alerts: boolOr(data.announcement_alerts, true),
+        maintenance_mode: boolOr(data.maintenance_mode, false),
         maintenance_message:
           data.maintenance_message ||
           "The app is under maintenance. Please try again later.",
@@ -344,6 +350,9 @@ export default function SystemSettings() {
                       <input id="maxLoginAttempts" type="number" min="1" max="20"
                         value={settings.max_login_attempts}
                         onChange={(e) => handleChange("max_login_attempts", e.target.value)} />
+                      <span style={{ fontSize: "8px", color: "#9ca3af" }}>
+                        Failed attempts before the account is locked
+                      </span>
                     </div>
                     <div className="field">
                       <label htmlFor="webSessionTimeout">Web session timeout (minutes)</label>
@@ -360,6 +369,9 @@ export default function SystemSettings() {
                       onChange={(e) => handleChange("lockout_duration", e.target.value)}>
                       {LOCKOUT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
+                    <span style={{ fontSize: "8px", color: "#9ca3af" }}>
+                      How long the account stays locked. "Until admin unlocks" requires manual reset.
+                    </span>
                   </div>
 
                   <ToggleRow

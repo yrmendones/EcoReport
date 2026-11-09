@@ -10,7 +10,10 @@ router.post('/generate-qr-token', authenticate, publicController.generateQRToken
 // Verify token
 router.get('/verify-token/:token', publicController.verifyQRToken);
 
-// Report categories for the mobile app dropdown
+// System status (maintenance mode check)
 router.get('/status', settingsController.getPublicStatus);
+
+// Report categories for the mobile app dropdown
+router.get('/categories', settingsController.getPublicCategories);
 
 module.exports = router;

@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaCamera, FaSignOutAlt, FaSpinner, FaEye, FaEyeSlash } from "react-icons/fa";
 import { apiFetch } from "../api";
+import {
+  DEFAULT_PASSWORD_POLICY,
+  fetchPasswordPolicy,
+  validatePassword as validatePasswordPolicy,
+} from "../utils/passwordPolicy";
 import { getMenuItems } from "../menu";
 import ProfileHeaderButton from "../components/ProfileHeaderButton";
 
@@ -57,6 +62,16 @@ export default function Profile() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [pwdError, setPwdError] = useState("");
   const [pwdLoading, setPwdLoading] = useState(false);
+
+  const [passwordPolicy, setPasswordPolicy] = useState(DEFAULT_PASSWORD_POLICY);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPasswordPolicy(apiFetch).then((policy) => {
+      if (!cancelled) setPasswordPolicy(policy);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const fetchProfile = async () => {
     try {
@@ -259,8 +274,9 @@ export default function Profile() {
       setPwdError("All fields are required.");
       return;
     }
-    if (pwdForm.new_password.length < 8 || pwdForm.new_password.length > 16) {
-      setPwdError("New password must be between 8 and 16 characters.");
+    const pwCheck = validatePasswordPolicy(pwdForm.new_password, passwordPolicy);
+    if (!pwCheck.ok) {
+      setPwdError(pwCheck.error);
       return;
     }
     if (pwdForm.new_password !== pwdForm.confirm_password) {
@@ -640,7 +656,7 @@ export default function Profile() {
                     type={showNew ? "text" : "password"}
                     value={pwdForm.new_password}
                     onChange={(e) => setPwdForm({ ...pwdForm, new_password: e.target.value })}
-                    placeholder="Enter new password (8-16 characters)"
+                    placeholder={`Enter new password (${passwordPolicy.min}-${passwordPolicy.max} characters)`}
                     maxLength={16}
                     required
                     style={{ width: '100%', paddingRight: '40px' }}

@@ -31,6 +31,8 @@ exports.getSettings = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.updateSettings = async (req, res) => {
     try {
+        await db.query('INSERT IGNORE INTO system_settings (id) VALUES (1)');
+
         const {
             barangay_name, contact_email, contact_number, address,
             pending_flag_days, required_id_type, covered_zones,
@@ -150,16 +152,25 @@ exports.getPublicCategories = async (req, res) => {
 exports.getPublicStatus = async (req, res) => {
     try {
         const [rows] = await db.query(
-            'SELECT maintenance_mode, maintenance_message FROM system_settings WHERE id = 1'
+            `SELECT maintenance_mode, maintenance_message,
+                    min_password_length, require_strong_password
+             FROM system_settings WHERE id = 1`
         );
         const s = rows[0] || {};
         res.json({
             maintenance_mode: !!s.maintenance_mode,
             maintenance_message: s.maintenance_message || 'The app is under maintenance. Please try again later.',
+            min_password_length: Number(s.min_password_length) || 8,
+            require_strong_password: s.require_strong_password !== 0,
         });
     } catch (error) {
         console.error(error);
         // Fail-open so a DB hiccup never locks everyone out
-        res.json({ maintenance_mode: false, maintenance_message: '' });
+        res.json({
+            maintenance_mode: false,
+            maintenance_message: '',
+            min_password_length: 8,
+            require_strong_password: true,
+        });
     }
 };

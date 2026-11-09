@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -9,6 +9,11 @@ import {
   FaCheckCircle,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import {
+  DEFAULT_PASSWORD_POLICY,
+  fetchPasswordPolicy,
+  validatePassword as validatePasswordPolicy,
+} from "../../utils/passwordPolicy";
 
 const INPUT_CLASS =
   "w-full min-h-[52px] bg-white border border-[#C8DCC3] rounded-2xl text-[14px] outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10 transition";
@@ -29,6 +34,16 @@ export default function ChangePassword() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
+  const [passwordPolicy, setPasswordPolicy] = useState(DEFAULT_PASSWORD_POLICY);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPasswordPolicy(apiFetch).then((policy) => {
+      if (!cancelled) setPasswordPolicy(policy);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -40,8 +55,9 @@ export default function ChangePassword() {
       return;
     }
 
-    if (newPassword.length < 8 || newPassword.length > 16) {
-      setError("New password must be between 8 and 16 characters.");
+    const pwCheck = validatePasswordPolicy(newPassword, passwordPolicy);
+    if (!pwCheck.ok) {
+      setError(pwCheck.error);
       return;
     }
 
@@ -190,7 +206,7 @@ export default function ChangePassword() {
                     type={showNew ? "text" : "password"}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password (8-16 characters)"
+                    placeholder={`Enter new password (${passwordPolicy.min}-${passwordPolicy.max} characters)`}
                     maxLength={16}
                     className={INPUT_CLASS}
                     style={{ padding: "0 56px 0 16px" }}

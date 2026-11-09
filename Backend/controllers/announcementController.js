@@ -132,7 +132,7 @@ exports.updateAnnouncement = async (req, res) => {
 
         // Broadcast only on Draft → Published transition
         // Broadcast to residents only if published AND announcement_alerts is enabled
-        if (finalStatus === 'Published') {
+        if (statusChanged && status === 'Published') {
             const broadcastType =
                 category === 'Health'   ? 'Health Announcement' :
                 category === 'Disaster' ? 'Disaster Alert' :
@@ -150,7 +150,7 @@ exports.updateAnnouncement = async (req, res) => {
                         `New ${broadcastType}: ${title}`,
                         cleanContent,
                         broadcastType,
-                        result.insertId
+                        req.params.id
                     );
                 } catch (notifErr) {
                     console.error('Failed to broadcast announcement:', notifErr);

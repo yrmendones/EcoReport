@@ -95,7 +95,7 @@ export default function EnvironmentalMap() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [userLocation, setUserLocation] = useState(null);
+  const userLocationRef = useRef(null);
   const [gettingLocation, setGettingLocation] = useState(false);
 
   const defaultCenter = [
@@ -167,6 +167,8 @@ export default function EnvironmentalMap() {
     markersRef.current.forEach((m) => mapRef.current.removeLayer(m));
     markersRef.current = [];
 
+    // setUserLocation on the very first geolocation success.
+    const userLocation = userLocationRef.current;
     if (userLocation) {
       const userMarker = L.circleMarker([userLocation.lat, userLocation.lng], {
         radius: 8,
@@ -212,7 +214,8 @@ export default function EnvironmentalMap() {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const { latitude, longitude } = pos.coords;
-          setUserLocation({ lat: latitude, lng: longitude });
+          // Update the ref BEFORE fetchReports so renderMarkers sees fresh coords
+          userLocationRef.current = { lat: latitude, lng: longitude };
           if (mapRef.current) mapRef.current.setView([latitude, longitude], 15);
           fetchReports(latitude, longitude);
         },
@@ -236,7 +239,8 @@ export default function EnvironmentalMap() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        setUserLocation({ lat: latitude, lng: longitude });
+        // Update the ref BEFORE fetchReports so renderMarkers sees fresh coords
+        userLocationRef.current = { lat: latitude, lng: longitude };
         if (mapRef.current) mapRef.current.setView([latitude, longitude], 16);
         fetchReports(latitude, longitude);
         setGettingLocation(false);

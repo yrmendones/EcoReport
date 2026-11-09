@@ -1,6 +1,7 @@
 const db = require('../db');
 const bcrypt = require('bcrypt');
 const { sanitizeText } = require('../utils/sanitizeHtml');
+const { validatePassword } = require('../utils/passwordPolicy');
 
 exports.getProfile = async (req, res) => {
     try {
@@ -51,8 +52,11 @@ exports.changePassword = async (req, res) => {
             return res.status(400).json({ error: 'All fields required.' });
         if (new_password !== confirm_password)
             return res.status(400).json({ error: 'New passwords do not match.' });
-        if (new_password.length < 8 || new_password.length > 16)
-            return res.status(400).json({ error: 'Password must be between 8 and 16 characters.' });
+
+        const passwordCheck = await validatePassword(new_password);
+        if (!passwordCheck.ok) {
+            return res.status(400).json({ error: passwordCheck.error });
+        }
         const [users] = await db.query('SELECT password_hash FROM users WHERE user_id = ?', [req.user.id]);
         const match = await bcrypt.compare(current_password, users[0].password_hash);
         if (!match) return res.status(401).json({ error: 'Current password is incorrect.' });

@@ -17,6 +17,11 @@ import { PaddleOCR } from "@paddleocr/paddleocr-js";
 import * as faceapi from "face-api.js";
 import * as ort from "onnxruntime-web";
 import { apiFetch } from "../../api";
+import {
+  DEFAULT_PASSWORD_POLICY,
+  fetchPasswordPolicy,
+  validatePassword as validatePasswordPolicy,
+} from "../../utils/passwordPolicy";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -755,6 +760,17 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // ============ Load password policy from backend ============
+  const [passwordPolicy, setPasswordPolicy] = useState(DEFAULT_PASSWORD_POLICY);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPasswordPolicy(apiFetch).then((policy) => {
+      if (!cancelled) setPasswordPolicy(policy);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   // ============ Load face-api models once ============
   useEffect(() => {
     const loadModels = async () => {
@@ -1041,8 +1057,9 @@ export default function Register() {
       setLoading(false);
       return;
     }
-    if (formData.password.length < 8 || formData.password.length > 16) {
-      setError("Password must be between 8 and 16 characters.");
+    const pwCheck = validatePasswordPolicy(formData.password, passwordPolicy);
+    if (!pwCheck.ok) {
+      setError(pwCheck.error);
       setLoading(false);
       return;
     }
@@ -1319,7 +1336,7 @@ export default function Register() {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  placeholder="Enter password (8-16 characters)"
+                  placeholder={`Enter password (${passwordPolicy.min}-${passwordPolicy.max} characters)`}
                   maxLength={16}
                   autoComplete="new-password"
                   className="block w-full min-w-0 box-border min-h-[52px] rounded-2xl border border-[#8BB37A] bg-white text-[16px] text-gray-800 placeholder:text-gray-400 outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20"

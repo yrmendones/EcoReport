@@ -166,6 +166,22 @@ export default function UserManagement() {
     }
   };
 
+  const handleUnlock = async (user) => {
+    closeMenu();
+    if (!window.confirm(`Reset failed login attempts for ${getFullName(user)}?\n\nThey will be able to log in again immediately.`)) return;
+
+    setBusyId(user.user_id);
+    try {
+      await apiFetch(`/api/admin/users/${user.user_id}/unlock`, { method: "PUT" });
+      await fetchUsers();
+      alert("Account unlocked. The user can log in again.");
+    } catch (err) {
+      alert("Failed to unlock: " + err.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleDelete = async (user) => {
     closeMenu();
     const confirm1 = window.confirm(
@@ -307,17 +323,33 @@ export default function UserManagement() {
                               </span>
                             </td>
                             <td>
-                              <span
-                                className={`user-status ${
-                                  u.status === "Deactivated"
-                                    ? "deactivated"
-                                    : u.status === "Online"
-                                    ? "online"
-                                    : "offline"
-                                }`}
-                              >
-                                {u.status || "Offline"}
-                              </span>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span
+                                  className={`user-status ${
+                                    u.status === "Deactivated"
+                                      ? "deactivated"
+                                      : u.status === "Online"
+                                      ? "online"
+                                      : "offline"
+                                  }`}
+                                >
+                                  {u.status || "Offline"}
+                                </span>
+                                {u.is_locked ? (
+                                  <span
+                                    className="user-status deactivated"
+                                    title={
+                                      u.locked_until && new Date(u.locked_until).getFullYear() < 9999
+                                        ? `Locked until ${new Date(u.locked_until).toLocaleString("en-US", {
+                                            month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+                                          })}`
+                                        : "Locked until admin unlocks"
+                                    }
+                                  >
+                                    🔒 Locked
+                                  </span>
+                                ) : null}
+                              </div>
                             </td>
                             <td className="actions-cell">
                               <div
@@ -339,6 +371,15 @@ export default function UserManagement() {
 
                                 {openMenuId === u.user_id && (
                                   <div className="manage-menu">
+                                    {u.is_locked ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUnlock(u)}
+                                        style={{ color: "#B83232", fontWeight: 700 }}
+                                      >
+                                        🔓 Reset failed logins
+                                      </button>
+                                    ) : null}
                                     <button
                                       type="button"
                                       onClick={() => handleChangeRole(u)}
