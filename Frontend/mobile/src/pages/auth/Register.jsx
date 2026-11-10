@@ -16,14 +16,12 @@ import {
 import { PaddleOCR } from "@paddleocr/paddleocr-js";
 import * as faceapi from "face-api.js";
 import * as ort from "onnxruntime-web";
-import { apiFetch } from "../../api";
+import { apiFetch, API_BASE_URL } from "../../api";
 import {
   DEFAULT_PASSWORD_POLICY,
   fetchPasswordPolicy,
   validatePassword as validatePasswordPolicy,
 } from "../../utils/passwordPolicy";
-
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 // ============================================================
 // ORT CONFIG - must run before PaddleOCR.create()
@@ -1011,7 +1009,7 @@ export default function Register() {
     if (!file) return null;
     const fd = new FormData();
     fd.append("files", file);
-    const response = await fetch(`${API_BASE}/api/guest/upload`, {
+    const response = await fetch(`${API_BASE_URL}/api/guest/upload`, {
       method: "POST",
       body: fd,
     });

@@ -10,9 +10,10 @@ import {
   FaCheckCircle,
   FaHome,
 } from "react-icons/fa";
-import { apiFetch } from "../../api";
+import { apiFetch, API_BASE_URL } from "../../api";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// API_BASE_URL is imported from ../../api - uses the Vite
+// proxy in development and VITE_API_URL in production
 
 const LABEL_CLASS = "block text-[14px] font-extrabold text-gray-900";
 const ERROR_CLASS = "error-text text-red-500 text-[12px] leading-5";
@@ -216,7 +217,7 @@ export default function GuestReport() {
         const formData = new FormData();
         allFiles.forEach((item) => formData.append("files", item.file));
 
-        const uploadResponse = await fetch(`${API_BASE}/api/guest/upload`, {
+        const uploadResponse = await fetch(`${API_BASE_URL}/api/guest/upload`, {
           method: "POST",
           body: formData,
         });
@@ -240,7 +241,7 @@ export default function GuestReport() {
         media: uploadedMedia,
       };
 
-      const response = await fetch(`${API_BASE}/api/reports/guest`, {
+      const response = await fetch(`${API_BASE_URL}/api/reports/guest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(guestData),

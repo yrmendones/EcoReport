@@ -7,6 +7,8 @@ require('./db');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+app.set('trust proxy', 1);
+
 // MIDDLEWARE
 // Cors allows localhost, LAN IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x),
 app.use(cors({

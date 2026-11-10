@@ -1,6 +1,48 @@
 const db = require('../db');
 const { sanitizeText } = require('../utils/sanitizeHtml');
 
+// ─────────────────────────────────────────────────────────────
+// IP extraction
+// ─────────────────────────────────────────────────────────────
+function getClientIp(req) {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded) {
+        // Comma-separated chain, first entry = client
+        const first = String(forwarded).split(',')[0].trim();
+        if (first) return first;
+    }
+    if (req.ip) return req.ip;
+    if (req.socket?.remoteAddress) return req.socket.remoteAddress;
+    if (req.connection?.remoteAddress) return req.connection.remoteAddress;
+    return 'unknown';
+}
+
+function cleanIp(ip) {
+    return String(ip || 'unknown')
+        .replace(/^::ffff:/, '')   // IPv4-mapped IPv6 → plain IPv4
+        .replace(/^::1$/, '127.0.0.1')
+        .slice(0, 45);             // VARCHAR(45) safety for IPv6
+}
+
+// ─────────────────────────────────────────────────────────────
+// Manila-day boundaries, expressed as UTC DATETIME strings.
+// Assumes `submitted_at` is stored in UTC (Railway MySQL default). reset at 12:00 AM Manila
+// ─────────────────────────────────────────────────────────────
+function getManilaDayRangeUtc() {
+    const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
+    const manilaNow = new Date(Date.now() + MANILA_OFFSET_MS);
+    const y = manilaNow.getUTCFullYear();
+    const m = manilaNow.getUTCMonth();
+    const d = manilaNow.getUTCDate();
+    const startUtc = new Date(Date.UTC(y, m, d) - MANILA_OFFSET_MS);
+    const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000);
+    return { startUtc, endUtc };
+}
+
+function toMysqlDateTime(date) {
+    return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 exports.submitGuestReport = async (req, res) => {
     try {
         const {
@@ -19,21 +61,23 @@ exports.submitGuestReport = async (req, res) => {
             return res.status(400).json({ error: 'Mobile number must be 11 digits starting with 09 (e.g., 09123456789).' });
         }
 
-        const guest_ip = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
-        const cleanIp = guest_ip.replace(/^::ffff:/, '').replace(/^::1$/, '127.0.0.1');
+        const rawIp = getClientIp(req);
+        const ip = cleanIp(rawIp);
 
-        // Limit 1 guest report per IP per calendar day
-        // Ignore deleted reports so guests can re-report
+        // The day boundary uses Asia/Manila (UTC+8), NOT the MySQL server timezone. 
+        // So the limit resets at 12:00 AM Manila even if the DB is in UTC
+        const { startUtc, endUtc } = getManilaDayRangeUtc();
         const [existing] = await db.query(
             `SELECT COUNT(*) as count FROM environmental_reports 
              WHERE guest_ip = ? 
-               AND DATE(submitted_at) = CURDATE()
+               AND submitted_at >= ? 
+               AND submitted_at < ?
                AND status != 'deleted'`,
-            [cleanIp]
+            [ip, toMysqlDateTime(startUtc), toMysqlDateTime(endUtc)]
         );
         if (existing[0].count > 0) {
             return res.status(429).json({
-                error: 'You have already submitted an active report today. Guest users are limited to 1 report per day.'
+                error: 'You have already submitted a report today. Guest users are limited to 1 report per day'
             });
         }
 
@@ -48,7 +92,7 @@ exports.submitGuestReport = async (req, res) => {
             `INSERT INTO environmental_reports 
             (user_id, guest_name, guest_mobile, category, description, latitude, longitude, guest_ip, status, submitted_at) 
             VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())`,
-            [safeName, safeMobile, safeCategory, safeDescription, latitude || null, longitude || null, cleanIp]
+            [safeName, safeMobile, safeCategory, safeDescription, latitude || null, longitude || null, ip]
         );
         const reportId = result.insertId;
 
