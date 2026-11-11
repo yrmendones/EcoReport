@@ -14,7 +14,7 @@ import {
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
 
-/* ---------- Certificates and fees (edit these) ---------- */
+/* ---------- Certificates and fees ---------- */
 const CERTIFICATES = [
   { name: "Barangay Clearance", fee: null },
   { name: "Barangay ID", fee: 100 },
@@ -26,8 +26,16 @@ const CERTIFICATES = [
 
 const formatFee = (fee) => `₱${Number(fee).toFixed(2)}`;
 
-/* ---------- Barangay schedule (edit these) ---------- */
+const formatLongDate = (iso) =>
+  iso
+    ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : "—";
 
+/* ---------- Barangay schedule (edit these) ---------- */
 const CLOSED_WEEKDAYS = [0]; // 0 = Sunday, 6 = Saturday
 const CLOSED_DATES = []; // Holidays, e.g. ["2026-12-25", "2026-12-30"]
 
@@ -305,7 +313,9 @@ export default function CertificateRequest() {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  // Snapshot of the submitted request — drives the success screen.
+  // null = form is shown; object = success screen.
+  const [submitted, setSubmitted] = useState(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -343,7 +353,6 @@ export default function CertificateRequest() {
 
     setLoading(true);
     setError("");
-    setSuccess(false);
 
     try {
       const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -353,7 +362,7 @@ export default function CertificateRequest() {
         return;
       }
 
-      await apiFetch("/api/certificates", {
+      const data = await apiFetch("/api/certificates", {
         method: "POST",
         body: JSON.stringify({
           certificate_type: certificate,
@@ -364,15 +373,24 @@ export default function CertificateRequest() {
         }),
       });
 
-      setSuccess(true);
+      // Snapshot the submitted values BEFORE clearing the form so the
+      // success screen has them. The form is cleared right after, so
+      // "Make Another Certificate Request" opens a fresh, empty form.
+      setSubmitted({
+        reference: `ER-${new Date().getFullYear()}-${String(
+          data.certificate_request_id || 0
+        ).padStart(4, "0")}`,
+        certificate: certificate,
+        purpose: purpose,
+        date: date,
+        notes: notes,
+        fee: selectedCertificate?.fee ?? null,
+      });
+
       setCertificate("");
       setPurpose("");
       setDate("");
       setNotes("");
-
-      setTimeout(() => {
-        navigate("/resident-dashboard");
-      }, 2000);
     } catch (err) {
       console.error("Error submitting certificate request:", err);
       setError(err.message || "Failed to submit request. Please try again.");
@@ -448,6 +466,79 @@ export default function CertificateRequest() {
     );
   }
 
+  // ───────── SUCCESS SCREEN ─────────
+  // Shown after a successful submission. Mirrors the Appointment success
+  // screen — same phone frame, summary card, and two-action layout.
+  if (submitted) {
+    return (
+      <PhoneFrame>
+        <PageHeader
+          title="Certificate Request"
+          onBack={() => navigate("/resident-dashboard")}
+        />
+
+        <main
+          className="flex-1 overflow-y-auto no-scrollbar flex flex-col items-center text-center"
+          style={{ ...mainStyle, gap: "24px" }}
+        >
+          <div className="w-[100px] h-[100px] rounded-full bg-[#E8F5E3] flex items-center justify-center shrink-0">
+            <FaCheckCircle size={72} className="text-[#0B5D2A]" />
+          </div>
+
+          <div className="flex flex-col shrink-0" style={{ gap: "8px" }}>
+            <h2 className="text-[26px] font-extrabold text-[#0B5D2A] leading-tight">
+              Certificate Requested!
+            </h2>
+            <p className="text-[14px] text-gray-600 leading-6">
+              Your request was sent to the barangay. Wait for approval and
+              we'll notify you once it's ready for pick up.
+            </p>
+          </div>
+
+          {/* Summary card — never shrinks so all rows stay visible */}
+          <div className="w-full min-w-0 box-border shrink-0 bg-white rounded-2xl border border-[#D5E4D1] shadow-sm text-left flex flex-col overflow-hidden">
+            <SummaryRow label="Reference" value={submitted.reference} />
+            <SummaryRow label="Certificate Type" value={submitted.certificate} />
+            <SummaryRow label="Purpose" value={submitted.purpose} />
+            <SummaryRow
+              label="Preferred Release Date"
+              value={formatLongDate(submitted.date)}
+            />
+            <SummaryRow
+              label="Fee"
+              value={
+                submitted.fee == null
+                  ? "Ask the barangay"
+                  : formatFee(submitted.fee)
+              }
+              last={!submitted.notes}
+            />
+            {submitted.notes && (
+              <SummaryRow label="Notes" value={submitted.notes} last />
+            )}
+          </div>
+
+          <div className="w-full flex flex-col shrink-0" style={{ gap: "16px" }}>
+            <button
+              type="button"
+              onClick={() => navigate("/resident-dashboard")}
+              className="w-full min-h-[54px] bg-[#0B5D2A] text-white rounded-2xl font-extrabold text-[16px] shadow-md hover:bg-[#084A21] active:scale-[0.98] transition"
+            >
+              Back to Dashboard
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubmitted(null)}
+              className="w-full min-h-[54px] border border-[#0B5D2A] text-[#0B5D2A] rounded-2xl font-extrabold text-[16px] hover:bg-[#F0F8ED] active:scale-[0.98] transition"
+            >
+              Make Another Certificate Request
+            </button>
+          </div>
+        </main>
+      </PhoneFrame>
+    );
+  }
+
   return (
     <PhoneFrame>
       <PageHeader
@@ -475,16 +566,6 @@ export default function CertificateRequest() {
               </p>
             </div>
           </div>
-
-          {success && (
-            <div
-              className="bg-green-100 border border-green-400 rounded-xl flex items-center text-green-700 text-sm leading-6"
-              style={{ padding: "14px 16px", gap: "12px" }}
-            >
-              <FaCheckCircle size={20} className="shrink-0" />
-              <span>Certificate request submitted successfully!</span>
-            </div>
-          )}
 
           {error && (
             <div
@@ -593,20 +674,31 @@ export default function CertificateRequest() {
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={loading || success}
+              disabled={loading}
               className="w-full min-h-[54px] rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[16px] flex items-center justify-center shadow-md hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50"
             >
               {loading ? "Submitting..." : "Submit Request"}
             </button>
-
-            {success && (
-              <p className="text-center text-[14px] text-green-600 leading-6">
-                Redirecting to dashboard...
-              </p>
-            )}
           </div>
         </div>
       </main>
     </PhoneFrame>
+  );
+}
+
+/* ---------- Success summary row ---------- */
+function SummaryRow({ label, value, last = false }) {
+  return (
+    <div
+      className={`min-w-0 flex flex-col ${!last ? "border-b border-gray-200" : ""}`}
+      style={{ padding: "20px", gap: "8px" }}
+    >
+      <p className="text-[13px] font-extrabold text-gray-500 uppercase tracking-wide leading-5">
+        {label}
+      </p>
+      <p className="text-[16px] leading-6 font-extrabold text-gray-900 break-words [overflow-wrap:anywhere]">
+        {value || "—"}
+      </p>
+    </div>
   );
 }

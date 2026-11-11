@@ -65,7 +65,7 @@ exports.submitGuestReport = async (req, res) => {
         const ip = cleanIp(rawIp);
 
         // The day boundary uses Asia/Manila (UTC+8), NOT the MySQL server timezone. 
-        // So the limit resets at 12:00 AM Manila even if the DB is in UTC
+        // The limit resets at 12:00 AM Manila even if the DB is in UTC
         const { startUtc, endUtc } = getManilaDayRangeUtc();
         const [existing] = await db.query(
             `SELECT COUNT(*) as count FROM environmental_reports 

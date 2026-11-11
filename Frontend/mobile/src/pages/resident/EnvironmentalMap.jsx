@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaSpinner, FaLocationArrow } from "react-icons/fa";
 import { apiFetch } from "../../api";
@@ -95,8 +95,20 @@ export default function EnvironmentalMap() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const userLocationRef = useRef(null);
+  const [userLocation, setUserLocation] = useState(null);
   const [gettingLocation, setGettingLocation] = useState(false);
+  const [viewMode, setViewMode] = useState("all");
+  const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
+  const myUserId = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}").user_id || null;
+    } catch {
+      return null;
+    }
+  })();
+  const myReportCount = myUserId
+    ? reports.filter((r) => r.user_id === myUserId).length
+    : 0;
 
   const defaultCenter = [
     (BARANGAY_BOUNDS.north + BARANGAY_BOUNDS.south) / 2,
@@ -114,8 +126,8 @@ export default function EnvironmentalMap() {
     mapRef.current = L.map(mapContainerRef.current, {
       center: defaultCenter,
       zoom: 15,
-      maxBounds: bounds,
-      maxBoundsViscosity: 1.0,
+      maxBounds: L.latLngBounds(bounds).pad(0.25),
+      maxBoundsViscosity: 0.7,
     });
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -153,7 +165,6 @@ export default function EnvironmentalMap() {
       // Only exclude deleted reports; assigned shows up (as ongoing)
       const visible = data.filter((r) => r.status?.toLowerCase() !== "deleted");
       setReports(visible);
-      renderMarkers(visible);
     } catch (err) {
       console.error("Error fetching reports:", err);
       setError("Failed to load nearby reports.");
@@ -162,13 +173,12 @@ export default function EnvironmentalMap() {
     }
   };
 
-  const renderMarkers = (data) => {
+  const renderMarkers = useCallback((data) => {
     if (!mapRef.current) return;
     markersRef.current.forEach((m) => mapRef.current.removeLayer(m));
     markersRef.current = [];
 
-    // setUserLocation on the very first geolocation success.
-    const userLocation = userLocationRef.current;
+    // state changes, so the coordinates here are always fresh.
     if (userLocation) {
       const userMarker = L.circleMarker([userLocation.lat, userLocation.lng], {
         radius: 8,
@@ -196,18 +206,38 @@ export default function EnvironmentalMap() {
         icon: createPinIcon(report.status),
       })
         .addTo(mapRef.current)
-        .bindPopup(`
-          <div style="font-family: Arial; padding: 4px; max-width: 220px; line-height: 1.5;">
+        .bindPopup(
+          `
+          <div style="font-family: Arial; padding: 4px; line-height: 1.5;">
             <strong style="font-size: 13px;">${esc(report.category || "Report")}</strong><br/>
             <span style="font-size: 11px; color: #666;">${esc(report.address || "Location")}</span><br/>
             <span style="font-size: 11px; color: #666;">Reported by: <strong>${esc(reporter)}</strong></span><br/>
             <span style="font-size: 11px; color: #999;">Status: ${esc(displayStatus.toUpperCase())}</span>
           </div>
-        `);
+          `,
+          {
+            autoPan: true,
+            autoPanPadding: [20, 55],
+            maxWidth: 240,
+            minWidth: 180,
+            closeButton: true,
+            autoClose: true,
+            closeOnClick: true,
+          }
+        );
 
       markersRef.current.push(marker);
     });
-  };
+  }, [userLocation]);
+
+  // Re-render markers whenever reports change OR the "show only mine" filter toggles.
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const filtered = viewMode === "mine"
+      ? reports.filter((r) => r.user_id === myUserId)
+      : reports;
+    renderMarkers(filtered);
+  }, [reports, viewMode, myUserId, renderMarkers]);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -215,7 +245,7 @@ export default function EnvironmentalMap() {
         (pos) => {
           const { latitude, longitude } = pos.coords;
           // Update the ref BEFORE fetchReports so renderMarkers sees fresh coords
-          userLocationRef.current = { lat: latitude, lng: longitude };
+          setUserLocation({ lat: latitude, lng: longitude });
           if (mapRef.current) mapRef.current.setView([latitude, longitude], 15);
           fetchReports(latitude, longitude);
         },
@@ -240,7 +270,7 @@ export default function EnvironmentalMap() {
       (pos) => {
         const { latitude, longitude } = pos.coords;
         // Update the ref BEFORE fetchReports so renderMarkers sees fresh coords
-        userLocationRef.current = { lat: latitude, lng: longitude };
+        setUserLocation({ lat: latitude, lng: longitude });
         if (mapRef.current) mapRef.current.setView([latitude, longitude], 16);
         fetchReports(latitude, longitude);
         setGettingLocation(false);
@@ -282,7 +312,7 @@ export default function EnvironmentalMap() {
         >
           <div
             className="relative rounded-2xl overflow-hidden border border-[#C8DCC3] bg-[#DCEFD8] shadow-sm"
-            style={{ height: "clamp(220px, 34dvh, 300px)" }}
+            style={{ height: "clamp(260px, 40dvh, 340px)" }}
           >
             <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
             {loading && (
@@ -290,6 +320,115 @@ export default function EnvironmentalMap() {
                 <FaSpinner className="animate-spin text-[#0B5D2A]" size={30} />
               </div>
             )}
+            {/* Report visibility filter */}
+            <div className="absolute top-3 right-3 z-[1000]">
+              <button
+                type="button"
+                onClick={() => setViewDropdownOpen((v) => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={viewDropdownOpen}
+                className="h-8 px-2.5 bg-white rounded-md shadow-md flex items-center gap-1.5 text-[12px] font-extrabold text-[#0B5D2A] active:scale-95 transition"
+              >
+                <span className="whitespace-nowrap">
+                  {viewMode === "mine" ? "My Reports" : "All Reports"}
+                </span>
+                {viewMode === "mine" && myReportCount > 0 && (
+                  <span className="bg-[#E8F5E3] text-[#0B5D2A] text-[10px] font-extrabold px-1.5 py-0.5 rounded leading-none">
+                    {myReportCount}
+                  </span>
+                )}
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#0B5D2A"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{
+                    transform: viewDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.15s ease",
+                    flexShrink: 0,
+                  }}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+
+              {viewDropdownOpen && (
+                <>
+                  {/* Click-away backdrop */}
+                  <div
+                    className="fixed inset-0 z-[999]"
+                    onClick={() => setViewDropdownOpen(false)}
+                    aria-hidden="true"
+                  />
+                  <div
+                    role="listbox"
+                    className="absolute top-9 right-0 z-[1000] bg-white rounded-md shadow-lg overflow-hidden min-w-[160px] border border-[#C8DCC3]"
+                  >
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={viewMode === "all"}
+                      onClick={() => {
+                        setViewMode("all");
+                        setViewDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2.5 text-[12px] font-bold flex items-center justify-between gap-3 transition ${
+                        viewMode === "all"
+                          ? "bg-[#E8F5E3] text-[#0B5D2A]"
+                          : "text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      <span>All Reports</span>
+                      {viewMode === "all" && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0B5D2A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={viewMode === "mine"}
+                      onClick={() => {
+                        if (myReportCount === 0) {
+                          alert(
+                            "You haven't submitted any reports yet. This filter only shows reports you've created."
+                          );
+                          return;
+                        }
+                        setViewMode("mine");
+                        setViewDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2.5 text-[12px] font-bold flex items-center justify-between gap-3 transition border-t border-[#E5EBE5] ${
+                        viewMode === "mine"
+                          ? "bg-[#E8F5E3] text-[#0B5D2A]"
+                          : "text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>My Reports</span>
+                        {myReportCount > 0 && (
+                          <span className="bg-[#E8F5E3] text-[#0B5D2A] text-[10px] font-extrabold px-1.5 py-0.5 rounded leading-none">
+                            {myReportCount}
+                          </span>
+                        )}
+                      </span>
+                      {viewMode === "mine" && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0B5D2A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
             <button
               type="button"
               onClick={handleGetLocation}

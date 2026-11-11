@@ -14,14 +14,19 @@ const MARKER_COLOR = "#0B5D2A";
 const createDragMarkerIcon = () =>
   L.divIcon({
     html: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="36" height="36" fill="${MARKER_COLOR}" style="filter: drop-shadow(0 3px 4px rgba(0,0,0,0.45));">
-        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-      </svg>
+      <div style="position: relative; width: 56px; height: 56px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45));">
+        <!-- Pulsing halo draws attention to the marker -->
+        <div class="eco-marker-halo"></div>
+        <!-- Pin itself -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="56" height="56" fill="${MARKER_COLOR}" style="position: relative; display: block;">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+      </div>
     `,
     className: "custom-drag-marker",
-    iconSize: [36, 36],
-    iconAnchor: [18, 36],
-    popupAnchor: [0, -36],
+    iconSize: [56, 56],
+    iconAnchor: [28, 56],
+    popupAnchor: [0, -56],
   });
 
 export default function ReportLocation() {
@@ -71,6 +76,33 @@ export default function ReportLocation() {
   const [gettingLocation, setGettingLocation] = useState(false);
   const [mapInitialized, setMapInitialized] = useState(false);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
+
+  // Inject the pulsing halo animation once. Cleaning up on unmount keeps
+  // StrictMode double-renders from leaving duplicate <style> tags behind.
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.id = "eco-marker-halo-style";
+    style.textContent = `
+      .eco-marker-halo {
+        position: absolute;
+        inset: 8px;
+        border-radius: 50%;
+        background: rgba(11, 93, 42, 0.30);
+        pointer-events: none;
+        animation: eco-halo-pulse 1.8s ease-out infinite;
+      }
+      @keyframes eco-halo-pulse {
+        0%   { transform: scale(1);   opacity: 0.55; }
+        70%  { transform: scale(1.9); opacity: 0; }
+        100% { transform: scale(1.9); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      const existing = document.getElementById("eco-marker-halo-style");
+      if (existing) existing.remove();
+    };
+  }, []);
 
   // Ray-casting point-in-polygon test
   const isPointInPolygon = (lat, lng, polygon) => {
@@ -151,6 +183,34 @@ export default function ReportLocation() {
       setError("");
     });
 
+    // Tap-to-place: single tap anywhere on the map moves the pin there.
+    mapRef.current.on("click", (e) => {
+      // Ignore clicks that land on the marker or an open popup otherwise
+      // tapping the pin would try to re-place it, causing jitter.
+      const target = e.originalEvent?.target;
+      if (target && target.closest) {
+        if (target.closest(".leaflet-marker-icon")) return;
+        if (target.closest(".leaflet-popup")) return;
+      }
+
+      const { lat, lng } = e.latlng;
+
+      if (!isValidLocation(lat, lng)) {
+        setError(
+          "Please tap inside Barangay Sto. Rosario Kanluran. Taps outside the barangay boundary are ignored."
+        );
+        return;
+      }
+
+      marker.setLatLng([lat, lng]);
+      setFormData({
+        latitude: lat.toFixed(6),
+        longitude: lng.toFixed(6),
+      });
+      setHasUserInteracted(true);
+      setError("");
+    });
+
     setMapInitialized(true);
 
     // Make sure the map measures its container after the layout is ready,
@@ -195,7 +255,7 @@ export default function ReportLocation() {
 
   const getLocation = () => {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser. Please drag the marker to your location.");
+      alert("Geolocation is not supported by your browser. Please tap on the map or drag the pin to your location.");
       return;
     }
 
@@ -404,7 +464,7 @@ export default function ReportLocation() {
             </p>
             {!hasUserInteracted && (
               <p className="text-[14px] text-[#B8791F] font-bold leading-6">
-                ⚠️ Please drag the marker or use GPS to set your location
+                ⚠️ Tap the map, drag the pin, or use GPS to set your location
               </p>
             )}
           </div>
@@ -436,7 +496,7 @@ export default function ReportLocation() {
                 className="text-[13px] leading-5 text-gray-500 text-center"
                 style={{ marginTop: "10px" }}
               >
-                Drag the marker to your location (must be within Barangay Sto. Rosario Kanluran)
+                Tap anywhere on the map to place the pin, or drag it — must be within Barangay Sto. Rosario Kanluran
               </p>
             </div>
 
@@ -521,7 +581,7 @@ export default function ReportLocation() {
             </button>
             {!hasUserInteracted && !loading && (
               <p className="text-[13px] leading-5 text-gray-500 text-center">
-                Drag the marker on the map to enable submission
+                Tap or drag the pin on the map to enable submission
               </p>
             )}
           </div>

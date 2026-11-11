@@ -66,6 +66,7 @@ export default function MapPage() {
   const mapRef = useRef(null);
   const mapContainerRef = useRef(null);
   const markersRef = useRef([]);
+  const initialFitRef = useRef(false);
   const menuItems = getMenuItems();
 
   const [category, setCategory] = useState("All");
@@ -223,9 +224,10 @@ export default function MapPage() {
       markersRef.current.push(marker);
     });
 
-    if (validReports.length > 0) {
+    if (validReports.length > 0 && !initialFitRef.current) {
       const group = L.featureGroup(markersRef.current);
       map.fitBounds(group.getBounds(), { padding: [30, 30] });
+      initialFitRef.current = true;
     }
   }, [reports]);
 
