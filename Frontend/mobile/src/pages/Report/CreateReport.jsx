@@ -90,18 +90,6 @@ export default function CreateReport() {
 
   return (
     <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">
-      {/* Hides the scrollbar but the page can still be scrolled */}
-      <style>{`
-        .hide-scrollbar {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-        }
-        .hide-scrollbar::-webkit-scrollbar {
-          display: none;
-          width: 0;
-          height: 0;
-        }
-      `}</style>
 
       {/* Full screen on phones, phone frame only on sm and up */}
       <div className="relative w-full h-[100dvh] sm:w-[390px] sm:h-[844px] bg-[#F8FAF8] sm:rounded-[40px] sm:border-[5px] sm:border-white sm:shadow-2xl overflow-hidden flex flex-col">
@@ -126,12 +114,10 @@ export default function CreateReport() {
 
         {/* SCROLLABLE CONTENT */}
         <main
-          className="hide-scrollbar flex-1 overflow-y-auto flex flex-col"
+          className="mobile-scroll flex-1 overflow-y-auto flex flex-col"
           style={{
             padding: "28px 24px 32px",
             gap: "28px",
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
           }}
         >
           {/* STEP */}

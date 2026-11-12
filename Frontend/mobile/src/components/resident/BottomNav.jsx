@@ -54,14 +54,14 @@ export default function BottomNav() {
       label: "Home",
       path: "/resident-dashboard",
       matches: ["/resident-dashboard"],
-      color: "#bbf18f", // green
+      color: "#bbf18f", // unified green
     },
     {
       icon: <FaClipboardList />,
       label: "Reports",
       path: "/my-reports",
       matches: ["/my-reports", "/report-details", "/report-status"],
-      color: "#7dd3fc", // sky blue
+      color: "#bbf18f", // unified green
     },
     {
       icon: <FaPlus />,
@@ -76,7 +76,7 @@ export default function BottomNav() {
       label: "Notification",
       path: "/notifications",
       matches: ["/notifications", "/notification-detail"],
-      color: "#fde68a", // amber
+      color: "#bbf18f", // unified green
     },
     {
       icon: <FaUser />,
@@ -89,7 +89,7 @@ export default function BottomNav() {
         "/qr-code",
         "/privacy-settings",
       ],
-      color: "#f9a8d4", // pink
+      color: "#bbf18f", // unified green
     },
   ];
 

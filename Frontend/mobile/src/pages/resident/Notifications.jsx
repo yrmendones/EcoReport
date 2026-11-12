@@ -8,6 +8,7 @@ import {
   FaSpinner,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import BottomNav from "../../components/resident/BottomNav";
 
 // Safe HTML → plain-text conversion for the list preview.
 const stripHtml = (html) => {
@@ -196,7 +197,7 @@ export default function Notifications() {
         <main
           className="flex-1 overflow-y-auto no-scrollbar flex flex-col"
           style={{
-            padding: "28px 24px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
+            padding: "28px 24px max(140px, calc(env(safe-area-inset-bottom) + 120px))",
             gap: "24px",
           }}
         >
@@ -308,6 +309,10 @@ export default function Notifications() {
             )}
           </div>
         </main>
+
+        <div className="absolute bottom-0 left-0 right-0 z-30">
+          <BottomNav />
+        </div>
       </div>
     </div>
   );

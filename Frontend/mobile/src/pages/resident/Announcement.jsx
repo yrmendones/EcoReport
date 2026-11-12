@@ -34,12 +34,6 @@ const toLabel = (value) => {
 // Announcements without a category go under "others"
 const getCategoryKey = (item) => normalize(item.category) || "others";
 
-// Hides the scrollbar in every browser, scrolling still works
-const hideScrollbarStyle = {
-  scrollbarWidth: "none",
-  msOverflowStyle: "none",
-};
-
 export default function Announcement() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("all");
@@ -85,14 +79,6 @@ export default function Announcement() {
 
   return (
     <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">
-      {/* Hides the scrollbar (Chrome, Safari, Edge) */}
-      <style>{`
-        .no-bar::-webkit-scrollbar {
-          display: none;
-          width: 0;
-          height: 0;
-        }
-      `}</style>
 
       {/* Full screen on phones, phone frame only on sm and up */}
       <div className="relative w-full h-[100dvh] sm:w-[390px] sm:h-[844px] bg-[#F8FAF8] sm:rounded-[40px] sm:border-[5px] sm:border-white sm:shadow-2xl overflow-hidden flex flex-col">
@@ -116,9 +102,8 @@ export default function Announcement() {
 
         {/* CONTENT */}
         <main
-          className="no-bar flex-1 overflow-y-auto flex flex-col"
+          className="mobile-scroll flex-1 overflow-y-auto flex flex-col"
           style={{
-            ...hideScrollbarStyle,
             padding: "32px 24px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
             gap: "28px",
           }}
