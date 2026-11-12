@@ -37,10 +37,16 @@ try {
 }
 
 // ============================================================
-// CONSTANTS
+// FACE VERIFICATION TOGGLE
 // ============================================================
+// `true`  = require ID face detection + live selfie capture during
+//           registration. The admin still reviews manually.
+// `false` = skip face section entirely (temporary bypass).
 const REQUIRE_FACE_VERIFICATION = true;
 
+// ============================================================
+// CONSTANTS
+// ============================================================
 const STREETS = [
   "A. Mariano Street", "Alagao Street", "Apitong Street", "Banaba Street",
   "C. Lorenzo Street", "Camia Street", "Capitan E. Alvero Street",
@@ -57,14 +63,7 @@ const STREETS = [
 
 // ── Street matching ────────────────────────────────────────
 // Restricts the current-address Street field to the STREETS list,
-// tolerating common typos: missing periods, extra spaces, partial names.
-//
-// normalizeStreet("A. Mariano")  → "a mariano"
-// normalizeStreet("a mariano st") → "a mariano st"
-//
-// findMatchingStreet("mariano")  → "A. Mariano Street"
-// findMatchingStreet("A Mariano") → "A. Mariano Street"
-// findMatchingStreet("zzz")       → null
+// tolerating typos: missing periods, extra spaces, partial keywords.
 const STREET_STOPWORDS = new Set([
   "street", "st", "ave", "avenue", "compound", "comp", "the", "and",
 ]);
@@ -73,8 +72,8 @@ function normalizeStreet(str) {
   return String(str || "")
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")   // strip diacritics
-    .replace(/[^a-z0-9\s]/g, " ")      // periods/commas/punct → space
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -83,25 +82,20 @@ function findMatchingStreet(typed) {
   const n = normalizeStreet(typed);
   if (!n) return null;
 
-  // Exact match after normalization
   for (const s of STREETS) {
     if (normalizeStreet(s) === n) return s;
   }
 
-  // Typed value is a substring of a street name
   const contains = STREETS.filter((s) => normalizeStreet(s).includes(n));
   if (contains.length === 1) return contains[0];
   if (contains.length > 1) {
-    // Ambiguous - prefer the shortest (most specific to the user's intent)
     return [...contains].sort((a, b) => a.length - b.length)[0];
   }
 
-  // Street name is contained in the typed value (user pasted full address)
   for (const s of STREETS) {
     if (n.includes(normalizeStreet(s))) return s;
   }
 
-  // Token overlap - ignore generic words like "street"
   const typedTokens = n.split(" ").filter((t) => t && !STREET_STOPWORDS.has(t));
   if (typedTokens.length === 0) return null;
 
@@ -139,17 +133,11 @@ const ID_TYPE_KEYWORDS = {
   "Barangay ID": ["BARANGAY", "BRGY"],
   "Driver's License": ["DRIVER", "LICENSE", "LTO"],
   "ePhilID / Digital National ID": [
-    "EPHILID",
-    "PHILID",
-    "PHILSYS",
-    "PHILIPPINE IDENTIFICATION",
+    "EPHILID", "PHILID", "PHILSYS", "PHILIPPINE IDENTIFICATION",
     "PAMBANSANG PAGKAKAKILANLAN",
   ],
   "National ID (PhilID)": [
-    "PHILID",
-    "PHILSYS",
-    "PHILIPPINE IDENTIFICATION",
-    "NATIONAL ID",
+    "PHILID", "PHILSYS", "PHILIPPINE IDENTIFICATION", "NATIONAL ID",
     "PAMBANSANG PAGKAKAKILANLAN",
   ],
   "National Police Clearance": ["POLICE", "CLEARANCE", "PNP"],
@@ -157,10 +145,7 @@ const ID_TYPE_KEYWORDS = {
   "Postal ID": ["POSTAL", "PHLPOST"],
   "Senior Citizen ID": ["SENIOR", "OSCA"],
   "Unified Multi-purpose ID (UMID)": [
-    "UMID",
-    "UNIFIED MULTI-PURPOSE",
-    "SSS",
-    "GSIS",
+    "UMID", "UNIFIED MULTI-PURPOSE", "SSS", "GSIS",
   ],
 };
 
@@ -187,9 +172,7 @@ function looksLikeValidId(ocrText, idType) {
   const text = normalizeText(ocrText);
   const keywords = (ID_TYPE_KEYWORDS[idType] || []).map(normalizeText);
   const hasIdKeyword = keywords.some((k) => text.includes(k));
-  const hasPhMarker = PH_MARKERS.map(normalizeText).some((m) =>
-    text.includes(m)
-  );
+  const hasPhMarker = PH_MARKERS.map(normalizeText).some((m) => text.includes(m));
   return hasIdKeyword || hasPhMarker;
 }
 
@@ -254,7 +237,7 @@ const fileToDataUrl = (file) =>
   });
 
 // ============================================================
-// CAMERA MODAL — new full-screen UI with optional live face check
+// CAMERA MODAL
 // ============================================================
 function CameraModal({
   title,
@@ -273,6 +256,15 @@ function CameraModal({
   const [busy, setBusy] = useState(false);
   const [camError, setCamError] = useState("");
   const [isFaceDetected, setIsFaceDetected] = useState(false);
+
+  // 5-second fallback — allow capture even if face detection doesn't fire,
+  // so residents are never stuck on the camera screen.
+  const [fallbackReady, setFallbackReady] = useState(false);
+  useEffect(() => {
+    if (!enableLiveFaceCheck) return;
+    const t = setTimeout(() => setFallbackReady(true), 5000);
+    return () => clearTimeout(t);
+  }, [enableLiveFaceCheck]);
 
   useEffect(() => {
     let cancelled = false;
@@ -300,8 +292,7 @@ function CameraModal({
 
         if (enableLiveFaceCheck && modelsLoaded) {
           detectionIntervalRef.current = setInterval(async () => {
-            if (cancelled || !videoRef.current || !videoRef.current.videoWidth)
-              return;
+            if (cancelled || !videoRef.current || !videoRef.current.videoWidth) return;
             try {
               const detection = await faceapi.detectSingleFace(
                 videoRef.current,
@@ -336,15 +327,15 @@ function CameraModal({
     };
   }, [facing, enableLiveFaceCheck, modelsLoaded]);
 
-    const handleCapture = () => {
+  const handleCapture = () => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
     setBusy(true);
     setCamError("");
 
-    // Cap capture at 1280px on the longest side - 4K phone cameras produce
-    // 2-5 MB JPEGs that time out on mobile WiFi and break compression.
-    // 1280px is more than enough resolution for a face or an ID card.
+    // Cap capture at 1280px on the longest side — 4K phone cameras produce
+    // 2-5 MB JPEGs that time out on mobile WiFi. 1280px is more than enough
+    // resolution for a face or an ID card.
     const MAX_DIM = 1280;
     let width = video.videoWidth;
     let height = video.videoHeight;
@@ -369,7 +360,6 @@ function CameraModal({
         const file = new File([blob], `${Date.now()}.jpg`, {
           type: "image/jpeg",
         });
-        // Debug — remove after confirming the fix works
         console.log(`[capture] ${width}x${height} — ${(file.size / 1024).toFixed(0)} KB`);
         onCapture(file);
       },
@@ -377,17 +367,6 @@ function CameraModal({
       0.85
     );
   };
-
-  // Face-detection fallback — if the models fail to load or the detector
-  // doesn't fire within 5 seconds, allow capture anyway. The admin still
-  // reviews the selfie manually; blocking the resident forever is worse
-  // than a slightly less "verified" capture.
-  const [fallbackReady, setFallbackReady] = useState(false);
-  useEffect(() => {
-    if (!enableLiveFaceCheck) return;
-    const t = setTimeout(() => setFallbackReady(true), 5000);
-    return () => clearTimeout(t);
-  }, [enableLiveFaceCheck]);
 
   const liveCheckReady =
     !enableLiveFaceCheck ||
@@ -536,9 +515,7 @@ function TermsModal({ onClose, onAgree }) {
           </p>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              1. Acceptance of Terms
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">1. Acceptance of Terms</h3>
             <p>
               By registering for or using the Barangay EcoReport System, you
               acknowledge that you have read, understood, and agreed to these
@@ -548,9 +525,7 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              2. Purpose of the System
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">2. Purpose of the System</h3>
             <p>
               The Barangay EcoReport System is designed to help residents report
               environmental concerns, monitor the status of submitted reports,
@@ -560,9 +535,7 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              3. Account Registration and Responsibilities
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">3. Account Registration and Responsibilities</h3>
             <p>
               Users must provide accurate, complete, and updated information when
               registering. Each user is responsible for maintaining the
@@ -573,9 +546,7 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              4. Submission of Environmental Reports
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">4. Submission of Environmental Reports</h3>
             <p>
               Users must provide truthful and accurate information when
               submitting environmental reports. Reports may include descriptions,
@@ -591,9 +562,7 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              5. Uploaded Photos, Videos, and Other Evidence
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">5. Uploaded Photos, Videos, and Other Evidence</h3>
             <p>
               Users must ensure that uploaded photos, videos, and other evidence
               are relevant to their reports and do not unlawfully violate the
@@ -607,9 +576,7 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              6. Report Status and Response Time
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">6. Report Status and Response Time</h3>
             <p>
               Users may track the status of their submitted reports through the
               system. Report statuses and updates are provided for information
@@ -626,26 +593,14 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              7. Proper Use of the System
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">7. Proper Use of the System</h3>
             <p>Users agree not to:</p>
             <ul className="list-disc pl-5 mt-2 space-y-1">
               <li>Provide false identities or impersonate another person.</li>
-              <li>
-                Submit fraudulent, abusive, or intentionally misleading reports.
-              </li>
-              <li>
-                Attempt to access another user's account or private information
-                without authorization.
-              </li>
-              <li>
-                Interfere with, damage, or disrupt the system or its services.
-              </li>
-              <li>
-                Use the system for unlawful activities or purposes unrelated to
-                its intended functions.
-              </li>
+              <li>Submit fraudulent, abusive, or intentionally misleading reports.</li>
+              <li>Attempt to access another user's account or private information without authorization.</li>
+              <li>Interfere with, damage, or disrupt the system or its services.</li>
+              <li>Use the system for unlawful activities or purposes unrelated to its intended functions.</li>
             </ul>
             <p className="mt-2">
               Violations may result in account restrictions or other appropriate
@@ -654,9 +609,7 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              8. Privacy and Personal Information
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">8. Privacy and Personal Information</h3>
             <p>
               The system may collect personal information necessary to provide
               its services, verify accounts, process reports, communicate
@@ -673,9 +626,7 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              9. Data Accuracy and System Availability
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">9. Data Accuracy and System Availability</h3>
             <p>
               Users are responsible for the accuracy of the information they
               submit. The system administrators will take reasonable steps to
@@ -690,9 +641,7 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              10. Third-Party Services and External Links
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">10. Third-Party Services and External Links</h3>
             <p>
               The system may contain links to external websites or services for
               additional information or assistance. These external services may
@@ -703,9 +652,7 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              11. Account Suspension or Restriction
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">11. Account Suspension or Restriction</h3>
             <p>
               The system administrators may investigate suspected misuse and
               restrict, suspend, or disable accounts when there are reasonable
@@ -715,9 +662,7 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              12. Changes to These Terms
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">12. Changes to These Terms</h3>
             <p>
               These Terms and Conditions may be revised when necessary to reflect
               changes in system features, operational procedures, or applicable
@@ -729,9 +674,7 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              13. Limitation of Responsibility
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">13. Limitation of Responsibility</h3>
             <p>
               The system is provided to support communication between residents
               and barangay personnel. To the extent permitted by applicable law,
@@ -744,9 +687,7 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              14. Governing Laws
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">14. Governing Laws</h3>
             <p>
               These Terms and Conditions shall be interpreted in accordance with
               applicable laws and regulations of the Republic of the Philippines.
@@ -754,9 +695,7 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              15. Contact and Assistance
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">15. Contact and Assistance</h3>
             <p>
               For questions, concerns, or assistance regarding the Barangay
               EcoReport System, users may contact the authorized barangay office
@@ -766,9 +705,7 @@ function TermsModal({ onClose, onAgree }) {
           </section>
 
           <section>
-            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">
-              16. Agreement and Consent
-            </h3>
+            <h3 className="font-bold text-[#0B5D2A] text-sm mb-1">16. Agreement and Consent</h3>
             <p>
               By checking the acceptance box or selecting the designated
               agreement button, you confirm that you have read and understood
@@ -828,12 +765,22 @@ export default function Register() {
   const [streetError, setStreetError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
 
+  // ---------- Password policy ----------
+  const [passwordPolicy, setPasswordPolicy] = useState(DEFAULT_PASSWORD_POLICY);
+  useEffect(() => {
+    let cancelled = false;
+    fetchPasswordPolicy(apiFetch).then((policy) => {
+      if (!cancelled) setPasswordPolicy(policy);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   // ---------- ID + OCR + face ----------
   const [residentIdFile, setResidentIdFile] = useState(null);
   const [residentIdPreview, setResidentIdPreview] = useState(null);
 
   const [ocrText, setOcrText] = useState("");
-  const [ocrScanStatus, setOcrScanStatus] = useState("idle"); // idle | scanning | done | error
+  const [ocrScanStatus, setOcrScanStatus] = useState("idle");
   const [ocrScanError, setOcrScanError] = useState("");
   const [ocrValidation, setOcrValidation] = useState({ passed: false, reason: "" });
   const ocrRunIdRef = useRef(0);
@@ -850,24 +797,13 @@ export default function Register() {
   const [facePreview, setFacePreview] = useState(null);
 
   // ---------- UI ----------
-  const [cameraMode, setCameraMode] = useState(null); // null | "id" | "face"
+  const [cameraMode, setCameraMode] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // ============ Load password policy from backend ============
-  const [passwordPolicy, setPasswordPolicy] = useState(DEFAULT_PASSWORD_POLICY);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchPasswordPolicy(apiFetch).then((policy) => {
-      if (!cancelled) setPasswordPolicy(policy);
-    });
-    return () => { cancelled = true; };
-  }, []);
 
   // ============ Load face-api models once ============
   useEffect(() => {
@@ -889,7 +825,7 @@ export default function Register() {
     loadModels();
   }, []);
 
-  // ============ OCR engine (cached across remounts) ============
+  // ============ OCR engine ============
   const getOcrEngine = async () => {
     if (window.__ecoOcrEngine) {
       ocrEngineRef.current = window.__ecoOcrEngine;
@@ -954,7 +890,6 @@ export default function Register() {
         return;
       }
 
-      // Store descriptor for future use (not compared to the selfie anymore).
       setIdDescriptor(detection.descriptor);
       setIdFaceFound(true);
     } catch (err) {
@@ -1005,10 +940,7 @@ export default function Register() {
     }
     const idOk = looksLikeValidId(ocrText, idType);
     if (!idOk) {
-      setOcrValidation({
-        passed: false,
-        reason: "This doesn't look like a valid ID.",
-      });
+      setOcrValidation({ passed: false, reason: "This doesn't look like a valid ID." });
       return;
     }
     const nameOk = matchesName(ocrText, formData);
@@ -1021,13 +953,101 @@ export default function Register() {
     }
     setOcrValidation({ passed: true, reason: "" });
   }, [
-    ocrText,
-    ocrScanStatus,
-    formData.first_name,
-    formData.middle_name,
-    formData.last_name,
+    ocrText, ocrScanStatus,
+    formData.first_name, formData.middle_name, formData.last_name,
     idType,
   ]);
+
+  // ============ Field validators ============
+  const validateFieldValue = (name, value) => {
+    const v = typeof value === "string" ? value.trim() : value;
+
+    switch (name) {
+      case "first_name":
+      case "last_name":
+      case "house_no":
+        return v === "" ? "This field is required." : "";
+
+      case "middle_name":
+        return v === "" ? "This field is required. Type N/A if none." : "";
+
+      case "permanent_house_no":
+      case "permanent_street":
+      case "permanent_barangay":
+      case "permanent_city":
+        if (sameAddress) return "";
+        return v === "" ? "This field is required." : "";
+
+      case "contact_number":
+        if (v === "") return "Contact number is required.";
+        if (!/^09\d{9}$/.test(v)) return "Must be 11 digits starting with 09.";
+        return "";
+
+      case "email":
+        if (v === "") return "Email is required.";
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Enter a valid email address.";
+        return "";
+
+      case "password":
+        if (!v) return "Password is required.";
+        if (v.length < passwordPolicy.min || v.length > passwordPolicy.max)
+          return `Password must be ${passwordPolicy.min}-${passwordPolicy.max} characters.`;
+        if (passwordPolicy.requireStrong) {
+          const hasLetter = /[A-Za-z]/.test(v);
+          const hasDigit = /\d/.test(v);
+          if (!hasLetter || !hasDigit) return "Password must contain letters and numbers.";
+        }
+        return "";
+
+      case "confirm_password":
+        if (!v) return "Please confirm your password.";
+        if (v !== formData.password) return "Passwords do not match.";
+        return "";
+
+      default:
+        return "";
+    }
+  };
+
+  const handleFieldBlur = (name) => {
+    const err = validateFieldValue(name, formData[name]);
+    setFieldErrors((prev) => ({ ...prev, [name]: err }));
+  };
+
+  // ============ Combined completeness check ============
+  const permanentComplete = sameAddress
+    ? true
+    : formData.permanent_house_no.trim() !== "" &&
+      formData.permanent_street.trim() !== "" &&
+      formData.permanent_barangay.trim() !== "" &&
+      formData.permanent_city.trim() !== "";
+
+  // Returns a human-readable list of everything still missing/invalid.
+  // Drives both the button's disabled state and the submit safety check.
+  const getMissingFields = () => {
+    const missing = [];
+    if (!formData.first_name.trim()) missing.push("First Name");
+    if (!formData.middle_name.trim()) missing.push("Middle Name");
+    if (!formData.last_name.trim()) missing.push("Last Name");
+    if (!formData.house_no.trim()) missing.push("House Number");
+    if (!findMatchingStreet(formData.street)) missing.push("Street");
+    if (!permanentComplete) missing.push("Permanent Address");
+    if (validateFieldValue("contact_number", formData.contact_number))
+      missing.push("Valid Contact Number");
+    if (validateFieldValue("email", formData.email))
+      missing.push("Valid Email Address");
+    if (validateFieldValue("password", formData.password))
+      missing.push("Valid Password");
+    if (validateFieldValue("confirm_password", formData.confirm_password))
+      missing.push("Matching Confirm Password");
+    if (!idType) missing.push("Type of Resident ID");
+    if (!residentIdFile) missing.push("Resident ID Photo");
+    if (ocrValidation.passed !== true) missing.push("ID Verification");
+    if (REQUIRE_FACE_VERIFICATION && !idFaceFound) missing.push("Clear Face on ID");
+    if (REQUIRE_FACE_VERIFICATION && !faceFile) missing.push("Face Verification Selfie");
+    if (!agreedToTerms) missing.push("Terms & Conditions");
+    return missing;
+  };
 
   // ============ Handlers ============
   const handleChange = (e) => {
@@ -1046,12 +1066,10 @@ export default function Register() {
 
     setFormData({ ...formData, [name]: value });
 
-    // Clear this field's error as soon as the user edits it
     if (fieldErrors[name]) {
       setFieldErrors((prev) => ({ ...prev, [name]: "" }));
     }
 
-    // Live re-validate confirm_password when password changes
     if (name === "password" && formData.confirm_password) {
       const mismatch = value !== formData.confirm_password;
       setFieldErrors((prev) => ({
@@ -1106,10 +1124,7 @@ export default function Register() {
     setStreetError("");
   };
 
-    const handleStreetBlur = () => {
-    // Delay so a dropdown item click can register first. If the user picked
-    // from the list, formData.street will already be canonical by the time
-    // this runs — no-op.
+  const handleStreetBlur = () => {
     setTimeout(() => {
       setShowStreetDropdown(false);
       const typed = formData.street.trim();
@@ -1125,94 +1140,6 @@ export default function Register() {
         setStreetError("Please select a street from the Sto. Rosario list.");
       }
     }, 180);
-  };
-
-  // ── Inline field validators ───
-  // One validator per field. Returns the error string (empty = valid).
-  // Used by handleFieldBlur (on blur), handleChange (to clear on edit),
-  // and validateAllFields (on submit + scroll-to-first-error).
-  const validateFieldValue = (name, value) => {
-    const v = typeof value === "string" ? value.trim() : value;
-
-    switch (name) {
-      case "first_name":
-      case "last_name":
-      case "house_no":
-        return v === "" ? "This field is required." : "";
-
-      case "middle_name":
-        return v === "" ? "This field is required. Type N/A if none." : "";
-
-      case "permanent_house_no":
-      case "permanent_street":
-      case "permanent_barangay":
-      case "permanent_city":
-        if (sameAddress) return "";
-        return v === "" ? "This field is required." : "";
-
-      case "contact_number":
-        if (v === "") return "Contact number is required.";
-        if (!/^09\d{9}$/.test(v)) return "Must be 11 digits starting with 09.";
-        return "";
-
-      case "email":
-        if (v === "") return "Email is required.";
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
-          return "Enter a valid email address.";
-        return "";
-
-      case "password":
-        if (!v) return "Password is required.";
-        if (v.length < passwordPolicy.min || v.length > passwordPolicy.max)
-          return `Password must be ${passwordPolicy.min}-${passwordPolicy.max} characters.`;
-        if (passwordPolicy.requireStrong) {
-          const hasLetter = /[A-Za-z]/.test(v);
-          const hasDigit = /\d/.test(v);
-          if (!hasLetter || !hasDigit)
-            return "Password must contain letters and numbers.";
-        }
-        return "";
-
-      case "confirm_password":
-        if (!v) return "Please confirm your password.";
-        if (v !== formData.password) return "Passwords do not match.";
-        return "";
-
-      default:
-        return "";
-    }
-  };
-
-  const handleFieldBlur = (name) => {
-    const err = validateFieldValue(name, formData[name]);
-    setFieldErrors((prev) => ({ ...prev, [name]: err }));
-  };
-
-  const getMissingFields = () => {
-    const missing = [];
-    if (!formData.first_name.trim()) missing.push("First Name");
-    if (!formData.middle_name.trim()) missing.push("Middle Name");
-    if (!formData.last_name.trim()) missing.push("Last Name");
-    if (!formData.house_no.trim()) missing.push("House Number");
-    if (!findMatchingStreet(formData.street)) missing.push("Street");
-    if (!permanentComplete) missing.push("Permanent Address");
-    if (validateFieldValue("contact_number", formData.contact_number))
-      missing.push("Valid Contact Number");
-    if (validateFieldValue("email", formData.email))
-      missing.push("Valid Email Address");
-    if (validateFieldValue("password", formData.password))
-      missing.push("Valid Password");
-    if (validateFieldValue("confirm_password", formData.confirm_password))
-      missing.push("Matching Confirm Password");
-    if (!idType) missing.push("Type of Resident ID");
-    if (!residentIdFile) missing.push("Resident ID Photo");
-    if (ocrValidation.passed !== true) missing.push("ID Verification");
-    if (REQUIRE_FACE_VERIFICATION && !idFaceFound)
-      missing.push("Clear Face on ID");
-    if (REQUIRE_FACE_VERIFICATION && !faceFile)
-      missing.push("Face Verification Selfie");
-    if (!agreedToTerms) missing.push("Terms & Conditions");
-    return missing;
   };
 
   const filteredStreets = STREETS.filter((s) =>
@@ -1231,13 +1158,14 @@ export default function Register() {
     setCameraMode(null);
   };
 
-  // Fault-tolerant compression: never rejects. If any step fails, the
-  // original file is uploaded as-is.
-  // Files under 1 MB are skipped entirely
+  // ============ Image compression (fault-tolerant) ============
+  // Resizes to max 1600px and re-encodes as JPEG. Skips files under 1 MB.
+  // NEVER rejects — falls back to the original file on any error, so
+  // compression can never block registration.
   const compressImage = (file, maxDim = 1600, quality = 0.82) => {
     return new Promise((resolve) => {
       if (!file || !file.type.startsWith("image/")) return resolve(file);
-      if (file.size < 1024 * 1024) return resolve(file); // < 1 MB → skip
+      if (file.size < 1024 * 1024) return resolve(file);
 
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -1257,8 +1185,7 @@ export default function Register() {
             canvas.toBlob(
               (blob) => {
                 if (!blob) return resolve(file);
-                const safeName =
-                  (file.name || "image").replace(/\.\w+$/, "") + ".jpg";
+                const safeName = (file.name || "image").replace(/\.\w+$/, "") + ".jpg";
                 resolve(new File([blob], safeName, { type: "image/jpeg" }));
               },
               "image/jpeg",
@@ -1277,12 +1204,12 @@ export default function Register() {
   };
 
   // ============ Upload to Cloudinary ============
-  const uploadFile = async (file) => {
+  const uploadFile = async (file, label = "file") => {
     if (!file) return null;
-
-    // Compress first — dramatically reduces upload time on mobile.
     const compressed = await compressImage(file);
-
+    console.log(
+      `[upload] ${label}: ${(file.size / 1024).toFixed(0)} KB → ${(compressed.size / 1024).toFixed(0)} KB`
+    );
     const fd = new FormData();
     fd.append("files", compressed);
     const response = await fetch(`${API_BASE_URL}/api/guest/upload`, {
@@ -1290,35 +1217,9 @@ export default function Register() {
       body: fd,
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Upload failed.");
+    if (!response.ok) throw new Error(data.error || `${label} upload failed.`);
     return data.files?.[0]?.url || null;
   };
-
-  // ============ Form completion ============
-  const permanentComplete = sameAddress
-    ? true
-    : formData.permanent_house_no.trim() !== "" &&
-      formData.permanent_street.trim() !== "" &&
-      formData.permanent_barangay.trim() !== "" &&
-      formData.permanent_city.trim() !== "";
-
-  const isFormComplete =
-    formData.first_name.trim() !== "" &&
-    formData.middle_name.trim() !== "" &&
-    formData.last_name.trim() !== "" &&
-    formData.house_no.trim() !== "" &&
-    findMatchingStreet(formData.street) !== null &&
-    permanentComplete &&
-    formData.contact_number.trim() !== "" &&
-    formData.email.trim() !== "" &&
-    formData.password !== "" &&
-    formData.confirm_password !== "" &&
-    idType !== "" &&
-    residentIdFile !== null &&
-    ocrValidation.passed === true &&
-    idFaceFound === true &&
-    faceFile !== null &&
-    agreedToTerms === true;
 
   // ============ Submit ============
   const handleRegister = async (e) => {
@@ -1326,16 +1227,8 @@ export default function Register() {
     setLoading(true);
     setError("");
 
-    // Resolve the typed street to the canonical STREETS entry. Handles
-    // the case where the user typed a partial / misspelled value without blurring the field first.
-    const resolvedStreet = findMatchingStreet(formData.street);
-    if (!resolvedStreet) {
-      setError("Please select a valid street from the Sto. Rosario list.");
-      setStreetError("Please select a street from the Sto. Rosario list.");
-      setLoading(false);
-      return;
-    }
-
+    // Safety check — the button is disabled when incomplete, but a
+    // JS-dispatched submit or stale state could slip through.
     const missing = getMissingFields();
     if (missing.length > 0) {
       setError(`Please complete: ${missing.join(", ")}.`);
@@ -1343,53 +1236,33 @@ export default function Register() {
       return;
     }
 
-    // Non-field checks (file / OCR / face / terms) — scroll to their
-    // respective sections if they fail.
-    if (!ocrValidation.passed) {
-      setError(ocrValidation.reason || "Please wait for ID verification.");
-      setLoading(false);
-      setTimeout(() => {
-        document
-          .getElementById("resident-id-input")
-          ?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 80);
-      return;
-    }
-    if (REQUIRE_FACE_VERIFICATION) {
-      if (!idFaceFound) {
-        setError("Please upload a clear ID with a visible face.");
-        setLoading(false);
-        return;
-      }
-      if (!faceFile) {
-        setError("Please complete the face verification.");
-        setLoading(false);
-        return;
-      }
-    }
-
     try {
-      // Upload sequentially
+      // Upload sequentially, not in parallel — avoids splitting limited
+      // mobile upload bandwidth across two simultaneous requests.
       const valid_id_url = await uploadFile(residentIdFile, "ID photo");
-      const selfie_image = await uploadFile(faceFile, "Selfie");
+      const selfie_image = REQUIRE_FACE_VERIFICATION
+        ? await uploadFile(faceFile, "Selfie")
+        : null;
+
+      const resolvedStreet = findMatchingStreet(formData.street) || formData.street;
 
       const permanent = sameAddress
         ? {
             permanent_house_no: formData.house_no,
-            permanent_street: resolvedStreet, // canonical name
+            permanent_street: resolvedStreet,
             permanent_barangay: "Sto. Rosario Kanluran",
             permanent_city: "Pateros",
           }
         : {
             permanent_house_no: formData.permanent_house_no,
-            permanent_street: formData.permanent_street, // free-text, no restriction
+            permanent_street: formData.permanent_street,
             permanent_barangay: formData.permanent_barangay,
             permanent_city: formData.permanent_city,
           };
 
       const payload = {
         ...formData,
-        street: resolvedStreet, // canonical name, not what user typed
+        street: resolvedStreet,
         ...permanent,
         permanent_same_as_current: sameAddress,
         id_type: idType,
@@ -1404,9 +1277,9 @@ export default function Register() {
 
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
-
       navigate("/resident-dashboard");
-        } catch (err) {
+    } catch (err) {
+      console.error("Register error:", err);
       setError(err.message || "Registration failed. Please try again.");
     } finally {
       setLoading(false);
@@ -1417,7 +1290,7 @@ export default function Register() {
   const field = (name, label, placeholder, extra = {}) => {
     const err = fieldErrors[name];
     return (
-      <div id={`field-${name}`} className="flex flex-col" style={{ gap: "8px" }}>
+      <div className="flex flex-col" style={{ gap: "8px" }}>
         <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
           {label} <span className="text-red-500">*</span>
         </label>
@@ -1435,10 +1308,7 @@ export default function Register() {
           {...extra}
         />
         {err && (
-          <p
-            className="text-[12px] text-red-500 leading-5 field-error-message"
-            data-error-for={name}
-          >
+          <p className="text-[12px] text-red-500 leading-5 field-error-message">
             {err}
           </p>
         )}
@@ -1488,7 +1358,7 @@ export default function Register() {
             {field("house_no", "House Number", "Enter house number")}
 
             {/* STREET - searchable dropdown */}
-            <div id="field-street" className="flex flex-col" style={{ gap: "8px" }}>
+            <div className="flex flex-col" style={{ gap: "8px" }}>
               <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
                 Street <span className="text-red-500">*</span>
               </label>
@@ -1538,10 +1408,7 @@ export default function Register() {
                 )}
               </div>
               {streetError && (
-                <p
-                  className="text-[12px] text-red-500 leading-5 field-error-message"
-                  data-error-for="street"
-                >
+                <p className="text-[12px] text-red-500 leading-5 field-error-message">
                   {streetError}
                 </p>
               )}
@@ -1584,17 +1451,13 @@ export default function Register() {
                   {field("permanent_house_no", "House Number", "Enter house number")}
                   {field("permanent_street", "Street", "Enter street")}
                   {field("permanent_barangay", "Barangay", "Enter barangay")}
-                  {field(
-                    "permanent_city",
-                    "City / Municipality",
-                    "Enter city or municipality"
-                  )}
+                  {field("permanent_city", "City / Municipality", "Enter city or municipality")}
                 </div>
               )}
             </div>
 
             {/* CONTACT */}
-            <div id="field-contact_number" className="flex flex-col" style={{ gap: "8px" }}>
+            <div className="flex flex-col" style={{ gap: "8px" }}>
               <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
                 Contact Number <span className="text-red-500">*</span>
               </label>
@@ -1613,17 +1476,14 @@ export default function Register() {
                 style={{ padding: "0 16px" }}
               />
               {fieldErrors.contact_number && (
-                <p
-                  className="text-[12px] text-red-500 leading-5 field-error-message"
-                  data-error-for="contact_number"
-                >
+                <p className="text-[12px] text-red-500 leading-5 field-error-message">
                   {fieldErrors.contact_number}
                 </p>
               )}
             </div>
 
             {/* EMAIL */}
-            <div id="field-email" className="flex flex-col" style={{ gap: "8px" }}>
+            <div className="flex flex-col" style={{ gap: "8px" }}>
               <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
                 Email Address <span className="text-red-500">*</span>
               </label>
@@ -1641,17 +1501,14 @@ export default function Register() {
                 style={{ padding: "0 16px" }}
               />
               {fieldErrors.email && (
-                <p
-                  className="text-[12px] text-red-500 leading-5 field-error-message"
-                  data-error-for="email"
-                >
+                <p className="text-[12px] text-red-500 leading-5 field-error-message">
                   {fieldErrors.email}
                 </p>
               )}
             </div>
 
             {/* PASSWORDS */}
-            <div id="field-password" className="flex flex-col" style={{ gap: "8px" }}>
+            <div className="flex flex-col" style={{ gap: "8px" }}>
               <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
                 Password <span className="text-red-500">*</span>
               </label>
@@ -1680,16 +1537,13 @@ export default function Register() {
                 </button>
               </div>
               {fieldErrors.password && (
-                <p
-                  className="text-[12px] text-red-500 leading-5 field-error-message"
-                  data-error-for="password"
-                >
+                <p className="text-[12px] text-red-500 leading-5 field-error-message">
                   {fieldErrors.password}
                 </p>
               )}
             </div>
 
-            <div id="field-confirm_password" className="flex flex-col" style={{ gap: "8px" }}>
+            <div className="flex flex-col" style={{ gap: "8px" }}>
               <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
                 Confirm Password <span className="text-red-500">*</span>
               </label>
@@ -1718,10 +1572,7 @@ export default function Register() {
                 </button>
               </div>
               {fieldErrors.confirm_password && (
-                <p
-                  className="text-[12px] text-red-500 leading-5 field-error-message"
-                  data-error-for="confirm_password"
-                >
+                <p className="text-[12px] text-red-500 leading-5 field-error-message">
                   {fieldErrors.confirm_password}
                 </p>
               )}
@@ -1744,9 +1595,7 @@ export default function Register() {
                 >
                   <option value="">Select ID type</option>
                   {ID_TYPES.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
+                    <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
                 <FaChevronDown
@@ -1929,52 +1778,48 @@ export default function Register() {
             )}
 
             {/* TERMS */}
-            <div id="field-agreedToTerms" className="flex flex-col shrink-0" style={{ gap: "6px" }}>
-            <div className="flex items-start" style={{ gap: "12px" }}>
-              <input
-                id="terms-checkbox"
-                type="checkbox"
-                checked={agreedToTerms}
-                onChange={(e) => {
-                  setAgreedToTerms(e.target.checked);
-                  if (fieldErrors.agreedToTerms) {
-                    setFieldErrors((prev) => ({ ...prev, agreedToTerms: "" }));
-                  }
-                }}
-                className="w-5 h-5 shrink-0 accent-[#0B5D2A] cursor-pointer"
-                style={{ marginTop: "2px" }}
-              />
-              <label
-                htmlFor="terms-checkbox"
-                className="min-w-0 text-[14px] leading-6 text-gray-700 cursor-pointer break-words"
-              >
-                I agree to the{" "}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setShowTermsModal(true);
+            <div className="flex flex-col shrink-0" style={{ gap: "6px" }}>
+              <div className="flex items-start" style={{ gap: "12px" }}>
+                <input
+                  id="terms-checkbox"
+                  type="checkbox"
+                  checked={agreedToTerms}
+                  onChange={(e) => {
+                    setAgreedToTerms(e.target.checked);
+                    if (fieldErrors.agreedToTerms) {
+                      setFieldErrors((prev) => ({ ...prev, agreedToTerms: "" }));
+                    }
                   }}
-                  className="font-extrabold text-[#0B5D2A] underline"
+                  className="w-5 h-5 shrink-0 accent-[#0B5D2A] cursor-pointer"
+                  style={{ marginTop: "2px" }}
+                />
+                <label
+                  htmlFor="terms-checkbox"
+                  className="min-w-0 text-[14px] leading-6 text-gray-700 cursor-pointer break-words"
                 >
-                  Terms &amp; Conditions
-                </button>{" "}
-                and confirm that all information provided is accurate.
-              </label>
-            </div>
-            {fieldErrors.agreedToTerms && (
-              <p
-                className="text-[12px] text-red-500 leading-5 field-error-message pl-8"
-                data-error-for="agreedToTerms"
-              >
-                {fieldErrors.agreedToTerms}
-              </p>
-            )}
+                  I agree to the{" "}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowTermsModal(true);
+                    }}
+                    className="font-extrabold text-[#0B5D2A] underline"
+                  >
+                    Terms &amp; Conditions
+                  </button>{" "}
+                  and confirm that all information provided is accurate.
+                </label>
+              </div>
+              {fieldErrors.agreedToTerms && (
+                <p className="text-[12px] text-red-500 leading-5 field-error-message pl-8">
+                  {fieldErrors.agreedToTerms}
+                </p>
+              )}
             </div>
 
             {/* SUBMIT */}
             <div className="flex flex-col items-center shrink-0" style={{ gap: "12px" }}>
-              {/* Backend errors */}
               {error && (
                 <div
                   className="w-full bg-red-100 border border-red-400 rounded-xl text-red-700 text-sm leading-6 break-words"
@@ -1985,8 +1830,7 @@ export default function Register() {
               )}
 
               {(() => {
-                const missingCount = getMissingFields().length;
-                const buttonDisabled = loading || missingCount > 0;
+                const buttonDisabled = loading || getMissingFields().length > 0;
                 return (
                   <button
                     type="submit"
@@ -2001,7 +1845,6 @@ export default function Register() {
                   </button>
                 );
               })()}
-
             </div>
           </form>
         </main>
