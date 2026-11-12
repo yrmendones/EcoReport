@@ -1206,7 +1206,7 @@ export default function Register() {
   // ============ Upload to Cloudinary ============
   const uploadFile = async (file, label = "file") => {
     if (!file) return null;
-
+    const compressed = await compressImage(file);
     const fd = new FormData();
     fd.append("files", compressed);
     const response = await fetch(`${API_BASE_URL}/api/guest/upload`, {
