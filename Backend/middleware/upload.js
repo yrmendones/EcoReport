@@ -5,10 +5,25 @@ const path = require('path');
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    if (extname && mimetype) return cb(null, true);
+    // Accept any file whose mimetype starts with image/ or video/,
+    // OR whose extension is a known media format. This handles HEIC,
+    // HEIF, WebP, QuickTime (video/quicktime for .mov), and future
+    // formats without needing updates.
+    const mimeOk = /^(image|video)\//i.test(file.mimetype || "");
+    const extOk = /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?|svg|mp4|mov|avi|webm|mkv|3gp|m4v)$/i.test(
+        path.extname(file.originalname || "")
+    );
+
+    if (mimeOk || extOk) {
+        console.log(
+            `[upload filter] ACCEPTED — name: "${file.originalname}", mime: "${file.mimetype}"`
+        );
+        return cb(null, true);
+    }
+
+    console.warn(
+        `[upload filter] REJECTED — name: "${file.originalname}", mime: "${file.mimetype}"`
+    );
     cb(new Error('Only images and videos are allowed.'));
 };
 
