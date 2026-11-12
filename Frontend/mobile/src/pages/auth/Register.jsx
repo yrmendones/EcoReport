@@ -53,6 +53,74 @@ const STREETS = [
   "Ausmolo Compound", "Austria Compound", "Concepcion Compound",
 ];
 
+// ── Street matching ────────────────────────────────────────
+// Restricts the current-address Street field to the STREETS list,
+// tolerating common typos: missing periods, extra spaces, partial names.
+//
+// normalizeStreet("A. Mariano")  → "a mariano"
+// normalizeStreet("a mariano st") → "a mariano st"
+//
+// findMatchingStreet("mariano")  → "A. Mariano Street"
+// findMatchingStreet("A Mariano") → "A. Mariano Street"
+// findMatchingStreet("zzz")       → null
+const STREET_STOPWORDS = new Set([
+  "street", "st", "ave", "avenue", "compound", "comp", "the", "and",
+]);
+
+function normalizeStreet(str) {
+  return String(str || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")   // strip diacritics
+    .replace(/[^a-z0-9\s]/g, " ")      // periods/commas/punct → space
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findMatchingStreet(typed) {
+  const n = normalizeStreet(typed);
+  if (!n) return null;
+
+  // Exact match after normalization
+  for (const s of STREETS) {
+    if (normalizeStreet(s) === n) return s;
+  }
+
+  // Typed value is a substring of a street name
+  const contains = STREETS.filter((s) => normalizeStreet(s).includes(n));
+  if (contains.length === 1) return contains[0];
+  if (contains.length > 1) {
+    // Ambiguous - prefer the shortest (most specific to the user's intent)
+    return [...contains].sort((a, b) => a.length - b.length)[0];
+  }
+
+  // Street name is contained in the typed value (user pasted full address)
+  for (const s of STREETS) {
+    if (n.includes(normalizeStreet(s))) return s;
+  }
+
+  // Token overlap - ignore generic words like "street"
+  const typedTokens = n.split(" ").filter((t) => t && !STREET_STOPWORDS.has(t));
+  if (typedTokens.length === 0) return null;
+
+  let best = null;
+  let bestScore = 0;
+  for (const s of STREETS) {
+    const stTokens = normalizeStreet(s)
+      .split(" ")
+      .filter((t) => t && !STREET_STOPWORDS.has(t));
+    const matched = typedTokens.filter((t) => stTokens.includes(t)).length;
+    const score = matched / typedTokens.length;
+    if (score > bestScore) {
+      bestScore = score;
+      best = s;
+    }
+  }
+  if (bestScore >= 0.5) return best;
+
+  return null;
+}
+
 const ID_TYPES = [
   "Barangay ID",
   "Driver's License",
@@ -727,6 +795,7 @@ export default function Register() {
   const [sameAddress, setSameAddress] = useState(false);
   const [idType, setIdType] = useState("");
   const [showStreetDropdown, setShowStreetDropdown] = useState(false);
+  const [streetError, setStreetError] = useState("");
 
   // ---------- ID + OCR + face ----------
   const [residentIdFile, setResidentIdFile] = useState(null);
@@ -986,6 +1055,27 @@ export default function Register() {
   const handleStreetSelect = (street) => {
     setFormData({ ...formData, street });
     setShowStreetDropdown(false);
+    setStreetError("");
+  };
+
+  const handleStreetBlur = () => {
+    // Delay so a dropdown item click can register first. If the user picked
+    // from the list, formData.street will already be canonical by the time this runs.
+    setTimeout(() => {
+      setShowStreetDropdown(false);
+      const typed = formData.street.trim();
+      if (!typed) {
+        setStreetError("");
+        return;
+      }
+      const resolved = findMatchingStreet(typed);
+      if (resolved) {
+        setFormData((prev) => ({ ...prev, street: resolved }));
+        setStreetError("");
+      } else {
+        setStreetError("Please select a street from the Sto. Rosario list.");
+      }
+    }, 180);
   };
 
   const filteredStreets = STREETS.filter((s) =>
@@ -1031,7 +1121,7 @@ export default function Register() {
     formData.middle_name.trim() !== "" &&
     formData.last_name.trim() !== "" &&
     formData.house_no.trim() !== "" &&
-    formData.street.trim() !== "" &&
+    findMatchingStreet(formData.street) !== null &&
     permanentComplete &&
     formData.contact_number.trim() !== "" &&
     formData.email.trim() !== "" &&
@@ -1049,6 +1139,16 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    // Resolve the typed street to the canonical STREETS entry. Handles
+    // the case where the user typed a partial / misspelled value without blurring the field first.
+    const resolvedStreet = findMatchingStreet(formData.street);
+    if (!resolvedStreet) {
+      setError("Please select a valid street from the Sto. Rosario list.");
+      setStreetError("Please select a street from the Sto. Rosario list.");
+      setLoading(false);
+      return;
+    }
 
     if (formData.password !== formData.confirm_password) {
       setError("Passwords do not match.");
@@ -1086,19 +1186,20 @@ export default function Register() {
       const permanent = sameAddress
         ? {
             permanent_house_no: formData.house_no,
-            permanent_street: formData.street,
+            permanent_street: resolvedStreet, // canonical name
             permanent_barangay: "Sto. Rosario Kanluran",
             permanent_city: "Pateros",
           }
         : {
             permanent_house_no: formData.permanent_house_no,
-            permanent_street: formData.permanent_street,
+            permanent_street: formData.permanent_street, // free-text, no restriction
             permanent_barangay: formData.permanent_barangay,
             permanent_city: formData.permanent_city,
           };
 
       const payload = {
         ...formData,
+        street: resolvedStreet, // canonical name, not what user typed
         ...permanent,
         permanent_same_as_current: sameAddress,
         id_type: idType,
@@ -1205,10 +1306,14 @@ export default function Register() {
                   onChange={(e) => {
                     setFormData({ ...formData, street: e.target.value });
                     setShowStreetDropdown(true);
+                    if (streetError) setStreetError("");
                   }}
                   onFocus={() => setShowStreetDropdown(true)}
+                  onBlur={handleStreetBlur}
                   placeholder="Search or select street..."
-                  className="block w-full min-w-0 box-border min-h-[52px] rounded-2xl border border-[#8BB37A] bg-white text-[16px] text-gray-800 placeholder:text-gray-400 placeholder:text-[14px] outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20"
+                  className={`block w-full min-w-0 box-border min-h-[52px] rounded-2xl border ${
+                    streetError ? "border-red-500" : "border-[#8BB37A]"
+                  } bg-white text-[16px] text-gray-800 placeholder:text-gray-400 placeholder:text-[14px] outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20`}
                   style={{ padding: "0 16px" }}
                   required
                 />
@@ -1238,6 +1343,9 @@ export default function Register() {
                   </>
                 )}
               </div>
+              {streetError && (
+                <p className="text-[12px] text-red-500 leading-5">{streetError}</p>
+              )}
             </div>
 
             {/* PERMANENT ADDRESS */}
