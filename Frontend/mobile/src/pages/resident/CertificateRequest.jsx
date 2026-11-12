@@ -675,7 +675,7 @@ export default function CertificateRequest() {
               type="button"
               onClick={handleSubmit}
               disabled={loading}
-              className="btn-primary w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-md transition disabled:opacity-50"
+              className="btn-success w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-md transition disabled:opacity-50"
             >
               {loading ? "Submitting..." : "Submit Request"}
             </button>

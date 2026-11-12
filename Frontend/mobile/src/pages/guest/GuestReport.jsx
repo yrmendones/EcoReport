@@ -742,7 +742,7 @@ export default function GuestReport() {
                 className={`w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] shadow-md transition flex items-center justify-center ${
                   loading
                     ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                    : "btn-primary"
+                    : "btn-success"
                 }`}
                 style={{ gap: "12px" }}
               >
