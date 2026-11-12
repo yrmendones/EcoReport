@@ -316,7 +316,8 @@ button {
    Covers: New Assignment, Create Announcement, Send Notification,
    Add Schedule, Add Service, Add Staff, Create Health Announcement,
    Add Hotline, New Incident, Create Alert, Add Item, Export CSV,
-   Download PDF, Open Camera, Open Verification, modal Save/Update/Create */
+   Download PDF, Open Camera, Open Verification, Change Password,
+   modal Save/Update/Create */
 #root .filter-export-btn,
 #root .qr-start-btn,
 #root .paste-submit,
@@ -325,9 +326,10 @@ button {
 #root .manage-button,
 #root .btn-save,
 #root .primary-button,
-#root .add-category-button {
+#root .add-category-button,
+#root .change-password-btn {
   background: #008CBA;
-  border-color: #006F96;
+  border: 1px solid #006F96;
   color: #ffffff;
 }
 #root .filter-export-btn:hover:not(:disabled),
@@ -338,8 +340,10 @@ button {
 #root .manage-button:hover:not(:disabled),
 #root .btn-save:hover:not(:disabled),
 #root .primary-button:hover:not(:disabled),
-#root .add-category-button:hover {
+#root .add-category-button:hover,
+#root .change-password-btn:hover {
   background: #0078A3;
+  border-color: #006F96;
 }
 
 /* ─── SECONDARY — Light Gray #E7E7E7 ───
@@ -384,19 +388,22 @@ button {
 
 /* ─── DANGER — Red #F44336 ───
    Covers: Reject Report, Reject Verification, Stop (QR scanner),
-   Deactivate (in dropdown) */
+   Deactivate (in dropdown), Logout */
 #root .reject-button,
 #root .qr-stop-btn,
 #root .verification-button.reject,
-#root .verification-button.reject:not(.rejected) {
+#root .verification-button.reject:not(.rejected),
+#root .logout-btn {
   background: #F44336;
-  border-color: #D93428;
+  border: 1px solid #D93428;
   color: #ffffff;
 }
 #root .reject-button:hover,
 #root .qr-stop-btn:hover,
-#root .verification-button.reject:hover:not(.rejected):not(:disabled) {
+#root .verification-button.reject:hover:not(.rejected):not(:disabled),
+#root .logout-btn:hover {
   background: #D93428;
+  border-color: #D93428;
 }
 
 /* ─── DARK / CONTRAST — Charcoal #555555 ───
