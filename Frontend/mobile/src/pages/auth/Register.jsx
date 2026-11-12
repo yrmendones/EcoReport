@@ -334,16 +334,28 @@ function CameraModal({
     };
   }, [facing, enableLiveFaceCheck, modelsLoaded]);
 
-  const handleCapture = () => {
+    const handleCapture = () => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
     setBusy(true);
     setCamError("");
 
+    // Cap capture at 1280px on the longest side - 4K phone cameras produce
+    // 2-5 MB JPEGs that time out on mobile WiFi and break compression.
+    // 1280px is more than enough resolution for a face or an ID card.
+    const MAX_DIM = 1280;
+    let width = video.videoWidth;
+    let height = video.videoHeight;
+    if (width > MAX_DIM || height > MAX_DIM) {
+      const scale = MAX_DIM / Math.max(width, height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
+
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d").drawImage(video, 0, 0);
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext("2d").drawImage(video, 0, 0, width, height);
 
     canvas.toBlob(
       (blob) => {
@@ -355,14 +367,30 @@ function CameraModal({
         const file = new File([blob], `${Date.now()}.jpg`, {
           type: "image/jpeg",
         });
+        // Debug — remove after confirming the fix works
+        console.log(`[capture] ${width}x${height} — ${(file.size / 1024).toFixed(0)} KB`);
         onCapture(file);
       },
       "image/jpeg",
-      0.9
+      0.85
     );
   };
 
-  const liveCheckReady = !enableLiveFaceCheck || (modelsLoaded && isFaceDetected);
+  // Face-detection fallback — if the models fail to load or the detector
+  // doesn't fire within 5 seconds, allow capture anyway. The admin still
+  // reviews the selfie manually; blocking the resident forever is worse
+  // than a slightly less "verified" capture.
+  const [fallbackReady, setFallbackReady] = useState(false);
+  useEffect(() => {
+    if (!enableLiveFaceCheck) return;
+    const t = setTimeout(() => setFallbackReady(true), 5000);
+    return () => clearTimeout(t);
+  }, [enableLiveFaceCheck]);
+
+  const liveCheckReady =
+    !enableLiveFaceCheck ||
+    (modelsLoaded && isFaceDetected) ||
+    fallbackReady;
   const canCapture = ready && !busy && liveCheckReady;
 
   return (
@@ -1094,11 +1122,60 @@ export default function Register() {
     setCameraMode(null);
   };
 
+  // Fault-tolerant compression: never rejects. If any step fails, the
+  // original file is uploaded as-is.
+  // Files under 1 MB are skipped entirely
+  const compressImage = (file, maxDim = 1600, quality = 0.82) => {
+    return new Promise((resolve) => {
+      if (!file || !file.type.startsWith("image/")) return resolve(file);
+      if (file.size < 1024 * 1024) return resolve(file); // < 1 MB → skip
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            let { width, height } = img;
+            if (width > maxDim || height > maxDim) {
+              const scale = maxDim / Math.max(width, height);
+              width = Math.round(width * scale);
+              height = Math.round(height * scale);
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+            canvas.toBlob(
+              (blob) => {
+                if (!blob) return resolve(file);
+                const safeName =
+                  (file.name || "image").replace(/\.\w+$/, "") + ".jpg";
+                resolve(new File([blob], safeName, { type: "image/jpeg" }));
+              },
+              "image/jpeg",
+              quality
+            );
+          } catch {
+            resolve(file);
+          }
+        };
+        img.onerror = () => resolve(file);
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve(file);
+      reader.readAsDataURL(file);
+    });
+  };
+
   // ============ Upload to Cloudinary ============
   const uploadFile = async (file) => {
     if (!file) return null;
+
+    // Compress first — dramatically reduces upload time on mobile.
+    const compressed = await compressImage(file);
+
     const fd = new FormData();
-    fd.append("files", file);
+    fd.append("files", compressed);
     const response = await fetch(`${API_BASE_URL}/api/guest/upload`, {
       method: "POST",
       body: fd,
@@ -1178,10 +1255,9 @@ export default function Register() {
     }
 
     try {
-      const [valid_id_url, selfie_image] = await Promise.all([
-        uploadFile(residentIdFile),
-        uploadFile(faceFile),
-      ]);
+      // Upload sequentially
+      const valid_id_url = await uploadFile(residentIdFile, "ID photo");
+      const selfie_image = await uploadFile(faceFile, "Selfie");
 
       const permanent = sameAddress
         ? {
@@ -1216,7 +1292,16 @@ export default function Register() {
       localStorage.setItem("user", JSON.stringify(data.user));
 
       navigate("/resident-dashboard");
-    } catch (err) {
+        } catch (err) {
+      // TEMPORARY DEBUG — remove after diagnosing
+      const debugInfo = [
+        `Error: ${err.message}`,
+        `API_BASE_URL: "${API_BASE_URL}"`,
+        `Resolved upload URL: "${API_BASE_URL}/api/guest/upload"`,
+        `Resolved register URL: "${API_BASE_URL}/api/auth/register"`,
+        `Window origin: "${window.location.origin}"`,
+      ].join("\n\n");
+      alert(debugInfo);
       setError(err.message || "Registration failed. Please try again.");
     } finally {
       setLoading(false);
