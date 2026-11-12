@@ -314,15 +314,24 @@ export default function AccountVerification() {
           <div className="sidebar-overlay"></div>
           <div className="sidebar-content">
             <div className="sidebar-brand">
-              <img src="/lightleaf.png" alt="EcoReport" className="sidebar-brand-image" />
+              <img
+                src="/lightleaf.png"
+                alt="EcoReport"
+                className="sidebar-brand-image"
+              />
               <span className="sidebar-brand-name">EcoReport</span>
             </div>
-            <div className="sidebar-barangay">Barangay Sto. Rosario Kanluran</div>
+            <div className="sidebar-barangay">
+              Barangay Sto. Rosario Kanluran
+            </div>
             <nav className="sidebar-menu">
               {menuItems.map((item, index) => (
-                <button key={index} type="button"
+                <button
+                  key={index}
+                  type="button"
                   className={`menu-item ${item.active ? "active" : ""}`}
-                  onClick={() => navigate(item.path)}>
+                  onClick={() => navigate(item.path)}
+                >
                   <img src={item.icon} alt="" className="menu-icon" />
                   <span className="menu-text">{item.name}</span>
                 </button>
@@ -342,38 +351,76 @@ export default function AccountVerification() {
               <div className="filter-bar">
                 <div className="search-box">
                   <span className="search-icon">🔍</span>
-                  <input type="text" placeholder="Search residents..."
-                    value={search} onChange={(e) => setSearch(e.target.value)} />
+                  <input
+                    type="text"
+                    placeholder="Search residents..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
                   {search && (
-                    <button type="button" className="clear-search"
-                      onClick={() => setSearch("")} aria-label="Clear">×</button>
+                    <button
+                      type="button"
+                      className="clear-search"
+                      onClick={() => setSearch("")}
+                      aria-label="Clear"
+                    >
+                      ×
+                    </button>
                   )}
                 </div>
 
-                <select className="filter-select" value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}>
-                  {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                <select
+                  className="filter-select"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  {STATUS_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
                 </select>
 
-                <select className="filter-select date-select" value={datePreset}
-                  onChange={(e) => setDatePreset(e.target.value)}>
-                  {DATE_PRESETS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                <select
+                  className="filter-select date-select"
+                  value={datePreset}
+                  onChange={(e) => setDatePreset(e.target.value)}
+                >
+                  {DATE_PRESETS.map((d) => (
+                    <option key={d.value} value={d.value}>
+                      {d.label}
+                    </option>
+                  ))}
                 </select>
 
                 {datePreset === "custom" && (
                   <div className="custom-range">
-                    <input type="date" className="filter-date-input" value={customStart}
+                    <input
+                      type="date"
+                      className="filter-date-input"
+                      value={customStart}
                       onChange={(e) => setCustomStart(e.target.value)}
-                      max={customEnd || undefined} aria-label="Start" />
+                      max={customEnd || undefined}
+                      aria-label="Start"
+                    />
                     <span className="range-sep">→</span>
-                    <input type="date" className="filter-date-input" value={customEnd}
+                    <input
+                      type="date"
+                      className="filter-date-input"
+                      value={customEnd}
                       onChange={(e) => setCustomEnd(e.target.value)}
-                      min={customStart || undefined} aria-label="End" />
+                      min={customStart || undefined}
+                      aria-label="End"
+                    />
                   </div>
                 )}
 
                 {hasActiveFilters && (
-                  <button type="button" className="filter-clear-btn" onClick={handleClearFilters}>
+                  <button
+                    type="button"
+                    className="filter-clear-btn"
+                    onClick={handleClearFilters}
+                  >
                     Clear
                   </button>
                 )}
@@ -431,7 +478,8 @@ export default function AccountVerification() {
                                       been pending longer than the admin's threshold.
                                       Only applies to "Pending Verification" rows. */}
                                   {status === "Pending Verification" &&
-                                    Number(r.days_pending) >= pendingFlagDays && (
+                                    Number(r.days_pending) >=
+                                      pendingFlagDays && (
                                       <span
                                         className="vstatus overdue"
                                         title={`Registered ${r.days_pending} day${r.days_pending === 1 ? "" : "s"} ago — flagged after ${pendingFlagDays} day${pendingFlagDays === 1 ? "" : "s"}`}
@@ -473,7 +521,10 @@ export default function AccountVerification() {
                         })
                       ) : (
                         <tr>
-                          <td colSpan="7" className="text-center py-8 text-gray-500">
+                          <td
+                            colSpan="7"
+                            className="text-center py-8 text-gray-500"
+                          >
                             No residents found matching the filters.
                           </td>
                         </tr>
@@ -486,24 +537,44 @@ export default function AccountVerification() {
               {!loading && !error && totalPages > 1 && (
                 <div className="rp-pagination-bar">
                   <div className="rp-page-info">
-                    Page <strong>{safePage}</strong> of <strong>{totalPages}</strong>
+                    Page <strong>{safePage}</strong> of{" "}
+                    <strong>{totalPages}</strong>
                   </div>
                   <div className="rp-pagination-controls">
-                    <button type="button" className="rp-page-btn rp-page-nav"
+                    <button
+                      type="button"
+                      className="rp-page-btn rp-page-nav"
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={safePage === 1}>‹ Prev</button>
+                      disabled={safePage === 1}
+                    >
+                      ‹ Prev
+                    </button>
                     {pageNumbers().map((p, i) =>
                       p === "..." ? (
-                        <span key={`e-${i}`} className="rp-page-ellipsis">…</span>
+                        <span key={`e-${i}`} className="rp-page-ellipsis">
+                          …
+                        </span>
                       ) : (
-                        <button key={p} type="button"
+                        <button
+                          key={p}
+                          type="button"
                           className={`rp-page-btn ${p === safePage ? "active" : ""}`}
-                          onClick={() => setPage(p)}>{p}</button>
-                      )
+                          onClick={() => setPage(p)}
+                        >
+                          {p}
+                        </button>
+                      ),
                     )}
-                    <button type="button" className="rp-page-btn rp-page-nav"
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={safePage === totalPages}>Next ›</button>
+                    <button
+                      type="button"
+                      className="rp-page-btn rp-page-nav"
+                      onClick={() =>
+                        setPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      disabled={safePage === totalPages}
+                    >
+                      Next ›
+                    </button>
                   </div>
                 </div>
               )}
@@ -512,7 +583,11 @@ export default function AccountVerification() {
 
           {view === "detail" && selectedResident && (
             <section className="qr-content-detail">
-              <button type="button" className="back-button" onClick={handleBackToList}>
+              <button
+                type="button"
+                className="back-button"
+                onClick={handleBackToList}
+              >
                 ‹ Back to Account Verification
               </button>
 
@@ -521,28 +596,40 @@ export default function AccountVerification() {
                   <div className="card-title">Resident Information</div>
                   <div className="resident-info-row">
                     <div className="resident-info-label">Resident ID</div>
-                    <div className="resident-info-value">{selectedResident.resident_id || "N/A"}</div>
+                    <div className="resident-info-value">
+                      {selectedResident.resident_id || "N/A"}
+                    </div>
                   </div>
                   <div className="resident-info-row">
                     <div className="resident-info-label">Full Name</div>
-                    <div className="resident-info-value">{getFullName(selectedResident)}</div>
+                    <div className="resident-info-value">
+                      {getFullName(selectedResident)}
+                    </div>
                   </div>
                   <div className="resident-info-row address-row">
                     <div className="resident-info-label">Address</div>
-                    <div className="resident-info-value">{selectedResident.address || "—"}</div>
+                    <div className="resident-info-value">
+                      {selectedResident.address || "—"}
+                    </div>
                   </div>
                   <div className="resident-info-row">
                     <div className="resident-info-label">Contact</div>
-                    <div className="resident-info-value">{selectedResident.contact_number || "—"}</div>
+                    <div className="resident-info-value">
+                      {selectedResident.contact_number || "—"}
+                    </div>
                   </div>
                   <div className="resident-info-row">
                     <div className="resident-info-label">Date Registered</div>
-                    <div className="resident-info-value">{formatDate(selectedResident.registered_at)}</div>
+                    <div className="resident-info-value">
+                      {formatDate(selectedResident.registered_at)}
+                    </div>
                   </div>
                   <div className="resident-info-row status-row">
                     <div className="resident-info-label">Status</div>
                     <div className="resident-info-value">
-                      <span className={`vstatus ${getStatusClass(currentStatus)}`}>
+                      <span
+                        className={`vstatus ${getStatusClass(currentStatus)}`}
+                      >
                         {currentStatus}
                       </span>
                     </div>
@@ -553,17 +640,28 @@ export default function AccountVerification() {
                   <div className="card-title">Uploaded Resident ID</div>
                   <div className="uploaded-id-wrapper">
                     {selectedResident.valid_id_url ? (
-                      <button type="button" className="uploaded-id-button"
-                        onClick={() => setLightboxImage({
-                          url: selectedResident.valid_id_url,
-                          alt: "Uploaded Resident ID",
-                        })} title="Click to view full size">
-                        <img src={selectedResident.valid_id_url} alt="Uploaded Resident ID"
-                          className="uploaded-id-image" />
+                      <button
+                        type="button"
+                        className="uploaded-id-button"
+                        onClick={() =>
+                          setLightboxImage({
+                            url: selectedResident.valid_id_url,
+                            alt: "Uploaded Resident ID",
+                          })
+                        }
+                        title="Click to view full size"
+                      >
+                        <img
+                          src={selectedResident.valid_id_url}
+                          alt="Uploaded Resident ID"
+                          className="uploaded-id-image"
+                        />
                         <div className="zoom-hint">🔍 Click to enlarge</div>
                       </button>
                     ) : (
-                      <div className="uploaded-id-empty">No ID uploaded during registration</div>
+                      <div className="uploaded-id-empty">
+                        No ID uploaded during registration
+                      </div>
                     )}
                   </div>
                 </div>
@@ -572,42 +670,65 @@ export default function AccountVerification() {
                   <div className="card-title">Selfie Verification</div>
                   <div className="uploaded-id-wrapper">
                     {selectedResident.selfie_image ? (
-                      <button type="button" className="uploaded-id-button"
-                        onClick={() => setLightboxImage({
-                          url: selectedResident.selfie_image,
-                          alt: "Resident Selfie",
-                        })} title="Click to view full size">
-                        <img src={selectedResident.selfie_image} alt="Resident Selfie"
-                          className="uploaded-id-image" />
+                      <button
+                        type="button"
+                        className="uploaded-id-button"
+                        onClick={() =>
+                          setLightboxImage({
+                            url: selectedResident.selfie_image,
+                            alt: "Resident Selfie",
+                          })
+                        }
+                        title="Click to view full size"
+                      >
+                        <img
+                          src={selectedResident.selfie_image}
+                          alt="Resident Selfie"
+                          className="uploaded-id-image"
+                        />
                         <div className="zoom-hint">🔍 Click to enlarge</div>
                       </button>
                     ) : (
-                      <div className="uploaded-id-empty">No selfie captured during registration</div>
+                      <div className="uploaded-id-empty">
+                        No selfie captured during registration
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
 
               <div className="verification-actions">
-                <button type="button"
+                <button
+                  type="button"
                   className={`verification-button verify ${currentStatus === "Verified Resident" ? "verified" : ""}`}
                   onClick={handleVerify}
-                  disabled={currentStatus === "Verified Resident" || verifying}>
-                  {verifying ? "Verifying..."
-                    : currentStatus === "Verified Resident" ? "✓ Verified Resident"
-                    : "Verify Resident"}
+                  disabled={currentStatus === "Verified Resident" || verifying}
+                >
+                  {verifying
+                    ? "Verifying..."
+                    : currentStatus === "Verified Resident"
+                      ? "✓ Verified Resident"
+                      : "Verify Resident"}
                 </button>
 
-                <button type="button"
+                <button
+                  type="button"
                   className={`verification-button reject ${currentStatus === "Rejected" ? "rejected" : ""}`}
                   onClick={handleReject}
-                  disabled={currentStatus === "Rejected" || rejecting}>
-                  {rejecting ? "Rejecting..."
-                    : currentStatus === "Rejected" ? "✕ Rejected"
-                    : "Reject Verification"}
+                  disabled={currentStatus === "Rejected" || rejecting}
+                >
+                  {rejecting
+                    ? "Rejecting..."
+                    : currentStatus === "Rejected"
+                      ? "✕ Rejected"
+                      : "Reject Verification"}
                 </button>
 
-                <button type="button" className="verification-button print" onClick={handlePrint}>
+                <button
+                  type="button"
+                  className="verification-button print"
+                  onClick={handlePrint}
+                >
                   Print Resident Info
                 </button>
               </div>
@@ -617,13 +738,30 @@ export default function AccountVerification() {
       </div>
 
       {lightboxImage && (
-        <div className="lightbox-overlay" onClick={() => setLightboxImage(null)}>
-          <button type="button" className="lightbox-close"
-            onClick={(e) => { e.stopPropagation(); setLightboxImage(null); }}
-            aria-label="Close">✕</button>
-          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
-            <img src={lightboxImage.url} alt={`${lightboxImage.alt} (full size)`}
-              className="lightbox-media" />
+        <div
+          className="lightbox-overlay"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            type="button"
+            className="lightbox-close"
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightboxImage(null);
+            }}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+          <div
+            className="lightbox-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={lightboxImage.url}
+              alt={`${lightboxImage.alt} (full size)`}
+              className="lightbox-media"
+            />
           </div>
         </div>
       )}
@@ -776,9 +914,9 @@ export default function AccountVerification() {
           line-height: 1;
         }
         .vstatus.pending {
-          background: #FFF8E1;
-          color: #8b6800;
-          border: 1px solid #F1D98A;
+          background: #f7eab3;
+          color: #525252;
+          border: 1px solid #d9cc9a;
         }
         .vstatus.verified {
           background: #EAF7EA;
@@ -786,14 +924,14 @@ export default function AccountVerification() {
           border: 1px solid #B8DCBA;
         }
         .vstatus.rejected {
-          background: #FDECEC;
-          color: #B83232;
-          border: 1px solid #E5B5B5;
+          background: #ffc8c8;
+          color: #525252;
+          border: 1px solid #e0b0b0;
         }
         .vstatus.overdue {
-          background: #FEF3C7;
-          color: #92400E;
-          border: 1px solid #FCD34D;
+          background: #f0d888;
+          color: #525252;
+          border: 1px solid #c9b478;
           font-variant-numeric: tabular-nums;
         }
 

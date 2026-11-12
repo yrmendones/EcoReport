@@ -246,10 +246,16 @@ export default function Report() {
           <div className="sidebar-overlay"></div>
           <div className="sidebar-content">
             <div className="sidebar-brand">
-              <img src="/lightleaf.png" alt="EcoReport" className="sidebar-brand-image" />
+              <img
+                src="/lightleaf.png"
+                alt="EcoReport"
+                className="sidebar-brand-image"
+              />
               <span className="sidebar-brand-name">EcoReport</span>
             </div>
-            <div className="sidebar-barangay">Barangay Sto. Rosario Kanluran</div>
+            <div className="sidebar-barangay">
+              Barangay Sto. Rosario Kanluran
+            </div>
             <nav className="sidebar-menu">
               {menuItems.map((item, index) => (
                 <button
@@ -326,7 +332,9 @@ export default function Report() {
                 onChange={(e) => setDatePreset(e.target.value)}
               >
                 {DATE_PRESETS.map((d) => (
-                  <option key={d.value} value={d.value}>{d.label}</option>
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
                 ))}
               </select>
 
@@ -362,7 +370,11 @@ export default function Report() {
                 </button>
               )}
 
-              <button type="button" className="filter-button" onClick={fetchReports}>
+              <button
+                type="button"
+                className="filter-button"
+                onClick={fetchReports}
+              >
                 <span>☷</span> Refresh
               </button>
             </div>
@@ -400,14 +412,19 @@ export default function Report() {
                   <tbody>
                     {paginatedReports.length > 0 ? (
                       paginatedReports.map((report, index) => {
-                        const formattedDate = new Date(report.submitted_at).toLocaleDateString(
-                          "en-US",
-                          { year: "numeric", month: "short", day: "numeric" }
-                        );
-                        const formattedTime = new Date(report.submitted_at).toLocaleTimeString(
-                          "en-US",
-                          { hour: "2-digit", minute: "2-digit" }
-                        );
+                        const formattedDate = new Date(
+                          report.submitted_at,
+                        ).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        });
+                        const formattedTime = new Date(
+                          report.submitted_at,
+                        ).toLocaleTimeString("en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
 
                         return (
                           <tr key={index}>
@@ -423,7 +440,7 @@ export default function Report() {
                                 report.location ||
                                 (report.latitude && report.longitude
                                   ? `${parseFloat(report.latitude).toFixed(6)}, ${parseFloat(
-                                      report.longitude
+                                      report.longitude,
                                     ).toFixed(6)}`
                                   : "N/A")}
                             </td>
@@ -433,7 +450,7 @@ export default function Report() {
                             </td>
                             <td>
                               <span className={`status-badge ${getStatusClass(report.status)}`}>
-                                {report.status}
+                                {report.status ? report.status.charAt(0).toUpperCase() + report.status.slice(1) : "—"}
                               </span>
                             </td>
                             <td>
@@ -461,7 +478,10 @@ export default function Report() {
                       })
                     ) : (
                       <tr>
-                        <td colSpan="8" className="text-center py-8 text-gray-500">
+                        <td
+                          colSpan="8"
+                          className="text-center py-8 text-gray-500"
+                        >
                           No reports found matching your filters.
                         </td>
                       </tr>
@@ -475,7 +495,8 @@ export default function Report() {
             {!loading && !error && totalPages > 1 && (
               <div className="rp-pagination-bar">
                 <div className="rp-page-info">
-                  Page <strong>{safePage}</strong> of <strong>{totalPages}</strong>
+                  Page <strong>{safePage}</strong> of{" "}
+                  <strong>{totalPages}</strong>
                 </div>
 
                 <div className="rp-pagination-controls">
@@ -502,7 +523,7 @@ export default function Report() {
                       >
                         {p}
                       </button>
-                    )
+                    ),
                   )}
 
                   <button
@@ -615,11 +636,11 @@ export default function Report() {
         .date-cell span { display: block; }
 
         .status-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 54px; height: 21px; padding: 0 8px; border-radius: 3px; font-size: 8px; font-weight: 700; border: 1px solid rgba(0,0,0,0.15); box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
-        .status-badge.pending { background: #fff0a8; color: #856400; }
-        .status-badge.ongoing { background: #a8c8ff; color: #0750ad; }
-        .status-badge.assigned { background: #cdb2ff; color: #5730a3; }
+        .status-badge.pending { background: #f7eab3; color: #525252; }
+        .status-badge.ongoing { background: #b6d3ff; color: #525252; }
+        .status-badge.assigned { background: #d0b6ff; color: #525252; }
         .status-badge.resolved { background: #bde5bd; color: #236523; }
-        .status-badge.rejected { background: #ffb8b8; color: #9b1d1d; }
+        .status-badge.rejected { background: #ffc8c8; color: #525252; }
 
         .actions { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .action-button { width: 17px; height: 17px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; }

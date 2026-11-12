@@ -674,9 +674,9 @@ export default function Certificate() {
 
         .status-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 58px; height: 20px; padding: 0 8px; border-radius: 3px; font-size: 8px; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.18); border: 1px solid rgba(0,0,0,0.15); }
         .status-badge.approved { background: #e1f6d8; color: #286a34; border-color: #82b975; }
-        .status-badge.pending { background: #ffe4a1; color: #d28a00; border-color: #e2b83f; }
-        .status-badge.rejected { background: #ffdcdc; color: #c00000; border-color: #df8a8a; }
-        .status-badge.released { background: #d1edcf; color: #287128; border-color: #82b975; }
+        .status-badge.pending { background: #f7eab3; color: #525252; border-color: #d9cc9a; }
+        .status-badge.rejected { background: #ffc8c8; color: #525252; border-color: #e0b0b0; }
+        .status-badge.released { background: #e7ffd5; color: #525252; border-color: #c9deb0; }
 
         .actions { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .action-button { width: 17px; height: 17px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; }

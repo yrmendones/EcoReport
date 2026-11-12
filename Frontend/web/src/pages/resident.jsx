@@ -73,7 +73,7 @@ export default function Resident() {
   // ============================================================
   // FILTER
   // ============================================================
-    const filteredResidents = residents.filter((resident) => {
+  const filteredResidents = residents.filter((resident) => {
     const searchValue = search.toLowerCase();
     const matchesSearch =
       resident.resident_id?.toLowerCase().includes(searchValue) ||
@@ -92,11 +92,14 @@ export default function Resident() {
   // ============================================================
   // PAGINATION
   // ============================================================
-  const totalPages = Math.max(1, Math.ceil(filteredResidents.length / PAGE_SIZE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredResidents.length / PAGE_SIZE),
+  );
   const safePage = Math.min(page, totalPages);
   const paginatedResidents = filteredResidents.slice(
     (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE
+    safePage * PAGE_SIZE,
   );
 
   const pageNumbers = () => {
@@ -116,7 +119,7 @@ export default function Resident() {
     return pages;
   };
 
-    useEffect(() => {
+  useEffect(() => {
     setPage(1);
   }, [search, statusFilter]);
 
@@ -131,7 +134,9 @@ export default function Resident() {
     if (isNoMiddleName(mid)) {
       return `${firstName} ${lastName}`.replace(/\s+/g, " ").trim() || "N/A";
     }
-    return `${firstName} ${mid} ${lastName}`.replace(/\s+/g, " ").trim() || "N/A";
+    return (
+      `${firstName} ${mid} ${lastName}`.replace(/\s+/g, " ").trim() || "N/A"
+    );
   };
 
   const getVerificationStatus = (resident) => {
@@ -228,7 +233,9 @@ export default function Resident() {
     if (editForm.contact_number) {
       const mobileRegex = /^(09)\d{9}$/;
       if (!mobileRegex.test(editForm.contact_number)) {
-        alert("Contact number must be 11 digits starting with 09 (e.g., 09123456789).");
+        alert(
+          "Contact number must be 11 digits starting with 09 (e.g., 09123456789).",
+        );
         return;
       }
     }
@@ -256,7 +263,12 @@ export default function Resident() {
   };
 
   const handleDelete = async (resident) => {
-    if (!window.confirm(`Delete resident ${getFullName(resident)}? This action cannot be undone.`)) return;
+    if (
+      !window.confirm(
+        `Delete resident ${getFullName(resident)}? This action cannot be undone.`,
+      )
+    )
+      return;
     try {
       await apiFetch(`/api/admin/residents/${resident.user_id}`, {
         method: "DELETE",
@@ -280,10 +292,16 @@ export default function Resident() {
           <div className="sidebar-overlay"></div>
           <div className="sidebar-content">
             <div className="sidebar-brand">
-              <img src="/lightleaf.png" alt="EcoReport" className="sidebar-brand-image" />
+              <img
+                src="/lightleaf.png"
+                alt="EcoReport"
+                className="sidebar-brand-image"
+              />
               <span className="sidebar-brand-name">EcoReport</span>
             </div>
-            <div className="sidebar-barangay">Barangay Sto. Rosario Kanluran</div>
+            <div className="sidebar-barangay">
+              Barangay Sto. Rosario Kanluran
+            </div>
             <nav className="sidebar-menu">
               {menuItems.map((item, index) => (
                 <button
@@ -383,7 +401,9 @@ export default function Resident() {
                     {paginatedResidents.length > 0 ? (
                       paginatedResidents.map((resident) => (
                         <tr key={resident.user_id}>
-                          <td className="resident-id">{resident.resident_id || "N/A"}</td>
+                          <td className="resident-id">
+                            {resident.resident_id || "N/A"}
+                          </td>
                           <td>{getFullName(resident)}</td>
                           <td>{resident.address || "N/A"}</td>
                           <td>{resident.contact_number || "N/A"}</td>
@@ -392,14 +412,18 @@ export default function Resident() {
                             {(() => {
                               const vStatus = getVerificationStatus(resident);
                               return (
-                                <span className={`verification-status ${getVerificationClass(vStatus)}`}>
+                                <span
+                                  className={`verification-status ${getVerificationClass(vStatus)}`}
+                                >
                                   {vStatus}
                                 </span>
                               );
                             })()}
                           </td>
                           <td>
-                            <span className={`resident-status ${resident.status?.toLowerCase() || ""}`}>
+                            <span
+                              className={`resident-status ${resident.status?.toLowerCase() || ""}`}
+                            >
                               {resident.status || "Unknown"}
                             </span>
                           </td>
@@ -427,7 +451,10 @@ export default function Resident() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="8" className="text-center py-8 text-gray-500">
+                        <td
+                          colSpan="8"
+                          className="text-center py-8 text-gray-500"
+                        >
                           No residents found.
                         </td>
                       </tr>
@@ -441,7 +468,8 @@ export default function Resident() {
             {!loading && !error && totalPages > 1 && (
               <div className="rp-pagination-bar">
                 <div className="rp-page-info">
-                  Page <strong>{safePage}</strong> of <strong>{totalPages}</strong>
+                  Page <strong>{safePage}</strong> of{" "}
+                  <strong>{totalPages}</strong>
                 </div>
 
                 <div className="rp-pagination-controls">
@@ -468,7 +496,7 @@ export default function Resident() {
                       >
                         {p}
                       </button>
-                    )
+                    ),
                   )}
 
                   <button
@@ -486,7 +514,7 @@ export default function Resident() {
         </main>
       </div>
 
-            {/* ============ EDIT MODAL ============ */}
+      {/* ============ EDIT MODAL ============ */}
       {showEditModal && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -500,7 +528,11 @@ export default function Resident() {
                   onClick={openNameSubModal}
                 >
                   <span>
-                    {[editForm.first_name, editForm.middle_name, editForm.last_name]
+                    {[
+                      editForm.first_name,
+                      editForm.middle_name,
+                      editForm.last_name,
+                    ]
                       .filter((n) => n && n.trim())
                       .join(" ") || "Tap to set name"}
                   </span>
@@ -542,14 +574,18 @@ export default function Resident() {
                   disabled
                   className="disabled-input"
                 />
-                <small style={{ color: "#888", fontSize: "10px" }}>Email cannot be changed</small>
+                <small style={{ color: "#888", fontSize: "10px" }}>
+                  Email cannot be changed
+                </small>
               </div>
 
               <div className="form-group">
                 <label>Status</label>
                 <select
                   value={editForm.status}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, status: e.target.value })
+                  }
                 >
                   <option value="Active">Active</option>
                   <option value="Deactivated">Deactivated</option>
@@ -557,10 +593,16 @@ export default function Resident() {
               </div>
 
               <div className="modal-actions">
-                <button type="button" className="btn-cancel" onClick={() => setShowEditModal(false)}>
+                <button
+                  type="button"
+                  className="btn-cancel"
+                  onClick={() => setShowEditModal(false)}
+                >
                   Cancel
                 </button>
-                <button type="submit" className="btn-save">Update</button>
+                <button type="submit" className="btn-save">
+                  Update
+                </button>
               </div>
             </form>
           </div>
@@ -569,7 +611,11 @@ export default function Resident() {
 
       {/* ============ NAME SUB-MODAL ============ */}
       {showNameSubModal && (
-        <div className="modal-overlay" style={{ zIndex: 2000 }} onClick={cancelNameSubModal}>
+        <div
+          className="modal-overlay"
+          style={{ zIndex: 2000 }}
+          onClick={cancelNameSubModal}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>Edit Full Name</h3>
             <div className="form-group">
@@ -577,7 +623,9 @@ export default function Resident() {
               <input
                 type="text"
                 value={editForm.first_name}
-                onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, first_name: e.target.value })
+                }
               />
             </div>
             <div className="form-group">
@@ -585,7 +633,9 @@ export default function Resident() {
               <input
                 type="text"
                 value={editForm.middle_name}
-                onChange={(e) => setEditForm({ ...editForm, middle_name: e.target.value })}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, middle_name: e.target.value })
+                }
                 placeholder="N/A if none"
               />
             </div>
@@ -594,14 +644,24 @@ export default function Resident() {
               <input
                 type="text"
                 value={editForm.last_name}
-                onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, last_name: e.target.value })
+                }
               />
             </div>
             <div className="modal-actions">
-              <button type="button" className="btn-cancel" onClick={cancelNameSubModal}>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={cancelNameSubModal}
+              >
                 Cancel
               </button>
-              <button type="button" className="btn-save" onClick={saveNameSubModal}>
+              <button
+                type="button"
+                className="btn-save"
+                onClick={saveNameSubModal}
+              >
                 Done
               </button>
             </div>
@@ -611,7 +671,11 @@ export default function Resident() {
 
       {/* ============ ADDRESS SUB-MODAL ============ */}
       {showAddressSubModal && (
-        <div className="modal-overlay" style={{ zIndex: 2000 }} onClick={cancelAddressSubModal}>
+        <div
+          className="modal-overlay"
+          style={{ zIndex: 2000 }}
+          onClick={cancelAddressSubModal}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>Edit Address</h3>
             <div className="form-group">
@@ -619,7 +683,9 @@ export default function Resident() {
               <input
                 type="text"
                 value={editForm.house_no}
-                onChange={(e) => setEditForm({ ...editForm, house_no: e.target.value })}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, house_no: e.target.value })
+                }
                 placeholder="e.g., 123"
               />
             </div>
@@ -628,18 +694,35 @@ export default function Resident() {
               <input
                 type="text"
                 value={editForm.street}
-                onChange={(e) => setEditForm({ ...editForm, street: e.target.value })}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, street: e.target.value })
+                }
                 placeholder="e.g., P. Gomez St."
               />
             </div>
-            <small style={{ color: "#888", fontSize: "10px", display: "block", marginTop: "6px" }}>
+            <small
+              style={{
+                color: "#888",
+                fontSize: "10px",
+                display: "block",
+                marginTop: "6px",
+              }}
+            >
               Barangay is added automatically when saved
             </small>
             <div className="modal-actions">
-              <button type="button" className="btn-cancel" onClick={cancelAddressSubModal}>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={cancelAddressSubModal}
+              >
                 Cancel
               </button>
-              <button type="button" className="btn-save" onClick={saveAddressSubModal}>
+              <button
+                type="button"
+                className="btn-save"
+                onClick={saveAddressSubModal}
+              >
                 Done
               </button>
             </div>
@@ -822,10 +905,20 @@ export default function Resident() {
         .resident-status.offline { color: #f5a623; }
         .resident-status.deactivated { color: #d51f1f; }
 
-        .verification-status { font-size: 8px; font-weight: 700; }
-        .verification-status.verified { color: #287128; }
-        .verification-status.pending { color: #d28a00; }
-        .verification-status.rejected { color: #d51f1f; }
+        .verification-status {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 3px 10px;
+          border-radius: 10px;
+          font-size: 9px;
+          font-weight: 700;
+          white-space: nowrap;
+          line-height: 1;
+        }
+        .verification-status.verified { background: #d1edcf; color: #2E7D32; }
+        .verification-status.pending  { background: #f7eab3; color: #525252; }
+        .verification-status.rejected { background: #ffc8c8; color: #525252; }
 
         .actions { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .action-button { width: 17px; height: 17px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; }

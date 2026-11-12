@@ -117,15 +117,25 @@ html, body, #root {
   flex-shrink: 0;
 }
 
-.persistent-sidebar-menu {
-  width: 100%;
-  padding-top: 5px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+/* ─── Grouped sections (Barangay Official sidebar) ─── */
+.persistent-menu-section {
+  margin-bottom: 4px;
+}
+
+.persistent-menu-section:first-of-type {
+  margin-top: 0;
+}
+
+.persistent-menu-section-title {
+  padding: 14px 14px 6px 42px;
+  color: rgba(255, 249, 223, 0.52);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  user-select: none;
+  white-space: nowrap;
 }
 
 /* Custom scrollbar (Chrome/Edge/Safari) */
@@ -163,6 +173,11 @@ html, body, #root {
     width: 26px;
     height: 24px;
   }
+  .persistent-menu-section-title {
+    padding: 10px 14px 4px 42px;
+    font-size: 9px;
+    letter-spacing: 1.2px;
+  }
 }
 
 @media (max-height: 750px) {
@@ -194,6 +209,11 @@ html, body, #root {
     width: 22px;
     height: 20px;
   }
+  .persistent-menu-section-title {
+    padding: 8px 12px 3px 34px;
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
 }
 
 @media (max-height: 650px) {
@@ -215,6 +235,11 @@ html, body, #root {
   .persistent-menu-icon {
     width: 20px;
     height: 18px;
+  }
+  .persistent-menu-section-title {
+    padding: 6px 10px 2px 28px;
+    font-size: 8px;
+    letter-spacing: 0.8px;
   }
 }
 
@@ -304,15 +329,14 @@ button {
    component's inline <style> block, so we don't have to edit 17
    separate files to keep things consistent.
 
-     Primary / Action    → Blue       #008CBA
+     Primary / Action    → Blue       #759ac8
      Success / Confirm   → Green      #04AA6D
-     Danger / Delete     → Red        #F44336
-     Warning / Caution   → Amber      #FF9800
-     Neutral / Secondary → Light Gray #E7E7E7
-     Dark / Contrast     → Charcoal   #555555
+     Danger / Delete     → Red        #af5450
+     Warning / Caution   → Orange     #c18350
+     Neutral / Secondary → Gray       #777b84
    ════════════════════════════════════════════════════════════ */
 
-/* ─── PRIMARY — Blue #008CBA ───
+/* ─── PRIMARY — Blue #759ac8 ───
    Covers: New Assignment, Create Announcement, Send Notification,
    Add Schedule, Add Service, Add Staff, Create Health Announcement,
    Add Hotline, New Incident, Create Alert, Add Item, Export CSV,
@@ -328,8 +352,8 @@ button {
 #root .primary-button,
 #root .add-category-button,
 #root .change-password-btn {
-  background: #008CBA;
-  border: 1px solid #006F96;
+  background: #759ac8;
+  border: 1px solid #6587b0;
   color: #ffffff;
 }
 #root .filter-export-btn:hover:not(:disabled),
@@ -342,11 +366,11 @@ button {
 #root .primary-button:hover:not(:disabled),
 #root .add-category-button:hover,
 #root .change-password-btn:hover {
-  background: #0078A3;
-  border-color: #006F96;
+  background: #6587b0;
+  border-color: #6587b0;
 }
 
-/* ─── SECONDARY — Light Gray #E7E7E7 ───
+/* ─── SECONDARY — Gray #777b84 ───
    Covers: Cancel, Back, Close, Clear filters, Refresh, Edit Info,
    Print Resident Info, Download CSV */
 #root .btn-cancel,
@@ -356,9 +380,9 @@ button {
 #root .edit-info-btn,
 #root .reset-button,
 #root .verification-button.print {
-  background: #E7E7E7;
-  border-color: #D0D0D0;
-  color: #333333;
+  background: #777b84;
+  border-color: #66696f;
+  color: #ffffff;
 }
 #root .btn-cancel:hover,
 #root .filter-clear-btn:hover,
@@ -367,7 +391,8 @@ button {
 #root .edit-info-btn:hover,
 #root .reset-button:hover,
 #root .verification-button.print:hover {
-  background: #D9D9D9;
+  background: #66696f;
+  border-color: #66696f;
 }
 
 /* ─── SUCCESS — Green #04AA6D ───
@@ -386,7 +411,7 @@ button {
   background: #03995F;
 }
 
-/* ─── DANGER — Red #F44336 ───
+/* ─── DANGER — Red #af5450 ───
    Covers: Reject Report, Reject Verification, Stop (QR scanner),
    Deactivate (in dropdown), Logout */
 #root .reject-button,
@@ -394,25 +419,54 @@ button {
 #root .verification-button.reject,
 #root .verification-button.reject:not(.rejected),
 #root .logout-btn {
-  background: #F44336;
-  border: 1px solid #D93428;
+  background: #af5450;
+  border: 1px solid #974744;
   color: #ffffff;
 }
 #root .reject-button:hover,
 #root .qr-stop-btn:hover,
 #root .verification-button.reject:hover:not(.rejected):not(:disabled),
 #root .logout-btn:hover {
-  background: #D93428;
-  border-color: #D93428;
+  background: #974744;
+  border-color: #974744;
 }
 
-/* ─── DARK / CONTRAST — Charcoal #555555 ───
+/* ─── NEUTRAL — Gray #777b84 ───
    Covers: Assign Worker (secondary workflow action) */
 #root .assign-button {
-  background: #555555;
-  border-color: #3D3D3D;
+  background: #777b84;
+  border-color: #66696f;
   color: #ffffff;
 }
+#root .assign-button:hover {
+  background: #66696f;
+  border-color: #66696f;
+}
+
+/* ─── WARNING — Orange #c18350 ───
+   Covers: future Reset / Archive / Proceed with Caution actions.
+   Currently no buttons use .btn-warning-equivalent class in the
+   web panel — reserved for future use. If you add a "Reset" or
+   "Archive" button, give it class .warning-button to inherit this. */
+#root .warning-button {
+  background: #c18350;
+  border: 1px solid #a8703f;
+  color: #ffffff;
+}
+#root .warning-button:hover:not(:disabled) {
+  background: #a8703f;
+  border-color: #a8703f;
+}
+
+/* ─── TABLE ROW ICON BUTTONS ─── */
+/* These icon buttons (pencil, trash, eye) are defined per-page as
+   `.action-button.edit` / `.action-button.delete` / `.action-button.view`.
+   The #root prefix gives them higher specificity than the inline
+   <style> blocks, so one rule here overrides every page at once.
+   `.action-button.view` stays green per project convention. */
+#root .action-button.edit { color: #759ac8; }
+#root .action-button.delete { color: #af5450; }
+
 #root .assign-button:hover {
   background: #3D3D3D;
 }

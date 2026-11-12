@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { apiFetch } from "./api";
-import { getMenuItems } from "./menu";
+import { getMenuSections } from "./menu";
 import MaintenanceGate from "./components/MaintenanceGate";
 import { DEFAULT_BARANGAY, fetchBarangayInfo } from "./utils/barangay";
 
@@ -173,8 +173,8 @@ function PersistentSidebar() {
   const { token, role } = readAuth();
   if (!token || (role !== "admin" && role !== "barangay_official")) return null;
 
-  const menuItems = getMenuItems(location.pathname);
-  if (menuItems.length === 0) return null;
+  const menuSections = getMenuSections(location.pathname);
+  if (menuSections.length === 0) return null;
 
   return (
     <aside className="persistent-sidebar">
@@ -187,16 +187,25 @@ function PersistentSidebar() {
         </div>
         <div className="persistent-sidebar-barangay">{barangay.name}</div>
         <nav className="persistent-sidebar-menu">
-          {menuItems.map((item, index) => (
-            <button
-              key={index}
-              type="button"
-              className={`persistent-menu-item ${item.active ? "active" : ""}`}
-              onClick={() => navigate(item.path)}
-            >
-              <img src={item.icon} alt="" className="persistent-menu-icon" />
-              <span className="persistent-menu-text">{item.name}</span>
-            </button>
+          {menuSections.map((section, si) => (
+            <div key={si} className="persistent-menu-section">
+              {section.title && (
+                <div className="persistent-menu-section-title">
+                  {section.title}
+                </div>
+              )}
+              {section.items.map((item, index) => (
+                <button
+                  key={`${si}-${index}`}
+                  type="button"
+                  className={`persistent-menu-item ${item.active ? "active" : ""}`}
+                  onClick={() => navigate(item.path)}
+                >
+                  <img src={item.icon} alt="" className="persistent-menu-icon" />
+                  <span className="persistent-menu-text">{item.name}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
       </div>

@@ -432,7 +432,7 @@ export default function AllReport() {
                     <div className="information-label">Status</div>
                     <div className="information-value">
                       <span className={`status-badge ${getStatusClass(report.status)}`}>
-                        {report.status}
+                        {report.status ? report.status.charAt(0).toUpperCase() + report.status.slice(1) : "—"}
                       </span>
                     </div>
                   </div>
@@ -635,11 +635,11 @@ export default function AllReport() {
         .date-divider { margin: 0 4px; color: #888888; }
         .status-row { min-height: 30px; }
         .status-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 84px; height: 20px; padding: 0 8px; border-radius: 4px; font-size: 8px; font-weight: 700; border: 1px solid rgba(0,0,0,0.12); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
-        .status-badge.pending { background: #ffe995; color: #8b6800; }
-        .status-badge.ongoing { background: #a9cbff; color: #0750ad; }
-        .status-badge.assigned { background: #cdb2ff; color: #5730a3; }
+        .status-badge.pending { background: #f7eab3; color: #525252; }
+        .status-badge.ongoing { background: #b6d3ff; color: #525252; }
+        .status-badge.assigned { background: #d0b6ff; color: #525252; }
         .status-badge.resolved { background: #bde5bd; color: #236523; }
-        .status-badge.rejected { background: #ffb8b8; color: #9b1d1d; }
+        .status-badge.rejected { background: #ffc8c8; color: #525252; }
 
         .map-container { height: 200px; margin: 10px; border-radius: 4px; overflow: hidden; border: 1px solid #d0d6d0; background: #e8ecec; }
 

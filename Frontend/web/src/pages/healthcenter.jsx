@@ -1522,15 +1522,37 @@ export default function HealthCenter() {
         .table-announcements .reports-table th:nth-child(5),
         .table-announcements .reports-table td:nth-child(5) { width: 13%; text-align: center; }
 
-        .apt-status { font-size: 8px; font-weight: 700; }
-        .apt-status.pending { color: #d28a00; }
-        .apt-status.confirmed { color: #2870b8; }
-        .apt-status.completed { color: #287128; }
-        .apt-status.cancelled { color: #e11d2e; }
+        .apt-status {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 3px 10px;
+          border-radius: 10px;
+          font-size: 9px;
+          font-weight: 700;
+          white-space: nowrap;
+          line-height: 1;
+        }
+        .apt-status.pending   { background: #f7eab3; color: #525252; }
+        .apt-status.confirmed { background: #d1edcf; color: #2E7D32; }
+        .apt-status.completed { background: #d1edcf; color: #2E7D32; }
+        .apt-status.cancelled { background: #ffc8c8; color: #525252; }
 
-        .svc-status { font-size: 8px; font-weight: 700; text-transform: capitalize; }
-        .svc-status.active, .svc-status.published { color: #287128; }
-        .svc-status.inactive, .svc-status.draft { color: #e11d2e; }
+        .svc-status {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 3px 10px;
+          border-radius: 10px;
+          font-size: 9px;
+          font-weight: 700;
+          white-space: nowrap;
+          line-height: 1;
+          text-transform: capitalize;
+        }
+        .svc-status.active, .svc-status.published { background: #d1edcf; color: #2E7D32; }
+        .svc-status.inactive { background: #ffc8c8; color: #525252; }
+        .svc-status.draft    { background: #f7eab3; color: #525252; }
 
         .actions { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .action-button { width: 17px; height: 17px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; }

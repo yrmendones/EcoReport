@@ -709,9 +709,19 @@ export default function Announcement() {
         .reports-table th:nth-child(4), .reports-table td:nth-child(4) { width: 12%; }
         .reports-table th:nth-child(5), .reports-table td:nth-child(5) { width: 10%; text-align: center; }
 
-        .status { font-size: 8px; font-weight: 700; }
-        .status.published { color: #27652f; }
-        .status.draft { color: #ff3030; }
+        .status {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 3px 10px;
+          border-radius: 10px;
+          font-size: 9px;
+          font-weight: 700;
+          white-space: nowrap;
+          line-height: 1;
+        }
+        .status.published { background: #d1edcf; color: #2E7D32; }
+        .status.draft     { background: #f7eab3; color: #525252; }
 
         .actions { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .action-button { width: 17px; height: 17px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; }

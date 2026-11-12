@@ -807,8 +807,8 @@ export default function Assignment() {
           box-shadow: 0 1px 2px rgba(0,0,0,0.14);
         }
         .assignment-status.resolved { background: #d1edcf; color: #287128; }
-        .assignment-status.assigned { background: #cdb2ff; color: #5730a3; }
-        .assignment-status.rejected { background: #ffb8b8; color: #9b1d1d; }
+        .assignment-status.assigned { background: #d0b6ff; color: #525252; }
+        .assignment-status.rejected { background: #ffc8c8; color: #525252; }
 
         .actions { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .action-button { width: 17px; height: 17px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; }

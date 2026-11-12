@@ -233,10 +233,16 @@ export default function Inventory() {
           <div className="sidebar-overlay"></div>
           <div className="sidebar-content">
             <div className="sidebar-brand">
-              <img src="/lightleaf.png" alt="EcoReport" className="sidebar-brand-image" />
+              <img
+                src="/lightleaf.png"
+                alt="EcoReport"
+                className="sidebar-brand-image"
+              />
               <span className="sidebar-brand-name">EcoReport</span>
             </div>
-            <div className="sidebar-barangay">Barangay Sto. Rosario Kanluran</div>
+            <div className="sidebar-barangay">
+              Barangay Sto. Rosario Kanluran
+            </div>
             <nav className="sidebar-menu">
               {menuItems.map((item, index) => (
                 <button
@@ -289,7 +295,9 @@ export default function Inventory() {
                 onChange={(e) => setCategoryFilter(e.target.value)}
               >
                 {CATEGORY_OPTIONS.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
                 ))}
               </select>
 
@@ -299,7 +307,9 @@ export default function Inventory() {
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
                 {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
                 ))}
               </select>
 
@@ -317,7 +327,13 @@ export default function Inventory() {
                 type="button"
                 className="filter-export-btn"
                 onClick={() => {
-                  setFormData({ item_name: "", category: "", quantity: "", unit: "", status: "Available" });
+                  setFormData({
+                    item_name: "",
+                    category: "",
+                    quantity: "",
+                    unit: "",
+                    status: "Available",
+                  });
                   setShowAddModal(true);
                 }}
               >
@@ -360,8 +376,8 @@ export default function Inventory() {
                                 item.status === "Available"
                                   ? "status-available"
                                   : item.status === "Low Stock"
-                                  ? "status-low"
-                                  : "status-out"
+                                    ? "status-low"
+                                    : "status-out"
                               }
                             >
                               {item.status}
@@ -391,7 +407,10 @@ export default function Inventory() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="6" className="text-center py-8 text-gray-500">
+                        <td
+                          colSpan="6"
+                          className="text-center py-8 text-gray-500"
+                        >
                           No inventory items found.
                         </td>
                       </tr>
@@ -405,7 +424,8 @@ export default function Inventory() {
             {!loading && !error && totalPages > 1 && (
               <div className="rp-pagination-bar">
                 <div className="rp-page-info">
-                  Page <strong>{safePage}</strong> of <strong>{totalPages}</strong>
+                  Page <strong>{safePage}</strong> of{" "}
+                  <strong>{totalPages}</strong>
                 </div>
 
                 <div className="rp-pagination-controls">
@@ -420,7 +440,9 @@ export default function Inventory() {
 
                   {pageNumbers().map((p, i) =>
                     p === "..." ? (
-                      <span key={`ellipsis-${i}`} className="rp-page-ellipsis">…</span>
+                      <span key={`ellipsis-${i}`} className="rp-page-ellipsis">
+                        …
+                      </span>
                     ) : (
                       <button
                         key={p}
@@ -430,7 +452,7 @@ export default function Inventory() {
                       >
                         {p}
                       </button>
-                    )
+                    ),
                   )}
 
                   <button
@@ -459,7 +481,9 @@ export default function Inventory() {
                 <input
                   type="text"
                   value={formData.item_name}
-                  onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, item_name: e.target.value })
+                  }
                   required
                   placeholder="e.g., Canned Sardines"
                 />
@@ -469,12 +493,16 @@ export default function Inventory() {
                 <label>Category</label>
                 <select
                   value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
                   required
                 >
                   <option value="">Select category</option>
                   {CATEGORY_FORM_OPTIONS.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -484,7 +512,9 @@ export default function Inventory() {
                 <input
                   type="number"
                   value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, quantity: e.target.value })
+                  }
                   min="0"
                   placeholder="e.g., 100"
                 />
@@ -494,12 +524,16 @@ export default function Inventory() {
                 <label>Unit</label>
                 <select
                   value={formData.unit}
-                  onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, unit: e.target.value })
+                  }
                   required
                 >
                   <option value="">Select unit</option>
                   {UNIT_OPTIONS.map((u) => (
-                    <option key={u} value={u}>{u}</option>
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -508,7 +542,9 @@ export default function Inventory() {
                 <label>Status</label>
                 <select
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, status: e.target.value })
+                  }
                 >
                   <option value="Available">Available</option>
                   <option value="Low Stock">Low Stock</option>
@@ -517,10 +553,16 @@ export default function Inventory() {
               </div>
 
               <div className="modal-actions">
-                <button type="button" className="btn-cancel" onClick={() => setShowAddModal(false)}>
+                <button
+                  type="button"
+                  className="btn-cancel"
+                  onClick={() => setShowAddModal(false)}
+                >
                   Cancel
                 </button>
-                <button type="submit" className="btn-save">Add</button>
+                <button type="submit" className="btn-save">
+                  Add
+                </button>
               </div>
             </form>
           </div>
@@ -538,7 +580,9 @@ export default function Inventory() {
                 <input
                   type="text"
                   value={formData.item_name}
-                  onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, item_name: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -547,17 +591,24 @@ export default function Inventory() {
                 <label>Category</label>
                 <select
                   value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
                   required
                 >
                   <option value="">Select category</option>
                   {CATEGORY_FORM_OPTIONS.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
                   ))}
                   {/* Fallback for legacy values */}
-                  {formData.category && !CATEGORY_FORM_OPTIONS.includes(formData.category) && (
-                    <option value={formData.category}>{formData.category} (legacy)</option>
-                  )}
+                  {formData.category &&
+                    !CATEGORY_FORM_OPTIONS.includes(formData.category) && (
+                      <option value={formData.category}>
+                        {formData.category} (legacy)
+                      </option>
+                    )}
                 </select>
               </div>
 
@@ -566,7 +617,9 @@ export default function Inventory() {
                 <input
                   type="number"
                   value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, quantity: e.target.value })
+                  }
                   min="0"
                 />
               </div>
@@ -575,16 +628,22 @@ export default function Inventory() {
                 <label>Unit</label>
                 <select
                   value={formData.unit}
-                  onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, unit: e.target.value })
+                  }
                   required
                 >
                   <option value="">Select unit</option>
                   {UNIT_OPTIONS.map((u) => (
-                    <option key={u} value={u}>{u}</option>
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
                   ))}
                   {/* Fallback for legacy values */}
                   {formData.unit && !UNIT_OPTIONS.includes(formData.unit) && (
-                    <option value={formData.unit}>{formData.unit} (legacy)</option>
+                    <option value={formData.unit}>
+                      {formData.unit} (legacy)
+                    </option>
                   )}
                 </select>
               </div>
@@ -593,7 +652,9 @@ export default function Inventory() {
                 <label>Status</label>
                 <select
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, status: e.target.value })
+                  }
                 >
                   <option value="Available">Available</option>
                   <option value="Low Stock">Low Stock</option>
@@ -602,10 +663,16 @@ export default function Inventory() {
               </div>
 
               <div className="modal-actions">
-                <button type="button" className="btn-cancel" onClick={() => setShowEditModal(false)}>
+                <button
+                  type="button"
+                  className="btn-cancel"
+                  onClick={() => setShowEditModal(false)}
+                >
                   Cancel
                 </button>
-                <button type="submit" className="btn-save">Update</button>
+                <button type="submit" className="btn-save">
+                  Update
+                </button>
               </div>
             </form>
           </div>
@@ -689,9 +756,22 @@ export default function Inventory() {
         .reports-table th:nth-child(5), .reports-table td:nth-child(5) { width: 14%; }
         .reports-table th:nth-child(6), .reports-table td:nth-child(6) { width: 12%; text-align: center; }
 
-        .status-available { color: #287128; font-size: 8px; font-weight: 700; }
-        .status-low { color: #f5a623; font-size: 8px; font-weight: 700; }
-        .status-out { color: #e11d2e; font-size: 8px; font-weight: 700; }
+        .status-available,
+        .status-low,
+        .status-out {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 3px 10px;
+          border-radius: 10px;
+          font-size: 9px;
+          font-weight: 700;
+          white-space: nowrap;
+          line-height: 1;
+        }
+        .status-available { background: #d1edcf; color: #2E7D32; }
+        .status-low       { background: #f7eab3; color: #525252; }
+        .status-out       { background: #ffc8c8; color: #525252; }
 
         .actions { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .action-button { width: 17px; height: 17px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; }

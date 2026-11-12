@@ -783,10 +783,21 @@ export default function Blotter() {
 
         .case-no { color: #34734b !important; font-weight: 700; }
 
-        .incident-status { font-size: 8px; font-weight: 700; text-transform: capitalize; }
-        .incident-status.open { color: #f5a400; }
-        .incident-status.investigating { color: #235ee8; }
-        .incident-status.closed { color: #ff1e27; }
+        .incident-status {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 3px 10px;
+          border-radius: 10px;
+          font-size: 9px;
+          font-weight: 700;
+          white-space: nowrap;
+          line-height: 1;
+          text-transform: capitalize;
+        }
+        .incident-status.open          { background: #f7eab3; color: #525252; }
+        .incident-status.investigating { background: #b6d3ff; color: #525252; }
+        .incident-status.closed        { background: #d1edcf; color: #2E7D32; }
 
         .actions { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .action-button { width: 17px; height: 17px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; }

@@ -120,19 +120,19 @@ body{
    classes (rounded-2xl, min-h-[54px], etc).
 
    Use:
-     .btn-primary    → Blue     — Submit, Login, Save, Register, Continue
-     .btn-success    → Green    — Confirm, Complete, Approve, Download
-     .btn-danger     → Red      — Delete, Logout, Remove, Cancel Account
-     .btn-warning    → Amber    — Reset, Archive, Proceed with Caution
-     .btn-secondary  → Light Gray — Back, Cancel, Close, Learn More
-     .btn-dark       → Charcoal — View Details, Secondary Action
+     .btn-primary    → Blue    #759ac8 — Submit, Login, Save, Register, Continue, Next
+     .btn-success    → Green   #04AA6D — Confirm, Complete, Approve, Resolve, Call
+     .btn-danger     → Red     #af5450 — Delete, Logout, Reject, Call 911
+     .btn-warning    → Orange  #c18350 — Reset, Caution
+     .btn-secondary  → Gray    #777b84 — Back, Cancel, Close
+     .btn-dark       → Gray    #777b84 — Secondary info (View on Map, Download, Share)
    ──────────────────────────────────────────────────────────── */
 
 .btn-primary {
-  background-color: #008CBA;
+  background-color: #759ac8;
   color: #ffffff;
 }
-.btn-primary:hover:not(:disabled) { background-color: #0078A3; }
+.btn-primary:hover:not(:disabled) { background-color: #6587b0; }
 .btn-primary:active:not(:disabled) { transform: scale(0.98); }
 
 .btn-success {
@@ -143,29 +143,29 @@ body{
 .btn-success:active:not(:disabled) { transform: scale(0.98); }
 
 .btn-danger {
-  background-color: #F44336;
+  background-color: #af5450;
   color: #ffffff;
 }
-.btn-danger:hover:not(:disabled) { background-color: #D93428; }
+.btn-danger:hover:not(:disabled) { background-color: #974744; }
 .btn-danger:active:not(:disabled) { transform: scale(0.98); }
 
 .btn-warning {
-  background-color: #FF9800;
+  background-color: #c18350;
   color: #ffffff;
 }
-.btn-warning:hover:not(:disabled) { background-color: #E88A00; }
+.btn-warning:hover:not(:disabled) { background-color: #aa7144; }
 .btn-warning:active:not(:disabled) { transform: scale(0.98); }
 
 .btn-secondary {
-  background-color: #E7E7E7;
-  color: #333333;
+  background-color: #777b84;
+  color: #ffffff;
 }
-.btn-secondary:hover:not(:disabled) { background-color: #D9D9D9; }
+.btn-secondary:hover:not(:disabled) { background-color: #65686f; }
 .btn-secondary:active:not(:disabled) { transform: scale(0.98); }
 
 .btn-dark {
-  background-color: #555555;
+  background-color: #777b84;
   color: #ffffff;
 }
-.btn-dark:hover:not(:disabled) { background-color: #3D3D3D; }
+.btn-dark:hover:not(:disabled) { background-color: #65686f; }
 .btn-dark:active:not(:disabled) { transform: scale(0.98); }

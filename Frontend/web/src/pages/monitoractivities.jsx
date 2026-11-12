@@ -704,13 +704,13 @@ export default function MonitorActivities() {
           border-radius: 10px; font-size: 9px; font-weight: 700;
         }
         .type-badge.audit {
-          background: #e3e8ee; color: #3b4a5a; border: 1px solid #c8d0d9;
+          background: #e5e7eb; color: #525252; border: 1px solid #d1d5db;
         }
         .type-badge.user {
-          background: #bde5bd; color: #236523; border: 1px solid #98cb98;
+          background: #d1edcf; color: #2E7D32; border: 1px solid #b8dcba;
         }
         .type-badge.security {
-          background: #fff0a8; color: #856400; border: 1px solid #e3cc70;
+          background: #f7eab3; color: #525252; border: 1px solid #d9cc9a;
         }
 
         .table-message {

@@ -687,12 +687,20 @@ export default function UserManagement() {
 
         /* STATUS */
         .user-status {
-          font-size: 9px; font-weight: 700;
-          display: inline-flex; align-items: center; gap: 4px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          padding: 3px 10px;
+          border-radius: 10px;
+          font-size: 9px;
+          font-weight: 700;
+          white-space: nowrap;
+          line-height: 1;
         }
-        .user-status.online { color: #287128; }
-        .user-status.offline { color: #8a7600; }
-        .user-status.deactivated { color: #d51f1f; }
+        .user-status.online      { background: #d1edcf; color: #2E7D32; }
+        .user-status.offline     { background: #e5e7eb; color: #525252; }
+        .user-status.deactivated { background: #ffc8c8; color: #525252; }
 
         /* MANAGE DROPDOWN */
         .actions-cell { overflow: visible !important; }

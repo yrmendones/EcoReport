@@ -736,8 +736,20 @@ export default function DisasterEmergency() {
         .reports-table th:nth-child(5), .reports-table td:nth-child(5) { width: 10%; }
         .reports-table th:nth-child(6), .reports-table td:nth-child(6) { width: 12%; text-align: center; }
 
-        .status-active { color: #287128; font-size: 8px; font-weight: 700; }
-        .status-inactive { color: #e11d2e; font-size: 8px; font-weight: 700; }
+        .status-active,
+        .status-inactive {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 3px 10px;
+          border-radius: 10px;
+          font-size: 9px;
+          font-weight: 700;
+          white-space: nowrap;
+          line-height: 1;
+        }
+        .status-active   { background: #d1edcf; color: #2E7D32; }
+        .status-inactive { background: #ffc8c8; color: #525252; }
 
         .actions { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .action-button { width: 17px; height: 17px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; }
