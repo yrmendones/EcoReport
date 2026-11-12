@@ -39,6 +39,8 @@ try {
 // ============================================================
 // CONSTANTS
 // ============================================================
+const REQUIRE_FACE_VERIFICATION = true;
+
 const STREETS = [
   "A. Mariano Street", "Alagao Street", "Apitong Street", "Banaba Street",
   "C. Lorenzo Street", "Camia Street", "Capitan E. Alvero Street",
@@ -824,6 +826,7 @@ export default function Register() {
   const [idType, setIdType] = useState("");
   const [showStreetDropdown, setShowStreetDropdown] = useState(false);
   const [streetError, setStreetError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // ---------- ID + OCR + face ----------
   const [residentIdFile, setResidentIdFile] = useState(null);
@@ -1035,10 +1038,27 @@ export default function Register() {
       if (digitsOnly.length >= 1 && digitsOnly[0] !== "0") return;
       if (digitsOnly.length >= 2 && digitsOnly[1] !== "9") return;
       setFormData({ ...formData, contact_number: digitsOnly.slice(0, 11) });
+      if (fieldErrors.contact_number) {
+        setFieldErrors((prev) => ({ ...prev, contact_number: "" }));
+      }
       return;
     }
 
     setFormData({ ...formData, [name]: value });
+
+    // Clear this field's error as soon as the user edits it
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+
+    // Live re-validate confirm_password when password changes
+    if (name === "password" && formData.confirm_password) {
+      const mismatch = value !== formData.confirm_password;
+      setFieldErrors((prev) => ({
+        ...prev,
+        confirm_password: mismatch ? "Passwords do not match." : "",
+      }));
+    }
   };
 
   const setIdFile = async (file) => {
@@ -1086,9 +1106,10 @@ export default function Register() {
     setStreetError("");
   };
 
-  const handleStreetBlur = () => {
+    const handleStreetBlur = () => {
     // Delay so a dropdown item click can register first. If the user picked
-    // from the list, formData.street will already be canonical by the time this runs.
+    // from the list, formData.street will already be canonical by the time
+    // this runs — no-op.
     setTimeout(() => {
       setShowStreetDropdown(false);
       const typed = formData.street.trim();
@@ -1104,6 +1125,94 @@ export default function Register() {
         setStreetError("Please select a street from the Sto. Rosario list.");
       }
     }, 180);
+  };
+
+  // ── Inline field validators ───
+  // One validator per field. Returns the error string (empty = valid).
+  // Used by handleFieldBlur (on blur), handleChange (to clear on edit),
+  // and validateAllFields (on submit + scroll-to-first-error).
+  const validateFieldValue = (name, value) => {
+    const v = typeof value === "string" ? value.trim() : value;
+
+    switch (name) {
+      case "first_name":
+      case "last_name":
+      case "house_no":
+        return v === "" ? "This field is required." : "";
+
+      case "middle_name":
+        return v === "" ? "This field is required. Type N/A if none." : "";
+
+      case "permanent_house_no":
+      case "permanent_street":
+      case "permanent_barangay":
+      case "permanent_city":
+        if (sameAddress) return "";
+        return v === "" ? "This field is required." : "";
+
+      case "contact_number":
+        if (v === "") return "Contact number is required.";
+        if (!/^09\d{9}$/.test(v)) return "Must be 11 digits starting with 09.";
+        return "";
+
+      case "email":
+        if (v === "") return "Email is required.";
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
+          return "Enter a valid email address.";
+        return "";
+
+      case "password":
+        if (!v) return "Password is required.";
+        if (v.length < passwordPolicy.min || v.length > passwordPolicy.max)
+          return `Password must be ${passwordPolicy.min}-${passwordPolicy.max} characters.`;
+        if (passwordPolicy.requireStrong) {
+          const hasLetter = /[A-Za-z]/.test(v);
+          const hasDigit = /\d/.test(v);
+          if (!hasLetter || !hasDigit)
+            return "Password must contain letters and numbers.";
+        }
+        return "";
+
+      case "confirm_password":
+        if (!v) return "Please confirm your password.";
+        if (v !== formData.password) return "Passwords do not match.";
+        return "";
+
+      default:
+        return "";
+    }
+  };
+
+  const handleFieldBlur = (name) => {
+    const err = validateFieldValue(name, formData[name]);
+    setFieldErrors((prev) => ({ ...prev, [name]: err }));
+  };
+
+  const getMissingFields = () => {
+    const missing = [];
+    if (!formData.first_name.trim()) missing.push("First Name");
+    if (!formData.middle_name.trim()) missing.push("Middle Name");
+    if (!formData.last_name.trim()) missing.push("Last Name");
+    if (!formData.house_no.trim()) missing.push("House Number");
+    if (!findMatchingStreet(formData.street)) missing.push("Street");
+    if (!permanentComplete) missing.push("Permanent Address");
+    if (validateFieldValue("contact_number", formData.contact_number))
+      missing.push("Valid Contact Number");
+    if (validateFieldValue("email", formData.email))
+      missing.push("Valid Email Address");
+    if (validateFieldValue("password", formData.password))
+      missing.push("Valid Password");
+    if (validateFieldValue("confirm_password", formData.confirm_password))
+      missing.push("Matching Confirm Password");
+    if (!idType) missing.push("Type of Resident ID");
+    if (!residentIdFile) missing.push("Resident ID Photo");
+    if (ocrValidation.passed !== true) missing.push("ID Verification");
+    if (REQUIRE_FACE_VERIFICATION && !idFaceFound)
+      missing.push("Clear Face on ID");
+    if (REQUIRE_FACE_VERIFICATION && !faceFile)
+      missing.push("Face Verification Selfie");
+    if (!agreedToTerms) missing.push("Terms & Conditions");
+    return missing;
   };
 
   const filteredStreets = STREETS.filter((s) =>
@@ -1227,31 +1336,36 @@ export default function Register() {
       return;
     }
 
-    if (formData.password !== formData.confirm_password) {
-      setError("Passwords do not match.");
+    const missing = getMissingFields();
+    if (missing.length > 0) {
+      setError(`Please complete: ${missing.join(", ")}.`);
       setLoading(false);
       return;
     }
-    const pwCheck = validatePasswordPolicy(formData.password, passwordPolicy);
-    if (!pwCheck.ok) {
-      setError(pwCheck.error);
-      setLoading(false);
-      return;
-    }
+
+    // Non-field checks (file / OCR / face / terms) — scroll to their
+    // respective sections if they fail.
     if (!ocrValidation.passed) {
       setError(ocrValidation.reason || "Please wait for ID verification.");
       setLoading(false);
+      setTimeout(() => {
+        document
+          .getElementById("resident-id-input")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 80);
       return;
     }
-    if (!idFaceFound) {
-      setError("Please upload a clear ID with a visible face.");
-      setLoading(false);
-      return;
-    }
-    if (!faceFile) {
-      setError("Please complete the face verification.");
-      setLoading(false);
-      return;
+    if (REQUIRE_FACE_VERIFICATION) {
+      if (!idFaceFound) {
+        setError("Please upload a clear ID with a visible face.");
+        setLoading(false);
+        return;
+      }
+      if (!faceFile) {
+        setError("Please complete the face verification.");
+        setLoading(false);
+        return;
+      }
     }
 
     try {
@@ -1293,15 +1407,6 @@ export default function Register() {
 
       navigate("/resident-dashboard");
         } catch (err) {
-      // TEMPORARY DEBUG — remove after diagnosing
-      const debugInfo = [
-        `Error: ${err.message}`,
-        `API_BASE_URL: "${API_BASE_URL}"`,
-        `Resolved upload URL: "${API_BASE_URL}/api/guest/upload"`,
-        `Resolved register URL: "${API_BASE_URL}/api/auth/register"`,
-        `Window origin: "${window.location.origin}"`,
-      ].join("\n\n");
-      alert(debugInfo);
       setError(err.message || "Registration failed. Please try again.");
     } finally {
       setLoading(false);
@@ -1309,24 +1414,37 @@ export default function Register() {
   };
 
   // ============ Reusable field ============
-  const field = (name, label, placeholder, extra = {}) => (
-    <div className="flex flex-col" style={{ gap: "8px" }}>
-      <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
-        {label} <span className="text-red-500">*</span>
-      </label>
-      <input
-        type="text"
-        name={name}
-        value={formData[name]}
-        onChange={handleChange}
-        placeholder={placeholder}
-        className="block w-full min-w-0 box-border min-h-[52px] rounded-2xl border border-[#8BB37A] bg-white text-[16px] text-gray-800 placeholder:text-gray-400 placeholder:text-[14px] outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20"
-        style={{ padding: "0 16px" }}
-        required
-        {...extra}
-      />
-    </div>
-  );
+  const field = (name, label, placeholder, extra = {}) => {
+    const err = fieldErrors[name];
+    return (
+      <div id={`field-${name}`} className="flex flex-col" style={{ gap: "8px" }}>
+        <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
+          {label} <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          name={name}
+          value={formData[name]}
+          onChange={handleChange}
+          onBlur={() => handleFieldBlur(name)}
+          placeholder={placeholder}
+          className={`block w-full min-w-0 box-border min-h-[52px] rounded-2xl border ${
+            err ? "border-red-500" : "border-[#8BB37A]"
+          } bg-white text-[16px] text-gray-800 placeholder:text-gray-400 placeholder:text-[14px] outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20`}
+          style={{ padding: "0 16px" }}
+          {...extra}
+        />
+        {err && (
+          <p
+            className="text-[12px] text-red-500 leading-5 field-error-message"
+            data-error-for={name}
+          >
+            {err}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   // ============================================================
   // RENDER
@@ -1363,15 +1481,6 @@ export default function Register() {
             className="flex flex-col"
             style={{ gap: "24px" }}
           >
-            {error && (
-              <div
-                className="bg-red-100 border border-red-400 rounded-xl text-red-700 text-sm leading-6 break-words shrink-0"
-                style={{ padding: "14px 16px" }}
-              >
-                {error}
-              </div>
-            )}
-
             {field("first_name", "First Name", "Enter first name")}
             {field("middle_name", "Middle Name", "Middle name (or N/A if none)")}
             {field("last_name", "Last Name", "Enter last name")}
@@ -1379,7 +1488,7 @@ export default function Register() {
             {field("house_no", "House Number", "Enter house number")}
 
             {/* STREET - searchable dropdown */}
-            <div className="flex flex-col" style={{ gap: "8px" }}>
+            <div id="field-street" className="flex flex-col" style={{ gap: "8px" }}>
               <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
                 Street <span className="text-red-500">*</span>
               </label>
@@ -1429,7 +1538,12 @@ export default function Register() {
                 )}
               </div>
               {streetError && (
-                <p className="text-[12px] text-red-500 leading-5">{streetError}</p>
+                <p
+                  className="text-[12px] text-red-500 leading-5 field-error-message"
+                  data-error-for="street"
+                >
+                  {streetError}
+                </p>
               )}
             </div>
 
@@ -1480,7 +1594,7 @@ export default function Register() {
             </div>
 
             {/* CONTACT */}
-            <div className="flex flex-col" style={{ gap: "8px" }}>
+            <div id="field-contact_number" className="flex flex-col" style={{ gap: "8px" }}>
               <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
                 Contact Number <span className="text-red-500">*</span>
               </label>
@@ -1489,17 +1603,27 @@ export default function Register() {
                 name="contact_number"
                 value={formData.contact_number}
                 onChange={handleChange}
+                onBlur={() => handleFieldBlur("contact_number")}
                 placeholder="Enter Phone Number"
                 maxLength={11}
                 inputMode="numeric"
-                className="block w-full min-w-0 box-border min-h-[52px] rounded-2xl border border-[#8BB37A] bg-white text-[16px] text-gray-800 placeholder:text-gray-400 outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20"
+                className={`block w-full min-w-0 box-border min-h-[52px] rounded-2xl border ${
+                  fieldErrors.contact_number ? "border-red-500" : "border-[#8BB37A]"
+                } bg-white text-[16px] text-gray-800 placeholder:text-gray-400 outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20`}
                 style={{ padding: "0 16px" }}
-                required
               />
+              {fieldErrors.contact_number && (
+                <p
+                  className="text-[12px] text-red-500 leading-5 field-error-message"
+                  data-error-for="contact_number"
+                >
+                  {fieldErrors.contact_number}
+                </p>
+              )}
             </div>
 
             {/* EMAIL */}
-            <div className="flex flex-col" style={{ gap: "8px" }}>
+            <div id="field-email" className="flex flex-col" style={{ gap: "8px" }}>
               <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
                 Email Address <span className="text-red-500">*</span>
               </label>
@@ -1508,16 +1632,26 @@ export default function Register() {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
+                onBlur={() => handleFieldBlur("email")}
                 placeholder="Enter email address"
                 autoComplete="email"
-                className="block w-full min-w-0 box-border min-h-[52px] rounded-2xl border border-[#8BB37A] bg-white text-[16px] text-gray-800 placeholder:text-gray-400 outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20"
+                className={`block w-full min-w-0 box-border min-h-[52px] rounded-2xl border ${
+                  fieldErrors.email ? "border-red-500" : "border-[#8BB37A]"
+                } bg-white text-[16px] text-gray-800 placeholder:text-gray-400 outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20`}
                 style={{ padding: "0 16px" }}
-                required
               />
+              {fieldErrors.email && (
+                <p
+                  className="text-[12px] text-red-500 leading-5 field-error-message"
+                  data-error-for="email"
+                >
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
 
             {/* PASSWORDS */}
-            <div className="flex flex-col" style={{ gap: "8px" }}>
+            <div id="field-password" className="flex flex-col" style={{ gap: "8px" }}>
               <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
                 Password <span className="text-red-500">*</span>
               </label>
@@ -1527,12 +1661,14 @@ export default function Register() {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
+                  onBlur={() => handleFieldBlur("password")}
                   placeholder={`Enter password (${passwordPolicy.min}-${passwordPolicy.max} characters)`}
                   maxLength={16}
                   autoComplete="new-password"
-                  className="block w-full min-w-0 box-border min-h-[52px] rounded-2xl border border-[#8BB37A] bg-white text-[16px] text-gray-800 placeholder:text-gray-400 outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20"
+                  className={`block w-full min-w-0 box-border min-h-[52px] rounded-2xl border ${
+                    fieldErrors.password ? "border-red-500" : "border-[#8BB37A]"
+                  } bg-white text-[16px] text-gray-800 placeholder:text-gray-400 outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20`}
                   style={{ padding: "0 56px 0 16px" }}
-                  required
                 />
                 <button
                   type="button"
@@ -1543,9 +1679,17 @@ export default function Register() {
                   {showPassword ? <FaEye /> : <FaEyeSlash />}
                 </button>
               </div>
+              {fieldErrors.password && (
+                <p
+                  className="text-[12px] text-red-500 leading-5 field-error-message"
+                  data-error-for="password"
+                >
+                  {fieldErrors.password}
+                </p>
+              )}
             </div>
 
-            <div className="flex flex-col" style={{ gap: "8px" }}>
+            <div id="field-confirm_password" className="flex flex-col" style={{ gap: "8px" }}>
               <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
                 Confirm Password <span className="text-red-500">*</span>
               </label>
@@ -1555,12 +1699,14 @@ export default function Register() {
                   name="confirm_password"
                   value={formData.confirm_password}
                   onChange={handleChange}
+                  onBlur={() => handleFieldBlur("confirm_password")}
                   placeholder="Confirm password"
                   maxLength={16}
                   autoComplete="new-password"
-                  className="block w-full min-w-0 box-border min-h-[52px] rounded-2xl border border-[#8BB37A] bg-white text-[16px] text-gray-800 placeholder:text-gray-400 outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20"
+                  className={`block w-full min-w-0 box-border min-h-[52px] rounded-2xl border ${
+                    fieldErrors.confirm_password ? "border-red-500" : "border-[#8BB37A]"
+                  } bg-white text-[16px] text-gray-800 placeholder:text-gray-400 outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20`}
                   style={{ padding: "0 56px 0 16px" }}
-                  required
                 />
                 <button
                   type="button"
@@ -1571,6 +1717,14 @@ export default function Register() {
                   {showConfirmPassword ? <FaEye /> : <FaEyeSlash />}
                 </button>
               </div>
+              {fieldErrors.confirm_password && (
+                <p
+                  className="text-[12px] text-red-500 leading-5 field-error-message"
+                  data-error-for="confirm_password"
+                >
+                  {fieldErrors.confirm_password}
+                </p>
+              )}
             </div>
 
             {/* ID TYPE */}
@@ -1719,7 +1873,8 @@ export default function Register() {
               </p>
             </div>
 
-            {/* FACE VERIFICATION */}
+            {/* FACE VERIFICATION — hidden when the toggle is off */}
+            {REQUIRE_FACE_VERIFICATION && (
             <div className="flex flex-col shrink-0" style={{ gap: "12px" }}>
               <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
                 Face Verification <span className="text-red-500">*</span>
@@ -1771,14 +1926,21 @@ export default function Register() {
                 </button>
               )}
             </div>
+            )}
 
             {/* TERMS */}
-            <div className="flex items-start shrink-0" style={{ gap: "12px" }}>
+            <div id="field-agreedToTerms" className="flex flex-col shrink-0" style={{ gap: "6px" }}>
+            <div className="flex items-start" style={{ gap: "12px" }}>
               <input
                 id="terms-checkbox"
                 type="checkbox"
                 checked={agreedToTerms}
-                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                onChange={(e) => {
+                  setAgreedToTerms(e.target.checked);
+                  if (fieldErrors.agreedToTerms) {
+                    setFieldErrors((prev) => ({ ...prev, agreedToTerms: "" }));
+                  }
+                }}
                 className="w-5 h-5 shrink-0 accent-[#0B5D2A] cursor-pointer"
                 style={{ marginTop: "2px" }}
               />
@@ -1800,27 +1962,46 @@ export default function Register() {
                 and confirm that all information provided is accurate.
               </label>
             </div>
+            {fieldErrors.agreedToTerms && (
+              <p
+                className="text-[12px] text-red-500 leading-5 field-error-message pl-8"
+                data-error-for="agreedToTerms"
+              >
+                {fieldErrors.agreedToTerms}
+              </p>
+            )}
+            </div>
 
             {/* SUBMIT */}
             <div className="flex flex-col items-center shrink-0" style={{ gap: "12px" }}>
-              <button
-                type="submit"
-                disabled={loading || !isFormComplete}
-                className={`w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] shadow-md transition ${
-                  loading || !isFormComplete
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "btn-primary active:scale-[0.98]"
-                }`}
-              >
-                {loading ? "Registering..." : "Register"}
-              </button>
-
-              {!isFormComplete && (
-                <p className="text-[13px] leading-5 text-gray-500 text-center max-w-[300px]">
-                  Please complete all fields, add your ID, verify it, finish face
-                  verification, and agree to Terms &amp; Conditions.
-                </p>
+              {/* Backend errors */}
+              {error && (
+                <div
+                  className="w-full bg-red-100 border border-red-400 rounded-xl text-red-700 text-sm leading-6 break-words"
+                  style={{ padding: "14px 16px" }}
+                >
+                  {error}
+                </div>
               )}
+
+              {(() => {
+                const missingCount = getMissingFields().length;
+                const buttonDisabled = loading || missingCount > 0;
+                return (
+                  <button
+                    type="submit"
+                    disabled={buttonDisabled}
+                    className={`w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] shadow-md transition ${
+                      buttonDisabled
+                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        : "btn-primary active:scale-[0.98]"
+                    }`}
+                  >
+                    {loading ? "Registering..." : "Register"}
+                  </button>
+                );
+              })()}
+
             </div>
           </form>
         </main>
