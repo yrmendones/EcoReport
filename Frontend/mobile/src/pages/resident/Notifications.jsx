@@ -216,7 +216,7 @@ export default function Notifications() {
               <button
                 type="button"
                 onClick={markAllAsRead}
-                className="shrink-0 min-h-[44px] rounded-xl text-[13px] font-extrabold text-[#0B5D2A] border border-[#C8DCC3] bg-white hover:bg-[#F4F8F2] active:scale-95 transition"
+                className="btn-primary shrink-0 min-h-[44px] rounded-xl text-[13px] font-extrabold shadow-sm transition active:scale-95"
                 style={{ padding: "0 14px" }}
               >
                 Mark all read

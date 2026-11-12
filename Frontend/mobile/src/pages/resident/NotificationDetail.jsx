@@ -156,7 +156,7 @@ export default function NotificationDetail() {
                 <button
                   type="button"
                   onClick={handleGoToReport}
-                  className="w-full h-[52px] bg-[#0B5D2A] text-white rounded-xl font-bold text-[15px] shadow-md hover:bg-[#084A21] active:scale-[0.98] transition"
+                  className="btn-primary w-full h-[52px] rounded-xl font-bold text-[15px] shadow-md transition"
                 >
                   View Report Details
                 </button>

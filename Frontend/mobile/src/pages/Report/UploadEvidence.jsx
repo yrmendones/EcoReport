@@ -307,7 +307,7 @@ export default function UploadEvidence() {
             type="button"
             onClick={handleNext}
             disabled={uploading || (images.length === 0 && videos.length === 0)}
-            className="w-full h-[56px] rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[15px] flex items-center justify-center gap-2 shadow-lg hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50"
+            className="btn-primary w-full h-[56px] rounded-2xl font-extrabold text-[15px] flex items-center justify-center gap-2 shadow-lg transition disabled:opacity-50"
           >
             {uploading ? (
               <>

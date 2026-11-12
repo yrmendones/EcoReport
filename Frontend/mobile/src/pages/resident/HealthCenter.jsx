@@ -390,7 +390,7 @@ export default function HealthCenter() {
           <button
             type="button"
             onClick={() => navigate("/appointment")}
-            className="w-full h-[58px] shrink-0 bg-[#0B5D2A] text-white rounded-[16px] font-bold text-[16px] flex items-center justify-center shadow-sm hover:bg-[#084A21] active:scale-[0.98] transition"
+            className="btn-primary w-full h-[58px] shrink-0 rounded-[16px] font-bold text-[16px] flex items-center justify-center shadow-sm transition"
           >
             Request Appointment
           </button>

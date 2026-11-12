@@ -504,7 +504,7 @@ export default function ReportLocation() {
               type="button"
               onClick={getLocation}
               disabled={gettingLocation}
-              className="w-full h-[54px] bg-[#0B5D2A] text-white rounded-2xl font-bold text-[15px] flex items-center justify-center gap-2 shadow-sm hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50"
+              className="btn-primary w-full h-[54px] rounded-2xl font-bold text-[15px] flex items-center justify-center gap-2 shadow-sm transition disabled:opacity-50"
             >
               {gettingLocation ? (
                 <>
@@ -572,7 +572,7 @@ export default function ReportLocation() {
                 ${
                   isSubmitDisabled
                     ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                    : "bg-[#0B5D2A] text-white hover:bg-[#084A21] active:scale-[0.98]"
+                    : "btn-success"
                 }
               `}
               style={{ padding: "0 24px" }}

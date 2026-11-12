@@ -252,7 +252,7 @@ export default function ChangePassword() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full min-h-[54px] rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[16px] flex items-center justify-center shadow-md hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50"
+                className="btn-primary w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-md transition disabled:opacity-50"
                 style={{ gap: "12px", marginTop: "8px" }}
               >
                 {loading ? (

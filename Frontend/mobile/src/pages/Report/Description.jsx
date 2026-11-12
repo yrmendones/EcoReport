@@ -131,7 +131,7 @@ export default function DescriptionStep() {
             type="button"
             onClick={handleNext}
             disabled={loading}
-            className="w-full h-[58px] bg-[#0B5D2A] text-white rounded-2xl font-extrabold text-[16px] shadow-lg flex items-center justify-center hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50"
+            className="btn-primary w-full h-[58px] rounded-2xl font-extrabold text-[16px] shadow-lg flex items-center justify-center transition disabled:opacity-50"
           >
             Next
           </button>

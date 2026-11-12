@@ -1616,7 +1616,7 @@ export default function Register() {
                 className={`w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] shadow-md transition ${
                   loading || !isFormComplete
                     ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-[#0B5D2A] text-white hover:bg-[#094C23] active:scale-[0.98]"
+                    : "btn-primary active:scale-[0.98]"
                 }`}
               >
                 {loading ? "Registering..." : "Register"}

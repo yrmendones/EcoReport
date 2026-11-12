@@ -502,7 +502,7 @@ export default function Appointment() {
             <button
               type="button"
               onClick={() => navigate("/qr-code")}
-              className="w-full min-h-[54px] bg-[#0B5D2A] text-white rounded-2xl font-extrabold text-[16px] shadow-md hover:bg-[#084A21] active:scale-[0.98] transition"
+              className="btn-primary w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] shadow-md transition"
             >
               View My QR Code
             </button>
@@ -510,7 +510,7 @@ export default function Appointment() {
             <button
               type="button"
               onClick={() => navigate("/health-center")}
-              className="w-full min-h-[54px] border border-[#0B5D2A] text-[#0B5D2A] rounded-2xl font-extrabold text-[16px] hover:bg-[#F0F8ED] active:scale-[0.98] transition"
+              className="btn-secondary w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] shadow-sm transition"
             >
               Back to Health Center
             </button>
@@ -556,7 +556,7 @@ export default function Appointment() {
             <button
               type="button"
               onClick={() => navigate("/health-center")}
-              className="w-full min-h-[54px] bg-[#0B5D2A] text-white rounded-2xl font-extrabold text-[16px] shadow-md hover:bg-[#084A21] active:scale-[0.98] transition"
+              className="btn-primary w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] shadow-md transition"
             >
               Back to Health Center
             </button>
@@ -564,7 +564,7 @@ export default function Appointment() {
             <button
               type="button"
               onClick={() => setSubmitted(null)}
-              className="w-full min-h-[54px] border border-[#0B5D2A] text-[#0B5D2A] rounded-2xl font-extrabold text-[16px] hover:bg-[#F0F8ED] active:scale-[0.98] transition"
+              className="btn-secondary w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] shadow-sm transition"
             >
               Make Another Appointment
             </button>
@@ -749,7 +749,7 @@ export default function Appointment() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full min-h-[54px] rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[16px] flex items-center justify-center shadow-md hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50"
+                className="btn-primary w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-md transition disabled:opacity-50"
                 style={{ gap: "12px" }}
               >
                 {loading ? (
@@ -758,7 +758,7 @@ export default function Appointment() {
                     Submitting...
                   </>
                 ) : (
-                  "Request Appointment"
+                  "Submit Appointment"
                 )}
               </button>
             </div>

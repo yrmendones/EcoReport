@@ -421,7 +421,7 @@ export default function QRCodePage() {
               type="button"
               onClick={handleDownload}
               disabled={!qrImageUrl || timeLeft <= 0}
-              className="flex-1 min-h-[54px] border border-[#0B5D2A] text-[#0B5D2A] bg-white rounded-2xl font-extrabold text-[15px] flex justify-center items-center hover:bg-[#E5F5E9] active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-success flex-1 min-h-[54px] rounded-2xl font-extrabold text-[15px] flex justify-center items-center shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ gap: "10px" }}
             >
               <FaDownload />
@@ -432,7 +432,7 @@ export default function QRCodePage() {
               type="button"
               onClick={handleShare}
               disabled={!qrImageUrl || timeLeft <= 0}
-              className="flex-1 min-h-[54px] bg-[#0B5D2A] text-white rounded-2xl font-extrabold text-[15px] flex justify-center items-center hover:bg-[#084A22] active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary flex-1 min-h-[54px] rounded-2xl font-extrabold text-[15px] flex justify-center items-center shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ gap: "10px" }}
             >
               <FaShareAlt />

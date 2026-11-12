@@ -239,7 +239,7 @@ export default function Profile() {
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full min-h-[54px] bg-white border border-red-200 rounded-2xl text-red-600 font-extrabold text-[16px] flex items-center justify-center hover:bg-red-50 active:bg-red-100 active:scale-[0.98] transition shrink-0"
+            className="btn-danger w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-sm transition shrink-0"
             style={{ gap: "12px" }}
           >
             <FaSignOutAlt />

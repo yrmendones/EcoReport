@@ -177,7 +177,7 @@ export default function EmergencyHotline() {
                   onClick={() =>
                     handleCall(item.clean_number || item.number.replace(/[^0-9]/g, ""))
                   }
-                  className="min-w-[68px] min-h-[44px] shrink-0 bg-[#0B5D2A] text-white rounded-xl font-extrabold text-[14px] flex items-center justify-center shadow-sm hover:bg-[#084A21] active:scale-95 transition"
+                  className="btn-success min-w-[68px] min-h-[44px] shrink-0 rounded-xl font-extrabold text-[14px] flex items-center justify-center shadow-sm transition"
                   style={{ padding: "0 14px" }}
                 >
                   Call
@@ -198,7 +198,7 @@ export default function EmergencyHotline() {
             <button
               type="button"
               onClick={() => handleCall("911")}
-              className="w-full min-h-[54px] bg-red-600 hover:bg-red-700 text-white rounded-xl font-extrabold text-[16px] flex items-center justify-center shadow-sm active:scale-[0.98] transition"
+              className="btn-danger w-full min-h-[54px] rounded-xl font-extrabold text-[16px] flex items-center justify-center shadow-sm transition"
               style={{ gap: "12px" }}
             >
               <FaPhoneAlt size={18} />

@@ -265,7 +265,7 @@ export default function PrivacySettings() {
             className={`w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] shadow-sm transition-all flex items-center justify-center shrink-0 ${
               saving
                 ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                : "bg-[#0B5D2A] text-white hover:bg-[#084A22] active:scale-[0.98]"
+                : "btn-primary"
             }`}
             style={{ gap: "12px" }}
           >

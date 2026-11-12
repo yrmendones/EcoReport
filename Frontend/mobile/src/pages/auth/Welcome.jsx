@@ -85,7 +85,7 @@ export default function Welcome() {
             <button
               type="button"
               onClick={handleResidentLogin}
-              className="w-full max-w-[280px] min-h-[56px] rounded-2xl bg-[#176B05] text-white font-extrabold text-[15px] flex items-center justify-center shadow-md hover:bg-[#125704] active:scale-[0.98] transition"
+              className="btn-primary w-full max-w-[280px] min-h-[56px] rounded-2xl font-extrabold text-[15px] flex items-center justify-center shadow-md transition"
               style={{ gap: "12px" }}
             >
               <FaUser size={18} />
@@ -95,7 +95,7 @@ export default function Welcome() {
             <button
               type="button"
               onClick={handleGuest}
-              className="w-full max-w-[280px] min-h-[56px] rounded-2xl bg-[#82B85B] text-white font-extrabold text-[15px] flex items-center justify-center shadow-md hover:bg-[#72A94D] active:scale-[0.98] transition"
+              className="btn-dark w-full max-w-[280px] min-h-[56px] rounded-2xl font-extrabold text-[15px] flex items-center justify-center shadow-md transition"
               style={{ gap: "12px" }}
             >
               <FaUsers size={18} />

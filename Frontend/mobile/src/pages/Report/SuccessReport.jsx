@@ -106,47 +106,15 @@ export default function ReportSuccess() {
               <button
                 type="button"
                 onClick={() => navigate("/my-reports")}
-                className="
-                  w-full
-                  h-[56px]
-                  rounded-2xl
-                  bg-[#0B5D2A]
-                  text-white
-                  font-extrabold
-                  text-[16px]
-                  flex
-                  items-center
-                  justify-center
-                  shadow-md
-                  hover:bg-[#084A21]
-                  active:scale-[0.98]
-                  transition
-                "
+                className="btn-primary w-full h-[56px] rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-md transition"
               >
                 View My Reports
               </button>
 
-              {/* BACK TO DASHBOARD */}
               <button
                 type="button"
                 onClick={() => navigate("/resident-dashboard")}
-                className="
-                  w-full
-                  h-[56px]
-                  rounded-2xl
-                  border-2
-                  border-[#0B5D2A]
-                  bg-white
-                  text-[#0B5D2A]
-                  font-extrabold
-                  text-[16px]
-                  flex
-                  items-center
-                  justify-center
-                  hover:bg-[#F0F8ED]
-                  active:scale-[0.98]
-                  transition
-                "
+                className="btn-secondary w-full h-[56px] rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-sm transition"
               >
                 Back to Dashboard
               </button>

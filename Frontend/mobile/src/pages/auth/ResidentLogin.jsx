@@ -194,7 +194,7 @@ export default function ResidentLogin() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full min-h-[54px] rounded-2xl bg-[#176B05] text-white text-[16px] font-extrabold shadow-md hover:bg-[#125704] active:scale-[0.98] transition disabled:opacity-50"
+              className="btn-primary w-full min-h-[54px] rounded-2xl text-[16px] font-extrabold shadow-md transition disabled:opacity-50"
               style={{ marginTop: "4px" }}
             >
               {loading ? "Logging in..." : "Login"}

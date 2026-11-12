@@ -293,5 +293,119 @@ button {
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(11, 93, 42, 0.35); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(11, 93, 42, 0.55); }
+::-webkit-scrollbar-thumb { background: rgba(107, 114, 128, 0.40); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(107, 114, 128, 0.60); }
+
+/* ════════════════════════════════════════════════════════════
+   STANDARD BUTTON PALETTE — Web Admin
+   ────────────────────────────────────────────────────────────
+   Buttons communicate purpose through color. Using `#root`
+   prefix to override the same-named classes defined inside each
+   component's inline <style> block, so we don't have to edit 17
+   separate files to keep things consistent.
+
+     Primary / Action    → Blue       #008CBA
+     Success / Confirm   → Green      #04AA6D
+     Danger / Delete     → Red        #F44336
+     Warning / Caution   → Amber      #FF9800
+     Neutral / Secondary → Light Gray #E7E7E7
+     Dark / Contrast     → Charcoal   #555555
+   ════════════════════════════════════════════════════════════ */
+
+/* ─── PRIMARY — Blue #008CBA ───
+   Covers: New Assignment, Create Announcement, Send Notification,
+   Add Schedule, Add Service, Add Staff, Create Health Announcement,
+   Add Hotline, New Incident, Create Alert, Add Item, Export CSV,
+   Download PDF, Open Camera, Open Verification, modal Save/Update/Create */
+#root .filter-export-btn,
+#root .qr-start-btn,
+#root .paste-submit,
+#root .export-button,
+#root .open-button,
+#root .manage-button,
+#root .btn-save,
+#root .primary-button,
+#root .add-category-button {
+  background: #008CBA;
+  border-color: #006F96;
+  color: #ffffff;
+}
+#root .filter-export-btn:hover:not(:disabled),
+#root .qr-start-btn:hover,
+#root .paste-submit:hover:not(:disabled),
+#root .export-button:hover:not(:disabled),
+#root .open-button:hover,
+#root .manage-button:hover:not(:disabled),
+#root .btn-save:hover:not(:disabled),
+#root .primary-button:hover:not(:disabled),
+#root .add-category-button:hover {
+  background: #0078A3;
+}
+
+/* ─── SECONDARY — Light Gray #E7E7E7 ───
+   Covers: Cancel, Back, Close, Clear filters, Refresh, Edit Info,
+   Print Resident Info, Download CSV */
+#root .btn-cancel,
+#root .filter-clear-btn,
+#root .filter-button,
+#root .outline-button,
+#root .edit-info-btn,
+#root .reset-button,
+#root .verification-button.print {
+  background: #E7E7E7;
+  border-color: #D0D0D0;
+  color: #333333;
+}
+#root .btn-cancel:hover,
+#root .filter-clear-btn:hover,
+#root .filter-button:hover,
+#root .outline-button:hover:not(:disabled),
+#root .edit-info-btn:hover,
+#root .reset-button:hover,
+#root .verification-button.print:hover {
+  background: #D9D9D9;
+}
+
+/* ─── SUCCESS — Green #04AA6D ───
+   Covers: Accept Report, Resolve Report, Verify Resident (approve) */
+#root .accept-button,
+#root .resolve-button,
+#root .verification-button.verify,
+#root .verification-button.verify:not(.verified) {
+  background: #04AA6D;
+  border-color: #03995F;
+  color: #ffffff;
+}
+#root .accept-button:hover,
+#root .resolve-button:hover,
+#root .verification-button.verify:hover:not(.verified):not(:disabled) {
+  background: #03995F;
+}
+
+/* ─── DANGER — Red #F44336 ───
+   Covers: Reject Report, Reject Verification, Stop (QR scanner),
+   Deactivate (in dropdown) */
+#root .reject-button,
+#root .qr-stop-btn,
+#root .verification-button.reject,
+#root .verification-button.reject:not(.rejected) {
+  background: #F44336;
+  border-color: #D93428;
+  color: #ffffff;
+}
+#root .reject-button:hover,
+#root .qr-stop-btn:hover,
+#root .verification-button.reject:hover:not(.rejected):not(:disabled) {
+  background: #D93428;
+}
+
+/* ─── DARK / CONTRAST — Charcoal #555555 ───
+   Covers: Assign Worker (secondary workflow action) */
+#root .assign-button {
+  background: #555555;
+  border-color: #3D3D3D;
+  color: #ffffff;
+}
+#root .assign-button:hover {
+  background: #3D3D3D;
+}

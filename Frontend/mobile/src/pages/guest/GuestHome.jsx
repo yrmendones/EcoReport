@@ -237,7 +237,7 @@ export default function GuestHome() {
             <button
               type="button"
               onClick={() => navigate("/register")}
-              className="w-full h-[50px] rounded-xl bg-[#0B5D2A] text-white font-extrabold text-[15px] shadow-sm hover:bg-[#084A21] active:scale-[0.98] transition"
+              className="btn-primary w-full h-[50px] rounded-xl font-extrabold text-[15px] shadow-sm transition"
             >
               Register Now
             </button>

@@ -33,7 +33,7 @@ const mainStyle = {
 };
 
 const primaryBtn =
-  "w-full min-h-[54px] rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[16px] flex items-center justify-center shadow-md hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50 shrink-0";
+  "btn-primary w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-md transition disabled:opacity-50 shrink-0";
 
 function PhoneFrame({ children, header }) {
   return (

@@ -264,7 +264,7 @@ export default function CreateReport() {
           <button
             type="button"
             onClick={handleNext}
-            className="w-full h-[58px] bg-[#0B5D2A] text-white rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-lg hover:bg-[#084A21] active:scale-[0.98] transition"
+            className="btn-primary w-full h-[58px] rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-lg transition"
           >
             Next
           </button>

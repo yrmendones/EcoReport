@@ -312,7 +312,7 @@ export default function ReportDetails() {
           <button
             type="button"
             onClick={() => navigate(`/report-status/${id}`)}
-            className="w-full min-h-[54px] bg-[#347145] text-white rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-md hover:bg-[#2b5c3a] active:scale-[0.98] transition shrink-0"
+            className="btn-primary w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-md transition shrink-0"
             style={{ gap: "12px" }}
           >
             View Status Timeline
@@ -323,7 +323,7 @@ export default function ReportDetails() {
             <button
               type="button"
               onClick={viewMap}
-              className="w-full min-h-[54px] bg-[#0B5D2A] text-white rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-md hover:bg-[#084A21] active:scale-[0.98] transition shrink-0"
+              className="btn-dark w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-md transition shrink-0"
               style={{ gap: "12px" }}
             >
               <FaMapMarkerAlt size={18} />

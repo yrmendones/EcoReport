@@ -522,14 +522,14 @@ export default function CertificateRequest() {
             <button
               type="button"
               onClick={() => navigate("/resident-dashboard")}
-              className="w-full min-h-[54px] bg-[#0B5D2A] text-white rounded-2xl font-extrabold text-[16px] shadow-md hover:bg-[#084A21] active:scale-[0.98] transition"
+              className="btn-primary w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] shadow-md transition"
             >
               Back to Dashboard
             </button>
             <button
               type="button"
               onClick={() => setSubmitted(null)}
-              className="w-full min-h-[54px] border border-[#0B5D2A] text-[#0B5D2A] rounded-2xl font-extrabold text-[16px] hover:bg-[#F0F8ED] active:scale-[0.98] transition"
+              className="btn-secondary w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] shadow-sm transition"
             >
               Make Another Certificate Request
             </button>
@@ -675,7 +675,7 @@ export default function CertificateRequest() {
               type="button"
               onClick={handleSubmit}
               disabled={loading}
-              className="w-full min-h-[54px] rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[16px] flex items-center justify-center shadow-md hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50"
+              className="btn-primary w-full min-h-[54px] rounded-2xl font-extrabold text-[16px] flex items-center justify-center shadow-md transition disabled:opacity-50"
             >
               {loading ? "Submitting..." : "Submit Request"}
             </button>
