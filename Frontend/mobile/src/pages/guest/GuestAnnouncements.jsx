@@ -31,11 +31,6 @@ const toLabel = (value) => {
 
 const getCategoryKey = (item) => normalize(item.category) || "others";
 
-const hideScrollbarStyle = {
-  scrollbarWidth: "none",
-  msOverflowStyle: "none",
-};
-
 export default function GuestAnnouncements() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("all");
@@ -80,14 +75,6 @@ export default function GuestAnnouncements() {
 
   return (
     <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">
-      <style>{`
-        .no-bar::-webkit-scrollbar {
-          display: none;
-          width: 0;
-          height: 0;
-        }
-      `}</style>
-
       <div className="relative w-full h-[100dvh] sm:w-[390px] sm:h-[844px] bg-[#F8FAF8] sm:rounded-[40px] sm:border-[5px] sm:border-white sm:shadow-2xl overflow-hidden flex flex-col">
         {/* HEADER */}
         <header
@@ -109,9 +96,8 @@ export default function GuestAnnouncements() {
 
         {/* CONTENT */}
         <main
-          className="no-bar flex-1 overflow-y-auto flex flex-col"
+          className="mobile-scroll flex-1 overflow-y-auto flex flex-col"
           style={{
-            ...hideScrollbarStyle,
             padding: "32px 24px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
             gap: "28px",
           }}
