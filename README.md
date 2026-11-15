@@ -6,7 +6,7 @@
 
 ## 📖 Overview
 
-Barangay Sto. Rosario Kanluran, Pateros relies on Facebook Messenger and manual walk-in reporting to handle environmental concerns such as illegal dumping, improper garbage disposal, flooding, clogged drainage, overgrown trees, and stray animal waste. Reports get buried in chats, lack proper tracking, and are difficult to validate — especially with limited barangay manpower.
+Barangay Sto. Rosario Kanluran, Pateros relies on Facebook Messenger and manual walk-in reporting to handle environmental concerns such as illegal dumping, improper garbage disposal, flooding, clogged drainage, overgrown trees, and stray animal waste. Reports get buried in chats, lack proper tracking, and are difficult to validate - especially with limited barangay manpower.
 
 **EcoReport** is a centralized mobile + web platform that streamlines environmental reporting and monitoring for residents, guest users, and barangay officials. Residents submit reports with photos, videos, and GPS-tagged locations; barangay officials review, validate, assign, and resolve them through an admin dashboard with real-time analytics, GIS mapping, and role-based access control.
 
