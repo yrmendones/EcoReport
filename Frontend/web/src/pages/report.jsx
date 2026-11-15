@@ -21,6 +21,23 @@ const toLocalDateStr = (date) => {
   return `${y}-${m}-${d}`;
 };
 
+// Fallback list only if /api/public/categories is unreachable.
+// Kept in sync with the seeded report_categories table.
+const FALLBACK_CATEGORIES = [
+  "Air Pollution",
+  "Animal Waste",
+  "Clogged Drainage",
+  "Damaged Roads",
+  "Flooding",
+  "Fallen Trees",
+  "Illegal Dumping",
+  "Improper Garbage Disposal",
+  "Overgrown Grass",
+  "Others Environmental Concerns",
+  "Crime",
+  "Blotter & Incident",
+];
+
 export default function Report() {
   const navigate = useNavigate();
   const menuItems = getMenuItems();
@@ -43,21 +60,26 @@ export default function Report() {
   const [page, setPage] = useState(1);
 
   // ============================================================
-  // CATEGORIES
+  // CATEGORIES (live from System Settings → Report Categories)
   // ============================================================
-  const categories = [
-    "All Categories",
-    "Air Pollution",
-    "Animal Waste",
-    "Clogged Drainage",
-    "Damaged Roads",
-    "Flooding",
-    "Fallen Trees",
-    "Illegal Dumping",
-    "Improper Garbage Disposal",
-    "Overgrown Grass",
-    "Others Environmental Concerns",
-  ];
+  const [categories, setCategories] = useState(["All Categories", ...FALLBACK_CATEGORIES]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await apiFetch("/api/public/categories");
+        if (cancelled) return;
+        if (Array.isArray(list) && list.length > 0) {
+          setCategories(["All Categories", ...list]);
+        }
+      } catch (err) {
+        // Fall back to FALLBACK_CATEGORIES - already set as initial state.
+        console.error("Failed to load categories, using fallback list:", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // ============================================================
   // FETCH REPORTS
