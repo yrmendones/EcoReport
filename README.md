@@ -18,7 +18,7 @@ Barangay Sto. Rosario Kanluran, Pateros relies on Facebook Messenger and manual 
 
 - Secure registration with ID upload, OCR verification, and face detection
 - Submit environmental reports with **photos, videos, GPS location**, and detailed descriptions
-- Track report status in real time (Pending → Assigned → Ongoing → Resolved / Rejected)
+- Track report status in real time (Pending → Ongoing → Assigned → Resolved / Rejected)
 - QR code for in-person identity verification at the barangay hall
 - Barangay announcements, waste collection schedules, and emergency hotlines
 - Health center information, appointment requests, and certificate requests
@@ -124,6 +124,6 @@ Barangay Sto. Rosario Kanluran, Pateros relies on Facebook Messenger and manual 
 ### 1. Clone the repository
 
 ```bash
-git clone <REPLACE_WITH_REPO_URL>.git
+git clone <https://github.com/yrmendones/EcoReport>.git
 cd EcoReport
 ```
