@@ -704,7 +704,7 @@ exports.getAllUsers = async (req, res) => {
             SELECT 
                 u.user_id, u.resident_id, u.first_name, u.middle_name, u.last_name,
                 u.house_no, u.street, u.address, u.permanent_address,
-                u.contact_number, u.email, u.role, u.is_verified, u.verification_status,
+                u.contact_number, u.email, u.role, u.can_assign_worker, u.is_verified, u.verification_status,
                 u.valid_id_url, u.selfie_image, u.registered_at, u.last_active_at,
                 CASE
                     WHEN u.status = 'Deactivated' THEN 'Deactivated'
@@ -764,7 +764,16 @@ exports.updateUserRole = async (req, res) => {
             return res.status(400).json({ error: `User is already ${role === 'barangay_official' ? 'a Barangay Official' : 'a Resident'}.` });
         }
 
-        await db.query('UPDATE users SET role = ? WHERE user_id = ?', [role, req.params.id]);
+        // Demoting back to resident clears the assign-worker permission
+        // it doesn't silently reactivate if the account is re-promoted later.
+        if (role === 'resident') {
+            await db.query(
+                'UPDATE users SET role = ?, can_assign_worker = 0 WHERE user_id = ?',
+                [role, req.params.id]
+            );
+        } else {
+            await db.query('UPDATE users SET role = ? WHERE user_id = ?', [role, req.params.id]);
+        }
 
         await logAudit(
             req,
@@ -784,10 +793,61 @@ exports.updateUserRole = async (req, res) => {
             console.error('Failed to notify user of role change:', notifErr);
         }
 
-        res.json({ message: `Role changed to ${role}.` });
+                res.json({ message: `Role changed to ${role}.` });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to change role.' });
+    }
+};
+
+exports.updateAssignPermission = async (req, res) => {
+    try {
+        const { can_assign_worker } = req.body;
+        if (typeof can_assign_worker !== 'boolean') {
+            return res.status(400).json({ error: 'can_assign_worker must be true or false.' });
+        }
+
+        const [user] = await db.query(
+            'SELECT user_id, resident_id, first_name, last_name, role FROM users WHERE user_id = ?',
+            [req.params.id]
+        );
+        if (user.length === 0) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+        if (user[0].role !== 'barangay_official') {
+            return res.status(400).json({
+                error: 'Only Barangay Officials can be granted assign-worker permission.',
+            });
+        }
+
+        await db.query(
+            'UPDATE users SET can_assign_worker = ? WHERE user_id = ?',
+            [can_assign_worker ? 1 : 0, req.params.id]
+        );
+
+        await logAudit(
+            req,
+            `${can_assign_worker ? 'Granted' : 'Revoked'} assign-worker permission for ${user[0].resident_id} (${user[0].first_name} ${user[0].last_name})`
+        );
+
+        // Notify the affected official so they know their permission changed.
+        try {
+            await notificationController.createNotification(
+                req.params.id,
+                can_assign_worker ? 'Permission Granted' : 'Permission Revoked',
+                can_assign_worker
+                    ? 'You can now assign workers in Report Management and Assignment Management.'
+                    : 'Your permission to assign workers has been revoked.',
+                'Account Update'
+            );
+        } catch (notifErr) {
+            console.error('Failed to notify user of permission change:', notifErr);
+        }
+
+        res.json({ message: 'Assign-worker permission updated.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update permission.' });
     }
 };
 

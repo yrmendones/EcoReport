@@ -147,7 +147,14 @@ exports.register = async (req, res) => {
         res.status(201).json({
             message: 'Registration successful!',
             token,
-            user: { user_id: result.insertId, resident_id, full_name: `${first_name} ${last_name}`, email, role: 'resident' }
+            user: {
+                user_id: result.insertId,
+                resident_id,
+                full_name: `${first_name} ${last_name}`,
+                email,
+                role: 'resident',
+                can_assign_worker: false,
+            }
         });
     } catch (error) {
         console.error(error);
@@ -230,7 +237,8 @@ exports.login = async (req, res) => {
                 full_name: `${user.first_name} ${user.last_name}`,
                 email: user.email,
                 role: user.role,
-                status: 'Online'
+                status: 'Online',
+                can_assign_worker: !!user.can_assign_worker,
             }
         });
     } catch (error) {
@@ -318,7 +326,8 @@ exports.adminLogin = async (req, res) => {
                 user_id: user.user_id,
                 full_name: `${user.first_name} ${user.last_name}`,
                 email: user.email,
-                role: user.role
+                role: user.role,
+                can_assign_worker: !!user.can_assign_worker,
             }
         });
     } catch (error) {

@@ -32,6 +32,18 @@ export default function Assignment() {
   const navigate = useNavigate();
   const menuItems = getMenuItems("/assignment");
 
+  const canAssign = (() => {
+    try {
+      const admin = JSON.parse(localStorage.getItem("admin") || "{}");
+      return (
+        admin.role === "admin" ||
+        (admin.role === "barangay_official" && admin.can_assign_worker === true)
+      );
+    } catch {
+      return false;
+    }
+  })();
+
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -366,13 +378,15 @@ export default function Assignment() {
                 </button>
               )}
 
-              <button
-                type="button"
-                className="filter-export-btn"
-                onClick={openCreateModal}
-              >
-                + New Assignment
-              </button>
+              {canAssign && (
+                <button
+                  type="button"
+                  className="filter-export-btn"
+                  onClick={openCreateModal}
+                >
+                  + New Assignment
+                </button>
+              )}
             </div>
 
             {/* TABLE */}
@@ -420,14 +434,16 @@ export default function Assignment() {
                           </td>
                           <td>
                             <div className="actions">
-                              <button
-                                type="button"
-                                className="action-button edit"
-                                title="Edit"
-                                onClick={() => handleEdit(assignment)}
-                              >
-                                ✎
-                              </button>
+                              {canAssign && (
+                                <button
+                                  type="button"
+                                  className="action-button edit"
+                                  title="Edit"
+                                  onClick={() => handleEdit(assignment)}
+                                >
+                                  ✎
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 className="action-button delete"

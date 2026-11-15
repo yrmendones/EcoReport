@@ -7,7 +7,8 @@ exports.getProfile = async (req, res) => {
     try {
         const [users] = await db.query(
             `SELECT user_id, resident_id, first_name, middle_name, last_name, 
-                    house_no, street, address, permanent_address, contact_number, email, role, status, 
+                    house_no, street, address, permanent_address, contact_number, email,
+                    role, can_assign_worker, status, 
                     is_verified, verification_status, valid_id_url,
                     settings, profile_picture, registered_at
              FROM users WHERE user_id = ?`,

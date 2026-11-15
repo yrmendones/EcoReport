@@ -3,7 +3,7 @@ const router = express.Router();
 const adminController = require('../controllers/adminController');
 const settingsController = require('../controllers/settingsController');
 const announcementController = require('../controllers/announcementController');
-const { authenticate, isAdmin, isStaff } = require('../middleware/auth');
+const { authenticate, isAdmin, isStaff, requireAssignPermission } = require('../middleware/auth');
 
 // All staff routes require authentication + a staff role (admin OR barangay_official)
 router.use(authenticate, isStaff);
@@ -18,13 +18,13 @@ router.get('/check-pending-alerts', isAdmin, adminController.checkPendingAlerts)
 router.get('/reports', adminController.getAllReports);
 router.get('/reports/:id', adminController.getReportDetails);
 router.put('/reports/:id/status', adminController.updateReportStatus);
-router.put('/reports/:id/assign', adminController.assignReport);
+router.put('/reports/:id/assign', requireAssignPermission, adminController.assignReport);
 router.delete('/reports/:id', adminController.deleteReport);
 
 // Assignments (shared)
 router.get('/assignments', adminController.getAssignments);
-router.post('/assignments', adminController.createAssignment);
-router.put('/assignments/:id', adminController.updateAssignment);
+router.post('/assignments', requireAssignPermission, adminController.createAssignment);
+router.put('/assignments/:id', requireAssignPermission, adminController.updateAssignment);
 router.delete('/assignments/:id', adminController.deleteAssignment);
 
 // Users (residents + officials) - ADMIN ONLY
@@ -32,6 +32,7 @@ router.get('/users', isAdmin, adminController.getAllUsers);
 router.put('/users/:id/role', isAdmin, adminController.updateUserRole);
 router.delete('/users/:id', isAdmin, adminController.deleteUser);
 router.put('/users/:id/unlock', isAdmin, adminController.unlockLogin);
+router.put('/users/:id/assign-permission', isAdmin, adminController.updateAssignPermission);
 
 // READ — both staff roles (official browses residents for report context)
 router.get('/residents', isStaff, adminController.getAllResidents);

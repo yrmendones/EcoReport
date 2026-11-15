@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(50) DEFAULT 'resident',
+    can_assign_worker BOOLEAN DEFAULT FALSE,
     status VARCHAR(50) DEFAULT 'Offline',
     last_active_at DATETIME NULL DEFAULT NULL,
     is_verified BOOLEAN DEFAULT 0,

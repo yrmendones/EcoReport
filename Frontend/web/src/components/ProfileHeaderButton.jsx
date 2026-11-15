@@ -20,11 +20,15 @@ export default function ProfileHeaderButton() {
         const data = await apiFetch("/api/users/me");
         if (cancelled) return;
         if (data.profile_picture) {
-          setPictureUrl(data.profile_picture);
-          const admin = JSON.parse(localStorage.getItem("admin") || "{}");
-          admin.profile_picture = data.profile_picture;
-          localStorage.setItem("admin", JSON.stringify(admin));
+        setPictureUrl(data.profile_picture);
         }
+        // Keep role + assign-worker permission in sync so gated UI
+        // (Assign Worker buttons) reflects admin changes without re-login.
+        const admin = JSON.parse(localStorage.getItem("admin") || "{}");
+        admin.profile_picture = data.profile_picture || admin.profile_picture;
+        admin.role = data.role || admin.role;
+        admin.can_assign_worker = !!data.can_assign_worker;
+        localStorage.setItem("admin", JSON.stringify(admin));
       } catch { /* silent */ }
     };
     fetchFresh();

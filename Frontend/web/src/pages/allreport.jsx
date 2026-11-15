@@ -65,6 +65,20 @@ export default function AllReport() {
   const mapContainerRef = useRef(null);
   const menuItems = getMenuItems("/allreport");
 
+  // Only admins and barangay officials with the assign-worker permission
+  // can assign a worker. Accept/Reject/Resolve remain open to all staff.
+  const canAssign = (() => {
+    try {
+      const admin = JSON.parse(localStorage.getItem("admin") || "{}");
+      return (
+        admin.role === "admin" ||
+        (admin.role === "barangay_official" && admin.can_assign_worker === true)
+      );
+    } catch {
+      return false;
+    }
+  })();
+
   // Lightbox state
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [videoError, setVideoError] = useState(false);
@@ -490,7 +504,9 @@ export default function AllReport() {
                 <div className="actions-row">
                   <button type="button" className="accept-button" onClick={handleAccept}>Accept Report</button>
                   <button type="button" className="reject-button" onClick={handleReject}>Reject Report</button>
-                  <button type="button" className="assign-button" onClick={handleAssign}>Assign Worker</button>
+                  {canAssign && (
+                    <button type="button" className="assign-button" onClick={handleAssign}>Assign Worker</button>
+                  )}
                   <button type="button" className="resolve-button" onClick={handleResolve}>Resolved</button>
                 </div>
               </div>
@@ -680,7 +696,8 @@ export default function AllReport() {
 
         .actions-section { width: 100%; margin-top: 7px; }
         .actions-title { color: #1c1c1c; font-size: 9px; font-weight: 800; margin-bottom: 5px; }
-        .actions-row { width: 100%; display: grid; grid-template-columns: 84px 84px 84px 84px; justify-content: space-between; align-items: center; }
+        .actions-row { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .actions-row > button { flex: 0 0 84px; }
         .accept-button { height: 26px; border: none; border-radius: 3px; background: #3c7c4a; color: #ffffff; font-family: Arial, Helvetica, sans-serif; font-size: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.18); }
         .accept-button:hover { background: #2e673b; }
         .reject-button { height: 26px; border: none; border-radius: 3px; background: #e00000; color: #ffffff; font-family: Arial, Helvetica, sans-serif; font-size: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.18); }

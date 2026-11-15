@@ -42,6 +42,7 @@ export default function UserManagement() {
 
   const [openMenuId, setOpenMenuId] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [permissionBusyId, setPermissionBusyId] = useState(null);
   const [page, setPage] = useState(1)
 
   const fetchUsers = async () => {
@@ -214,6 +215,23 @@ export default function UserManagement() {
       alert("Failed to unlock: " + err.message);
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const handleToggleAssignPermission = async (user) => {
+    if (user.role !== "barangay_official") return;
+    const newValue = !user.can_assign_worker;
+    setPermissionBusyId(user.user_id);
+    try {
+      await apiFetch(`/api/admin/users/${user.user_id}/assign-permission`, {
+        method: "PUT",
+        body: JSON.stringify({ can_assign_worker: newValue }),
+      });
+      await fetchUsers();
+    } catch (err) {
+      alert("Failed to update permission: " + err.message);
+    } finally {
+      setPermissionBusyId(null);
     }
   };
 
@@ -423,6 +441,28 @@ export default function UserManagement() {
                                         ? "→ Promote to Barangay Official"
                                         : "→ Demote to Resident"}
                                     </button>
+                                    {u.role === "barangay_official" && (
+                                      <label
+                                        className="assign-permission-row"
+                                        onClick={(e) => e.stopPropagation()}
+                                        title="Allow this official to assign workers in Report Management and Assignment Management"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={!!u.can_assign_worker}
+                                          disabled={permissionBusyId === u.user_id}
+                                          onChange={() => handleToggleAssignPermission(u)}
+                                        />
+                                        <span>
+                                          Assign Worker
+                                          {permissionBusyId === u.user_id && (
+                                            <span style={{ color: "#9ca3af", marginLeft: 6 }}>
+                                              (saving…)
+                                            </span>
+                                          )}
+                                        </span>
+                                      </label>
+                                    )}
                                     <button
                                       type="button"
                                       onClick={() => handleToggleLock(u)}
@@ -741,6 +781,34 @@ export default function UserManagement() {
         .manage-menu button.danger {
           color: #d51f1f; font-weight: 700;
           border-top: 1px solid #e3ebe5;
+        }
+
+        /* Assign Worker permission toggle (barangay officials only) */
+        .assign-permission-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border-top: 1px solid #e3ebe5;
+          border-bottom: 1px solid #e3ebe5;
+          font-family: inherit;
+          font-size: 10px;
+          color: #333;
+          cursor: pointer;
+          user-select: none;
+        }
+        .assign-permission-row:hover { background: #f3f8f4; }
+        .assign-permission-row input[type="checkbox"] {
+          width: 14px;
+          height: 14px;
+          margin: 0;
+          accent-color: #347145;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+        .assign-permission-row input[type="checkbox"]:disabled {
+          cursor: wait;
+          opacity: 0.6;
         }
 
         .table-message {
