@@ -39,23 +39,23 @@ Barangay Sto. Rosario Kanluran, Pateros relies on Facebook Messenger and manual 
 - Health center, waste schedule, certificates, inventory, blotter, and disaster alerts
 - GIS map with all reports plotted inside the barangay boundary
 - Activity analytics with CSV export
-- **Assign Worker permission** — admin can grant specific officials the right to assign workers (not all officials have this by default)
+- **Assign Worker permission** - admin can grant specific officials the right to assign workers (not all officials have this by default)
 
 ### For System Administrators (Web Admin Panel)
 
 - User management with role changes, lock/unlock, and account deactivation
 - Resident account verification (approve/reject uploaded IDs)
-- System settings — barangay info, password policy, login lockout, report categories, maintenance mode
+- System settings - barangay info, password policy, login lockout, report categories, maintenance mode
 - Audit logs of all staff actions with CSV export
 - Generate reports (account activity, login activity, verification, admin actions, security)
 
 ### System-Wide
 
-- **Maintenance mode** — admins can temporarily block resident/guest access with a custom message
+- **Maintenance mode** - admins can temporarily block resident/guest access with a custom message
 - **JWT authentication** with configurable session timeouts and failed-login lockout
-- **Role-based access control** — Admin, Barangay Official, Resident, Guest
-- **Secure QR verification** — tokenized QR codes that expire every 10 minutes
-- **Audit trail** — every staff action is logged
+- **Role-based access control** - Admin, Barangay Official, Resident, Guest
+- **Secure QR verification** - tokenized QR codes that expire every 10 minutes
+- **Audit trail** - every staff action is logged
 
 ---
 
