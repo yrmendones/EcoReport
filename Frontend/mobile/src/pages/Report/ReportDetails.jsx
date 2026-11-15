@@ -3,34 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { FaArrowLeft, FaMapMarkerAlt, FaSpinner } from "react-icons/fa";
 import { apiFetch } from "../../api";
 
-// Severity based on report category
-const SEVERITY_BY_CATEGORY = {
-  "Flooding": "High",
-  "Fallen Trees": "High",
-  "Clogged Drainage": "High",
-  "Crime": "High",
-  "Blotter & Incident": "High",
-  "Blotter & Incidents": "High",
-  "Illegal Dumping": "Medium",
-  "Improper Garbage Disposal": "Medium",
-  "Damaged Roads": "Medium",
-  "Animal Waste": "Medium",
-  "Air Pollution": "Low",
-  "Overgrown Grass": "Low",
-  "Others Environmental Concerns": "Low",
-};
-
-const SEVERITY_STYLES = {
-  High: "text-[#B42323] font-bold",
-  Medium: "text-[#B8791F] font-bold",
-  Low: "text-[#286C2D] font-bold",
-};
-
-const getSeverity = (category) => {
-  if (!category) return "Medium";
-  return SEVERITY_BY_CATEGORY[category] || "Medium";
-};
-
 // Map backend status what the resident sees
 const getDisplayStatus = (rawStatus) => {
   if (!rawStatus) return "Pending";
@@ -141,7 +113,6 @@ export default function ReportDetails() {
 
   const displayStatus = getDisplayStatus(report.status);
   const statusStyle = STATUS_STYLES[displayStatus] || STATUS_STYLES.Pending;
-  const severity = getSeverity(report.category);
 
   const formattedReport = {
     ref: report.reference || `ER-2026-${String(report.report_id).padStart(4, "0")}`,
@@ -160,7 +131,6 @@ export default function ReportDetails() {
     location:
       report.address ||
       `${report.latitude || "N/A"}, ${report.longitude || "N/A"}`,
-    severity,
     status: displayStatus,
     latitude: report.latitude,
     longitude: report.longitude,
@@ -247,12 +217,6 @@ export default function ReportDetails() {
                     ? "text-gray-400"
                     : "text-gray-800"
                 }
-              />
-              {/* Severity based on category */}
-              <InfoRow
-                title="Severity"
-                value={formattedReport.severity}
-                color={SEVERITY_STYLES[formattedReport.severity] || "text-gray-800"}
                 last
               />
             </div>
