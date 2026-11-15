@@ -61,6 +61,23 @@ const createPinIcon = (status) => {
   });
 };
 
+// Fallback list only if /api/public/categories is unreachable.
+// Kept in sync with the seeded report_categories table.
+const FALLBACK_CATEGORIES = [
+  "Air Pollution",
+  "Animal Waste",
+  "Clogged Drainage",
+  "Damaged Roads",
+  "Flooding",
+  "Fallen Trees",
+  "Illegal Dumping",
+  "Improper Garbage Disposal",
+  "Overgrown Grass",
+  "Others Environmental Concerns",
+  "Crime",
+  "Blotter & Incident",
+];
+
 export default function MapPage() {
   const navigate = useNavigate();
   const mapRef = useRef(null);
@@ -76,20 +93,30 @@ export default function MapPage() {
   const [error, setError] = useState("");
 
   // ============================================================
-  // FILTER OPTIONS
+  // FILTER OPTIONS (category list synced from System Settings → Report Categories)
   // ============================================================
+  const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await apiFetch("/api/public/categories");
+        if (cancelled) return;
+        if (Array.isArray(list) && list.length > 0) {
+          setCategories(list);
+        }
+      } catch (err) {
+        // Fall back to FALLBACK_CATEGORIES - already set as initial state.
+        console.error("Failed to load categories, using fallback list:", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const categoryOptions = [
     { value: "All", label: "All Categories" },
-    { value: "Air Pollution", label: "Air Pollution" },
-    { value: "Animal Waste", label: "Animal Waste" },
-    { value: "Clogged Drainage", label: "Clogged Drainage" },
-    { value: "Damaged Roads", label: "Damaged Roads" },
-    { value: "Flooding", label: "Flooding" },
-    { value: "Fallen Trees", label: "Fallen Trees" },
-    { value: "Illegal Dumping", label: "Illegal Dumping" },
-    { value: "Improper Garbage Disposal", label: "Improper Garbage Disposal" },
-    { value: "Overgrown Grass", label: "Overgrown Grass" },
-    { value: "Others Environmental Concerns", label: "Others" },
+    ...categories.map((c) => ({ value: c, label: c })),
   ];
 
   const statusOptions = [

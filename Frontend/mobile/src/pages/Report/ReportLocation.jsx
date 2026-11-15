@@ -496,7 +496,7 @@ export default function ReportLocation() {
                 className="text-[13px] leading-5 text-gray-500 text-center"
                 style={{ marginTop: "10px" }}
               >
-                Tap anywhere on the map to place the pin, or drag it — must be within Barangay Sto. Rosario Kanluran
+                Tap anywhere on the map to place the pin, or drag it to adjust. It must be within Barangay Sto. Rosario Kanluran
               </p>
             </div>
 

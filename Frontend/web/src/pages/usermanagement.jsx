@@ -242,7 +242,7 @@ export default function UserManagement() {
     );
     if (!confirm1) return;
     const confirm2 = window.confirm(
-      "Are you absolutely sure? All their reports and records will be lost."
+      "Are you absolutely sure? Their certificate requests and appointments will be deleted. The environmental reports will be preserved as anonymous records."
     );
     if (!confirm2) return;
 
