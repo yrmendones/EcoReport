@@ -6,7 +6,7 @@
 
 ## 📖 Overview
 
-Barangay Sto. Rosario Kanluran, Pateros relies on Facebook Messenger and manual walk-in reporting to handle environmental concerns such as illegal dumping, improper garbage disposal, flooding, clogged drainage, overgrown trees, and stray animal waste. Reports get buried in chats, lack proper tracking, and are difficult to validate — especially with limited barangay manpower.
+Barangay Sto. Rosario Kanluran, Pateros relies on Facebook Messenger and manual walk-in reporting to handle environmental concerns such as illegal dumping, improper garbage disposal, flooding, clogged drainage, overgrown trees, and stray animal waste. Reports get buried in chats, lack proper tracking, and are difficult to validate - especially with limited barangay manpower.
 
 **EcoReport** is a centralized mobile + web platform that streamlines environmental reporting and monitoring for residents, guest users, and barangay officials. Residents submit reports with photos, videos, and GPS-tagged locations; barangay officials review, validate, assign, and resolve them through an admin dashboard with real-time analytics, GIS mapping, and role-based access control.
 
@@ -18,7 +18,7 @@ Barangay Sto. Rosario Kanluran, Pateros relies on Facebook Messenger and manual 
 
 - Secure registration with ID upload, OCR verification, and face detection
 - Submit environmental reports with **photos, videos, GPS location**, and detailed descriptions
-- Track report status in real time (Pending → Assigned → Ongoing → Resolved / Rejected)
+- Track report status in real time (Pending → Ongoing → Assigned → Resolved / Rejected)
 - QR code for in-person identity verification at the barangay hall
 - Barangay announcements, waste collection schedules, and emergency hotlines
 - Health center information, appointment requests, and certificate requests
@@ -39,23 +39,23 @@ Barangay Sto. Rosario Kanluran, Pateros relies on Facebook Messenger and manual 
 - Health center, waste schedule, certificates, inventory, blotter, and disaster alerts
 - GIS map with all reports plotted inside the barangay boundary
 - Activity analytics with CSV export
-- **Assign Worker permission** — admin can grant specific officials the right to assign workers (not all officials have this by default)
+- **Assign Worker permission** - admin can grant specific officials the right to assign workers (not all officials have this by default)
 
 ### For System Administrators (Web Admin Panel)
 
 - User management with role changes, lock/unlock, and account deactivation
 - Resident account verification (approve/reject uploaded IDs)
-- System settings — barangay info, password policy, login lockout, report categories, maintenance mode
+- System settings - barangay info, password policy, login lockout, report categories, maintenance mode
 - Audit logs of all staff actions with CSV export
 - Generate reports (account activity, login activity, verification, admin actions, security)
 
 ### System-Wide
 
-- **Maintenance mode** — admins can temporarily block resident/guest access with a custom message
+- **Maintenance mode** - admins can temporarily block resident/guest access with a custom message
 - **JWT authentication** with configurable session timeouts and failed-login lockout
-- **Role-based access control** — Admin, Barangay Official, Resident, Guest
-- **Secure QR verification** — tokenized QR codes that expire every 10 minutes
-- **Audit trail** — every staff action is logged
+- **Role-based access control** - Admin, Barangay Official, Resident, Guest
+- **Secure QR verification** - tokenized QR codes that expire every 10 minutes
+- **Audit trail** - every staff action is logged
 
 ---
 
@@ -124,6 +124,6 @@ Barangay Sto. Rosario Kanluran, Pateros relies on Facebook Messenger and manual 
 ### 1. Clone the repository
 
 ```bash
-git clone <REPLACE_WITH_REPO_URL>.git
+git clone <https://github.com/yrmendones/EcoReport>.git
 cd EcoReport
 ```

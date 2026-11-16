@@ -15,9 +15,6 @@ const fileFilter = (req, file, cb) => {
     );
 
     if (mimeOk || extOk) {
-        console.log(
-            `[upload filter] ACCEPTED — name: "${file.originalname}", mime: "${file.mimetype}"`
-        );
         return cb(null, true);
     }
 
