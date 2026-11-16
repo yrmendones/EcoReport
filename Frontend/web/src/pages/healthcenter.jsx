@@ -75,7 +75,6 @@ function pageNumbersFor(safePage, totalPages) {
 }
 
 function PaginationBar({ page, totalPages, onPageChange }) {
-  if (totalPages <= 1) return null;
   const safePage = Math.min(page, totalPages);
 
   return (

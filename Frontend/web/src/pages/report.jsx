@@ -514,7 +514,7 @@ export default function Report() {
             </div>
 
             {/* PAGINATION BAR */}
-            {!loading && !error && totalPages > 1 && (
+            {!loading && !error && (
               <div className="rp-pagination-bar">
                 <div className="rp-page-info">
                   Page <strong>{safePage}</strong> of{" "}

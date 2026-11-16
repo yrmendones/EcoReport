@@ -493,7 +493,7 @@ export default function Blotter() {
             </div>
 
             {/* PAGINATION */}
-            {!loading && !error && totalPages > 1 && (
+            {!loading && !error && (
               <div className="rp-pagination-bar">
                 <div className="rp-page-info">
                   Page <strong>{safePage}</strong> of <strong>{totalPages}</strong>

@@ -393,7 +393,7 @@ export default function AuditLogs() {
           </div>
 
           {/* ─── PAGINATION ─── */}
-          {!loading && !error && totalPages > 1 && (
+          {!loading && !error && (
             <div className="audit-pagination-bar">
               <div className="audit-page-info">
                 Page <strong>{page}</strong> of <strong>{totalPages}</strong>
