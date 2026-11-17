@@ -23,7 +23,7 @@ app.use(cors({
         ].filter(Boolean);
 
         // Allow localhost on any port
-        const isLocalhost = /^http:\/\/localhost(:\d+)?$/.test(origin);
+        const isLocalhost = /^https?:\/\/localhost(:\d+)?$/.test(origin);
 
         // Allow any private LAN IP
         const isLanIp = /^http:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin);
