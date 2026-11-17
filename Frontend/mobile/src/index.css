@@ -169,3 +169,86 @@ body{
 }
 .btn-dark:hover:not(:disabled) { background-color: #65686f; }
 .btn-dark:active:not(:disabled) { transform: scale(0.98); }
+
+/*
+ * The sm: page dimensions are a desktop preview frame. A phone in landscape
+ * can also be wider than Tailwind's sm breakpoint, so remove that frame only
+ * while the mobile app is landscape and let its content use the real viewport.
+ */
+@media (orientation: landscape) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 100dvh;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  [class~="sm:py-6"] {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  [class~="sm:px-3"] {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  [class~="sm:w-[390px]"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  [class~="sm:h-[844px]"] {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+  }
+
+  [class~="sm:rounded-[40px]"] {
+    border-radius: 0 !important;
+  }
+
+  [class~="sm:border-[5px]"] {
+    border: 0 !important;
+  }
+
+  [class~="sm:shadow-2xl"] {
+    box-shadow: none !important;
+  }
+
+  /* The verification screen uses its own fixed preview dimensions. */
+  [class~="min-h-screen"][class~="p-4"] {
+    min-height: 100dvh;
+    padding: 0 !important;
+  }
+
+  [class~="w-[390px]"][class~="h-[780px]"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100dvh !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  main[class~="overflow-y-auto"] {
+    width: 100%;
+    min-width: 0;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: max(24px, env(safe-area-inset-left)) !important;
+    padding-right: max(24px, env(safe-area-inset-right)) !important;
+  }
+
+  nav[class~="h-[76px]"] {
+    height: calc(76px + env(safe-area-inset-bottom)) !important;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
