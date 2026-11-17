@@ -63,15 +63,54 @@ function RequireResident() {
   return <Outlet />;
 }
 
+// Reopen a saved resident session directly in the app instead of showing the
+// welcome or login screen after the WebView has been closed and relaunched.
+function RedirectIfResident({ children }) {
+  const token = localStorage.getItem("token");
+  let role = null;
+  try {
+    role = JSON.parse(localStorage.getItem("user") || "{}").role || null;
+  } catch {
+    role = null;
+  }
+
+  if (token && role === "resident") {
+    return <Navigate to="/resident-dashboard" replace />;
+  }
+
+  return children;
+}
+
 export default function AppRouter() {
   return (
     <BrowserRouter>
       <MaintenanceGate>
         <Routes>
           {/* ================= AUTHENTICATION ================= */}
-          <Route path="/" element={<Welcome />} />
-          <Route path="/resident-login" element={<ResidentLogin />} />
-          <Route path="/login" element={<ResidentLogin />} />
+          <Route
+            path="/"
+            element={
+              <RedirectIfResident>
+                <Welcome />
+              </RedirectIfResident>
+            }
+          />
+          <Route
+            path="/resident-login"
+            element={
+              <RedirectIfResident>
+                <ResidentLogin />
+              </RedirectIfResident>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <RedirectIfResident>
+                <ResidentLogin />
+              </RedirectIfResident>
+            }
+          />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ForgotPassword />} />
