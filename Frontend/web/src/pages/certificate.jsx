@@ -833,16 +833,18 @@ export default function Certificate() {
               <div className="form-group">
                 <label>Fee (₱)</label>
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
+                  required
                   value={typeForm.fee}
-                  onChange={(e) => setTypeForm({ ...typeForm, fee: e.target.value })}
-                  placeholder="Leave empty if fee varies"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                      setTypeForm({ ...typeForm, fee: v });
+                    }
+                  }}
+                  placeholder="e.g., 100"
                 />
-                <small style={{ color: "#888", fontSize: "10px" }}>
-                  Leave empty for "Ask the barangay" (variable fee). Use 0 for free.
-                </small>
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn-cancel" onClick={() => setShowAddTypeModal(false)}>
@@ -873,16 +875,18 @@ export default function Certificate() {
               <div className="form-group">
                 <label>Fee (₱)</label>
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
+                  required
                   value={typeForm.fee}
-                  onChange={(e) => setTypeForm({ ...typeForm, fee: e.target.value })}
-                  placeholder="Leave empty if fee varies"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                      setTypeForm({ ...typeForm, fee: v });
+                    }
+                  }}
+                  placeholder="e.g., 100"
                 />
-                <small style={{ color: "#888", fontSize: "10px" }}>
-                  Leave empty for "Ask the barangay" (variable fee). Use 0 for free.
-                </small>
               </div>
               <div className="form-group">
                 <label>Status</label>
