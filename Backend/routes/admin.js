@@ -52,6 +52,13 @@ router.get('/certificates', adminController.getCertificates);
 router.put('/certificates/:id', adminController.updateCertificateStatus);
 router.delete('/certificates/:id', adminController.deleteCertificate);
 
+// Certificate Types - official manages the list + fees
+const certificateTypesController = require('../controllers/certificateTypesController');
+router.get('/certificate-types', certificateTypesController.getAllCertificateTypes);
+router.post('/certificate-types', certificateTypesController.createCertificateType);
+router.put('/certificate-types/:id', certificateTypesController.updateCertificateType);
+router.delete('/certificate-types/:id', certificateTypesController.deleteCertificateType);
+
 // Appointments (shared)
 router.get('/appointments', adminController.getAppointments);
 router.get('/appointments/stats', adminController.getAppointmentStats);

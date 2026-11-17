@@ -603,7 +603,7 @@ export default function GenerateReports() {
         }
         .type-button:hover { background: #f3f4f6; }
         .type-button.selected {
-          background: #1d4ed8; border-color: #1d4ed8; color: #ffffff;
+          background: #16a34a; border-color: #16a34a; color: #ffffff;
         }
 
         .period-label {
@@ -668,11 +668,12 @@ export default function GenerateReports() {
         }
         .chart-bar {
           width: 100%;
-          background: #1d4ed8;
+          background: #16a34a;
           border-radius: 2px 2px 0 0;
           min-height: 0;
           transition: height 0.25s ease;
         }
+        .chart-bar:hover { background: #15803d; }
         .chart-bar:hover { background: #1e40af; }
         .chart-empty {
           padding: 40px 20px; text-align: center;

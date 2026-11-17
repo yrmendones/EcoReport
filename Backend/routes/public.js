@@ -16,4 +16,8 @@ router.get('/status', settingsController.getPublicStatus);
 // Report categories for the mobile app dropdown
 router.get('/categories', settingsController.getPublicCategories);
 
+// Certificate types (name + fee) for the mobile app dropdown
+const certificateTypesController = require('../controllers/certificateTypesController');
+router.get('/certificate-types', certificateTypesController.getPublicCertificateTypes);
+
 module.exports = router;

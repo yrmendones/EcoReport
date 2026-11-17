@@ -1,32 +1,28 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../api";
 import { getMenuItems } from "../menu";
 import ProfileHeaderButton from "../components/ProfileHeaderButton";
+import { FaTrash } from "react-icons/fa";
 
 const PAGE_SIZE = 25;
 
-const CATEGORY_OPTIONS = [
-  "All Categories",
-  "Barangay Clearance",
-  "Barangay ID",
-  "Cedula",
-  "School Requirement",
-  "Proof of Residency",
-  "Senior Citizen ID Requirement",
-  "Certificate of Residency",
-  "Certificate of Indigency",
-  "Business Clearance",
-];
-
-const CERT_FEES = {
-  "Barangay Clearance": null,
-  "Barangay ID": 100,
-  "Cedula": 20,
-  "School Requirement": 100,
-  "Proof of Residency": 100,
-  "Senior Citizen ID Requirement": 100,
-};
+function pageNumbersFor(safePage, totalPages) {
+  const pages = [];
+  const maxButtons = 5;
+  if (totalPages <= maxButtons + 2) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    const start = Math.max(2, safePage - 1);
+    const end = Math.min(totalPages - 1, safePage + 1);
+    if (start > 2) pages.push("...");
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < totalPages - 1) pages.push("...");
+    pages.push(totalPages);
+  }
+  return pages;
+}
 
 const formatFee = (fee) => {
   if (fee === null || fee === undefined || fee === "") return "—";
@@ -63,6 +59,21 @@ export default function Certificate() {
   const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Tabs
+  const [activeTab, setActiveTab] = useState("Requests");
+
+  // Certificate types
+  const [certificateTypes, setCertificateTypes] = useState([]);
+  const [loadingTypes, setLoadingTypes] = useState(true);
+  const [typeSearch, setTypeSearch] = useState("");
+  const [typesPage, setTypesPage] = useState(1);
+
+  // Manage Types modals
+  const [showAddTypeModal, setShowAddTypeModal] = useState(false);
+  const [showEditTypeModal, setShowEditTypeModal] = useState(false);
+  const [editingType, setEditingType] = useState(null);
+  const [typeForm, setTypeForm] = useState({ name: "", fee: "", is_active: true });
 
   // Filters
   const [search, setSearch] = useState("");
@@ -101,6 +112,63 @@ export default function Certificate() {
   useEffect(() => {
     fetchCertificates();
   }, []);
+
+  const fetchCertificateTypes = async () => {
+    try {
+      setLoadingTypes(true);
+      const data = await apiFetch("/api/admin/certificate-types");
+      setCertificateTypes(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching certificate types:", err);
+    } finally {
+      setLoadingTypes(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCertificateTypes();
+  }, []);
+
+  // Live filter dropdown — merges admin types + any legacy type still in requests
+  const categoryOptions = useMemo(() => {
+    const set = new Set(["All Categories"]);
+    certificateTypes.forEach((t) => { if (t.name) set.add(t.name); });
+    certificates.forEach((c) => { if (c.certificate_type) set.add(c.certificate_type); });
+    return Array.from(set);
+  }, [certificateTypes, certificates]);
+
+    const feeByType = useMemo(() => {
+    const map = {};
+    certificateTypes.forEach((t) => { map[t.name] = t.fee; });
+    return map;
+  }, [certificateTypes]);
+
+  const filteredTypes = useMemo(() => {
+    const s = typeSearch.trim().toLowerCase();
+    if (!s) return certificateTypes;
+    return certificateTypes.filter((t) => {
+      const feeText =
+        t.fee === null || t.fee === undefined
+          ? "ask the barangay"
+          : formatFee(t.fee).toLowerCase();
+      return (
+        t.name?.toLowerCase().includes(s) ||
+        feeText.includes(s) ||
+        (t.is_active ? "active" : "inactive").includes(s)
+      );
+    });
+  }, [certificateTypes, typeSearch]);
+
+  const typesTotalPages = Math.max(1, Math.ceil(filteredTypes.length / PAGE_SIZE));
+  const typesSafePage = Math.min(typesPage, typesTotalPages);
+  const paginatedTypes = filteredTypes.slice(
+    (typesSafePage - 1) * PAGE_SIZE,
+    typesSafePage * PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setTypesPage(1);
+  }, [typeSearch]);
 
   // ============================================================
   // DATE RANGE HELPER
@@ -258,6 +326,70 @@ export default function Certificate() {
     }
   };
 
+  // ─── Manage Types handlers ───
+  const openAddTypeModal = () => {
+    setTypeForm({ name: "", fee: "", is_active: true });
+    setShowAddTypeModal(true);
+  };
+
+  const openEditTypeModal = (t) => {
+    setEditingType(t);
+    setTypeForm({
+      name: t.name,
+      fee: t.fee === null || t.fee === undefined ? "" : String(t.fee),
+      is_active: !!t.is_active,
+    });
+    setShowEditTypeModal(true);
+  };
+
+  const handleCreateType = async (e) => {
+    e.preventDefault();
+    try {
+      await apiFetch("/api/admin/certificate-types", {
+        method: "POST",
+        body: JSON.stringify({
+          name: typeForm.name,
+          fee: typeForm.fee === "" ? null : Number(typeForm.fee),
+        }),
+      });
+      setShowAddTypeModal(false);
+      await fetchCertificateTypes();
+      alert("Certificate type added!");
+    } catch (err) {
+      alert("Failed to add: " + err.message);
+    }
+  };
+
+  const handleUpdateType = async (e) => {
+    e.preventDefault();
+    try {
+      await apiFetch(`/api/admin/certificate-types/${editingType.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: typeForm.name,
+          fee: typeForm.fee === "" ? null : Number(typeForm.fee),
+          is_active: typeForm.is_active,
+        }),
+      });
+      setShowEditTypeModal(false);
+      await fetchCertificateTypes();
+      alert("Certificate type updated!");
+    } catch (err) {
+      alert("Failed to update: " + err.message);
+    }
+  };
+
+  const handleDeleteType = async (t) => {
+    if (!window.confirm(`Delete certificate type "${t.name}"? Existing requests are not affected.`)) return;
+    try {
+      await apiFetch(`/api/admin/certificate-types/${t.id}`, { method: "DELETE" });
+      await fetchCertificateTypes();
+      alert("Certificate type deleted.");
+    } catch (err) {
+      alert("Failed to delete: " + err.message);
+    }
+  };
+
   // ============================================================
   // FORMAT DATE
   // ============================================================
@@ -307,6 +439,22 @@ export default function Certificate() {
           </header>
 
           <section className="certificate-content">
+            {/* TABS */}
+            <div className="cert-tabs">
+              {["Requests", "Manage Types"].map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  className={`cert-tab ${activeTab === tab ? "active" : ""}`}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            {activeTab === "Requests" && (
+            <>
             {/* FILTER BAR */}
             <div className="filter-bar">
               <div className="search-box">
@@ -334,7 +482,7 @@ export default function Certificate() {
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
               >
-                {CATEGORY_OPTIONS.map((c) => (
+                {categoryOptions.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
@@ -429,7 +577,7 @@ export default function Certificate() {
                             {formatFee(
                               cert.fee !== null && cert.fee !== undefined
                                 ? cert.fee
-                                : CERT_FEES[cert.certificate_type]
+                                : feeByType[cert.certificate_type]
                             )}
                           </td>
                           <td>
@@ -458,7 +606,7 @@ export default function Certificate() {
                                 title="Delete"
                                 onClick={() => handleDelete(cert)}
                               >
-                                🗑
+                                <FaTrash size={12} />
                               </button>
                             </div>
                           </td>
@@ -518,10 +666,244 @@ export default function Certificate() {
                   </button>
                 </div>
               </div>
+              )}
+            </>
+            )}
+
+            {activeTab === "Manage Types" && (
+            <>
+            <div className="filter-bar">
+              <div className="search-box">
+                <span className="search-icon">🔍</span>
+                <input
+                  type="text"
+                  placeholder="Search certificate types..."
+                  value={typeSearch}
+                  onChange={(e) => setTypeSearch(e.target.value)}
+                />
+                {typeSearch && (
+                  <button
+                    type="button"
+                    className="clear-search"
+                    onClick={() => setTypeSearch("")}
+                    aria-label="Clear search"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                className="filter-export-btn"
+                onClick={openAddTypeModal}
+              >
+                + Add Certificate Type
+              </button>
+            </div>
+
+            <div className="table-wrapper">
+              {loadingTypes ? (
+                <div className="table-message">Loading certificate types...</div>
+              ) : (
+                <table className="reports-table">
+                  <thead>
+                    <tr>
+                      <th>Certificate Type</th>
+                      <th>Fee</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedTypes.length > 0 ? (
+                      paginatedTypes.map((t) => (
+                        <tr key={t.id}>
+                          <td>{t.name}</td>
+                          <td className="fee-cell">
+                            {t.fee === null || t.fee === undefined
+                              ? "Ask the barangay"
+                              : formatFee(t.fee)}
+                          </td>
+                          <td>
+                            <span className={`cert-type-status ${t.is_active ? "active" : "inactive"}`}>
+                              {t.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="actions">
+                              <button
+                                type="button"
+                                className="action-button edit"
+                                title="Edit"
+                                onClick={() => openEditTypeModal(t)}
+                              >
+                                ✎
+                              </button>
+                              <button
+                                type="button"
+                                className="action-button delete"
+                                title="Delete"
+                                onClick={() => handleDeleteType(t)}
+                              >
+                                <FaTrash size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" className="text-center py-8 text-gray-500">
+                          {typeSearch
+                            ? `No certificate types match "${typeSearch}".`
+                            : 'No certificate types yet. Click "+ Add Certificate Type" to create one.'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {!loadingTypes && (
+              <div className="rp-pagination-bar">
+                <div className="rp-page-info">
+                  Page <strong>{typesSafePage}</strong> of <strong>{typesTotalPages}</strong>
+                </div>
+
+                <div className="rp-pagination-controls">
+                  <button
+                    type="button"
+                    className="rp-page-btn rp-page-nav"
+                    onClick={() => setTypesPage((p) => Math.max(1, p - 1))}
+                    disabled={typesSafePage === 1}
+                  >
+                    ‹ Prev
+                  </button>
+
+                  {pageNumbersFor(typesSafePage, typesTotalPages).map((p, i) =>
+                    p === "..." ? (
+                      <span key={`ellipsis-${i}`} className="rp-page-ellipsis">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        type="button"
+                        className={`rp-page-btn ${p === typesSafePage ? "active" : ""}`}
+                        onClick={() => setTypesPage(p)}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    type="button"
+                    className="rp-page-btn rp-page-nav"
+                    onClick={() => setTypesPage((p) => Math.min(typesTotalPages, p + 1))}
+                    disabled={typesSafePage === typesTotalPages}
+                  >
+                    Next ›
+                  </button>
+                </div>
+              </div>
+            )}
+            </>
             )}
           </section>
         </main>
       </div>
+
+      {/* ADD TYPE MODAL */}
+      {showAddTypeModal && (
+        <div className="modal-overlay" onClick={() => setShowAddTypeModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Add Certificate Type</h3>
+            <form onSubmit={handleCreateType}>
+              <div className="form-group">
+                <label>Certificate Name</label>
+                <input
+                  type="text"
+                  value={typeForm.name}
+                  onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })}
+                  required
+                  placeholder="e.g., Barangay Clearance"
+                />
+              </div>
+              <div className="form-group">
+                <label>Fee (₱)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={typeForm.fee}
+                  onChange={(e) => setTypeForm({ ...typeForm, fee: e.target.value })}
+                  placeholder="Leave empty if fee varies"
+                />
+                <small style={{ color: "#888", fontSize: "10px" }}>
+                  Leave empty for "Ask the barangay" (variable fee). Use 0 for free.
+                </small>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-cancel" onClick={() => setShowAddTypeModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-save">Add</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT TYPE MODAL */}
+      {showEditTypeModal && editingType && (
+        <div className="modal-overlay" onClick={() => setShowEditTypeModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Edit Certificate Type</h3>
+            <form onSubmit={handleUpdateType}>
+              <div className="form-group">
+                <label>Certificate Name</label>
+                <input
+                  type="text"
+                  value={typeForm.name}
+                  onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Fee (₱)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={typeForm.fee}
+                  onChange={(e) => setTypeForm({ ...typeForm, fee: e.target.value })}
+                  placeholder="Leave empty if fee varies"
+                />
+                <small style={{ color: "#888", fontSize: "10px" }}>
+                  Leave empty for "Ask the barangay" (variable fee). Use 0 for free.
+                </small>
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select
+                  value={typeForm.is_active ? "active" : "inactive"}
+                  onChange={(e) => setTypeForm({ ...typeForm, is_active: e.target.value === "active" })}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-cancel" onClick={() => setShowEditTypeModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-save">Update</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* EDIT STATUS MODAL */}
       {showEditModal && (
@@ -569,7 +951,7 @@ export default function Certificate() {
                 {formatFee(
                   selectedCertificate.fee !== null && selectedCertificate.fee !== undefined
                     ? selectedCertificate.fee
-                    : CERT_FEES[selectedCertificate.certificate_type]
+                    : feeByType[selectedCertificate.certificate_type]
                 )}
               </p>
               <p><strong>Status:</strong> {selectedCertificate.status}</p>
@@ -617,6 +999,57 @@ export default function Certificate() {
           flex-direction: column;
         }
 
+        /* ─── TABS ─── */
+        .cert-tabs {
+          width: 100%;
+          height: 42px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 0 2px;
+          flex-shrink: 0;
+          overflow-x: auto;
+          overflow-y: hidden;
+          scrollbar-width: none;
+        }
+        .cert-tabs::-webkit-scrollbar { display: none; }
+        .cert-tab {
+          height: 30px;
+          padding: 0 14px;
+          border: 1px solid #a6b7a7;
+          border-radius: 3px;
+          background: #ffffff;
+          color: #444444;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 10px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+          flex-shrink: 0;
+          transition: background 0.15s ease;
+        }
+        .cert-tab.active {
+          background: #367046;
+          color: #ffffff;
+          border-color: #367046;
+          font-weight: 800;
+        }
+        .cert-tab:hover:not(.active) { background: #f3f7f3; }
+
+        .cert-type-status {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 3px 10px;
+          border-radius: 10px;
+          font-size: 9px;
+          font-weight: 700;
+          white-space: nowrap;
+          line-height: 1;
+        }
+        .cert-type-status.active { background: #d1edcf; color: #2E7D32; }
+        .cert-type-status.inactive { background: #ffc8c8; color: #525252; }
+
         /* ─── FILTER BAR ─── */
         .filter-bar { width: 100%; height: 42px; display: flex; align-items: center; gap: 14px; padding: 0 2px; flex-shrink: 0; }
 
@@ -636,6 +1069,9 @@ export default function Certificate() {
 
         .filter-clear-btn { height: 30px; padding: 0 12px; border: 1px solid #e0a5a5; border-radius: 3px; background: #ffffff; color: #b3261e; font-family: Arial, Helvetica, sans-serif; font-size: 10px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
         .filter-clear-btn:hover { background: #fdecec; }
+
+        .filter-export-btn { height: 30px; padding: 0 14px; border: 1px solid #547f5c; border-radius: 3px; background: #367046; color: #ffffff; font-family: Arial, Helvetica, sans-serif; font-size: 10px; font-weight: 700; cursor: pointer; margin-left: auto; flex-shrink: 0; }
+        .filter-export-btn:hover { background: #2e623d; }
 
         /* ─── TABLE ─── */
         .table-wrapper {

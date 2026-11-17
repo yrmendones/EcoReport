@@ -14,16 +14,7 @@ import {
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
 
-/* ---------- Certificates and fees ---------- */
-const CERTIFICATES = [
-  { name: "Barangay Clearance", fee: null },
-  { name: "Barangay ID", fee: 100 },
-  { name: "Cedula", fee: 20 },
-  { name: "School Requirement", fee: 100 },
-  { name: "Proof of Residency", fee: 100 },
-  { name: "Senior Citizen ID Requirement", fee: 100 },
-];
-
+/* ---------- Certificates ---------- */
 const formatFee = (fee) => `₱${Number(fee).toFixed(2)}`;
 
 const formatLongDate = (iso) =>
@@ -307,13 +298,16 @@ export default function CertificateRequest() {
     verification_status: "Pending Verification",
   });
 
+  const [certificates, setCertificates] = useState([]);
+  const [loadingCertificates, setLoadingCertificates] = useState(true);
+
   const [certificate, setCertificate] = useState("");
   const [purpose, setPurpose] = useState("");
   const [date, setDate] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  // Snapshot of the submitted request — drives the success screen.
+  // Snapshot of the submitted request - drives the success screen.
   // null = form is shown; object = success screen.
   const [submitted, setSubmitted] = useState(null);
 
@@ -334,11 +328,24 @@ export default function CertificateRequest() {
     fetchUser();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch("/api/public/certificate-types")
+      .then((data) => {
+        if (!cancelled && Array.isArray(data)) setCertificates(data);
+      })
+      .catch((err) => console.error("Failed to load certificate types:", err))
+      .finally(() => {
+        if (!cancelled) setLoadingCertificates(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   const isVerified =
     userStatus.is_verified === 1 &&
     userStatus.verification_status === "Verified Resident";
 
-  const selectedCertificate = CERTIFICATES.find((c) => c.name === certificate);
+  const selectedCertificate = certificates.find((c) => c.name === certificate);
 
   const handleSubmit = async () => {
     if (!certificate || !purpose || !date) {
@@ -368,7 +375,6 @@ export default function CertificateRequest() {
           certificate_type: certificate,
           purpose: purpose,
           preferred_release_date: date,
-          fee: selectedCertificate?.fee ?? null,
           notes: notes || null,
         }),
       });
@@ -593,13 +599,19 @@ export default function CertificateRequest() {
                 disabled={loading}
               >
                 <option value="">Select Certificate</option>
-                {CERTIFICATES.map((item) => (
-                  <option key={item.name} value={item.name}>
-                    {item.fee == null
-                      ? item.name
-                      : `${item.name} - ${formatFee(item.fee)}`}
-                  </option>
-                ))}
+                {loadingCertificates ? (
+                  <option value="" disabled>Loading...</option>
+                ) : certificates.length === 0 ? (
+                  <option value="" disabled>No certificates available</option>
+                ) : (
+                  certificates.map((item) => (
+                    <option key={item.name} value={item.name}>
+                      {item.fee == null
+                        ? item.name
+                        : `${item.name} - ${formatFee(item.fee)}`}
+                    </option>
+                  ))
+                )}
               </select>
               <FaChevronDown
                 size={14}

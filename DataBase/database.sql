@@ -413,7 +413,20 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- 27. SAMPLE DATA
+-- 27. CERTIFICATE TYPES (admin-managed certificate list + fees)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS certificate_types (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    fee DECIMAL(10,2) NULL,
+    display_order INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- 28. SAMPLE DATA
 -- ============================================================
 
 INSERT IGNORE INTO system_settings (id) VALUES (1);
@@ -465,8 +478,19 @@ INSERT INTO medical_staff (staff_name, role, display_order) VALUES
 ('Ma. Theresa Dela Cruz', 'BHW', 3),
 ('Gloria Berame', 'BNS', 4);
 
+CREATE TABLE IF NOT EXISTS certificate_types (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    fee DECIMAL(10,2) NULL,
+    display_order INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
 -- ============================================================
--- 28. INDEXES
+-- 29. INDEXES
 -- ============================================================
 
 CREATE INDEX idx_reports_user_id ON environmental_reports(user_id);

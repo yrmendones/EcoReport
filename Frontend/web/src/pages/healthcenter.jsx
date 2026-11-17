@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../api";
 import { getMenuItems } from "../menu";
 import ProfileHeaderButton from "../components/ProfileHeaderButton";
+import { FaTrash } from "react-icons/fa";
 import RichTextEditor from "../components/RichTextEditor";
 
 const PAGE_SIZE = 25;
@@ -772,7 +773,7 @@ export default function HealthCenter() {
                               <div className="actions">
                                 <button className="action-button edit" onClick={() => handleEditAppointment(a)} title="Edit">✎</button>
                                 <button className="action-button view" onClick={() => handleViewAppointment(a)} title="View">◉</button>
-                                <button className="action-button delete" onClick={() => handleDeleteAppointment(a)} title="Delete">🗑</button>
+                                <button className="action-button delete" onClick={() => handleDeleteAppointment(a)} title="Delete"><FaTrash size={12} /></button>
                               </div>
                             </td>
                           </tr>
@@ -856,7 +857,7 @@ export default function HealthCenter() {
                             <td>
                               <div className="actions">
                                 <button className="action-button edit" onClick={() => handleEditService(svc)} title="Edit">✎</button>
-                                <button className="action-button delete" onClick={() => handleDeleteService(svc)} title="Delete">🗑</button>
+                                <button className="action-button delete" onClick={() => handleDeleteService(svc)} title="Delete"><FaTrash size={12} /></button>
                               </div>
                             </td>
                           </tr>
@@ -928,7 +929,7 @@ export default function HealthCenter() {
                             <td>
                               <div className="actions">
                                 <button className="action-button edit" onClick={() => handleEditStaff(s)} title="Edit">✎</button>
-                                <button className="action-button delete" onClick={() => handleDeleteStaff(s)} title="Delete">🗑</button>
+                                <button className="action-button delete" onClick={() => handleDeleteStaff(s)} title="Delete"><FaTrash size={12} /></button>
                               </div>
                             </td>
                           </tr>
@@ -1050,7 +1051,7 @@ export default function HealthCenter() {
                             <td>
                               <div className="actions">
                                 <button className="action-button edit" onClick={() => handleEditAnnouncement(ann)} title="Edit">✎</button>
-                                <button className="action-button delete" onClick={() => handleDeleteAnnouncement(ann)} title="Delete">🗑</button>
+                                <button className="action-button delete" onClick={() => handleDeleteAnnouncement(ann)} title="Delete"><FaTrash size={12} /></button>
                               </div>
                             </td>
                           </tr>

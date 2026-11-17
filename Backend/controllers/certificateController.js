@@ -4,7 +4,7 @@ exports.createCertificateRequest = async (req, res) => {
     try {
         // user_id is derived from the verified JWT cannot be spoofed
         const user_id = req.user.id;
-        const { certificate_type, purpose, preferred_release_date, notes, fee } = req.body;
+        const { certificate_type, purpose, preferred_release_date, notes } = req.body;
         if (!certificate_type || !purpose || !preferred_release_date)
             return res.status(400).json({ error: 'Missing required fields.' });
 
@@ -20,17 +20,23 @@ exports.createCertificateRequest = async (req, res) => {
             });
         }
 
-        const parsedFee =
-            fee !== undefined && fee !== null && fee !== ""
-                ? Number(fee)
-                : null;
-        const safeFee = Number.isFinite(parsedFee) ? parsedFee : null;
+        // The client cannot set the fee - server-side lookup ensures integrity.
+        const [typeRows] = await db.query(
+            'SELECT fee FROM certificate_types WHERE name = ? AND is_active = 1 LIMIT 1',
+            [certificate_type]
+        );
+        if (typeRows.length === 0) {
+            return res.status(400).json({
+                error: 'That certificate type is no longer available. Please choose a different one.',
+            });
+        }
+        const serverFee = typeRows[0].fee;
 
         const [result] = await db.query(
             `INSERT INTO certificate_requests 
             (user_id, certificate_type, purpose, preferred_release_date, fee, notes, status, requested_at) 
             VALUES (?, ?, ?, ?, ?, ?, 'Pending', NOW())`,
-            [user_id, certificate_type, purpose, preferred_release_date, safeFee, notes || null]
+            [user_id, certificate_type, purpose, preferred_release_date, serverFee, notes || null]
         );
         res.status(201).json({ message: 'Certificate requested!', certificate_request_id: result.insertId });
     } catch (error) {

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../api";
 import { getMenuItems } from "../menu";
 import ProfileHeaderButton from "../components/ProfileHeaderButton";
+import { FaTrash } from "react-icons/fa";
 
 const PAGE_SIZE = 25;
 
@@ -399,7 +400,7 @@ export default function Inventory() {
                                 title="Delete"
                                 onClick={() => handleDelete(item)}
                               >
-                                🗑
+                                <FaTrash size={12} />
                               </button>
                             </div>
                           </td>

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../api";
 import { getMenuItems } from "../menu";
 import ProfileHeaderButton from "../components/ProfileHeaderButton";
+import { FaTrash } from "react-icons/fa";
 import RichTextEditor from "../components/RichTextEditor";
 
 const PAGE_SIZE = 25;
@@ -448,7 +449,7 @@ export default function Announcement() {
                                 title="Delete"
                                 onClick={() => handleDelete(announcement)}
                               >
-                                🗑
+                                <FaTrash size={12} />
                               </button>
                             </div>
                           </td>
