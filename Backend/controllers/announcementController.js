@@ -3,6 +3,7 @@ const { logAudit } = require('../utils/auditLogger');
 const { formatRow, formatRows } = require('../utils/dateFormatter');
 const notificationController = require('./notificationController');
 const { sanitizeDescription } = require('../utils/sanitizeHtml');
+const withTransaction = require('../utils/withTransaction');
 
 exports.getPublishedAnnouncements = async (req, res) => {
     try {
@@ -107,26 +108,46 @@ exports.updateAnnouncement = async (req, res) => {
         if (!title || !content || !category || !status)
             return res.status(400).json({ error: 'Title, content, category, and status required.' });
 
-        // Fetch existing to detect status change
-        const [existing] = await db.query(
-            'SELECT title, status FROM announcements WHERE announcement_id = ?',
-            [req.params.id]
-        );
-        if (existing.length === 0) {
+        const cleanContent = sanitizeDescription(content);
+        const updateResult = await withTransaction(db, async (connection) => {
+            // Lock linked alert rows before the announcement row, matching the
+            // alert update/delete transaction order.
+            const [linkedAlerts] = await connection.query(
+                'SELECT alert_id FROM disaster_alerts WHERE linked_announcement_id = ? FOR UPDATE',
+                [req.params.id]
+            );
+            const [existing] = await connection.query(
+                'SELECT title, status FROM announcements WHERE announcement_id = ? FOR UPDATE',
+                [req.params.id]
+            );
+            if (existing.length === 0) return null;
+
+            const finalCategory = linkedAlerts.length > 0 ? 'Disaster' : category;
+            await connection.query(
+                'UPDATE announcements SET title = ?, content = ?, category = ?, status = ? WHERE announcement_id = ?',
+                [title, cleanContent, finalCategory, status, req.params.id]
+            );
+
+            if (linkedAlerts.length > 0) {
+                await connection.query(
+                    `UPDATE disaster_alerts
+                     SET title = ?, description = ?, status = ?
+                     WHERE linked_announcement_id = ?`,
+                    [title, cleanContent || null, status === 'Published' ? 'Active' : 'Inactive', req.params.id]
+                );
+            }
+
+            return { existing: existing[0], category: finalCategory };
+        });
+        if (!updateResult) {
             return res.status(404).json({ error: 'Announcement not found.' });
         }
 
-        const cleanContent = sanitizeDescription(content);
-        await db.query(
-            'UPDATE announcements SET title = ?, content = ?, category = ?, status = ? WHERE announcement_id = ?',
-            [title, cleanContent, category, status, req.params.id]
-        );
-
         // Audit
-        const statusChanged = existing[0].status !== status;
+        const statusChanged = updateResult.existing.status !== status;
         const auditMsg = statusChanged
-            ? `Updated announcement "${title}" status from ${existing[0].status} to ${status}`
-            : `Updated announcement "${title}" (category: ${category})`;
+            ? `Updated announcement "${title}" status from ${updateResult.existing.status} to ${status}`
+            : `Updated announcement "${title}" (category: ${updateResult.category})`;
 
         await logAudit(req, auditMsg);
 
@@ -134,8 +155,8 @@ exports.updateAnnouncement = async (req, res) => {
         // Broadcast to residents only if published AND announcement_alerts is enabled
         if (statusChanged && status === 'Published') {
             const broadcastType =
-                category === 'Health'   ? 'Health Announcement' :
-                category === 'Disaster' ? 'Disaster Alert' :
+                updateResult.category === 'Health'   ? 'Health Announcement' :
+                updateResult.category === 'Disaster' ? 'Disaster Alert' :
                                           'Announcement';
 
             // Check the system-wide switch
@@ -169,18 +190,34 @@ exports.updateAnnouncement = async (req, res) => {
 
 exports.deleteAnnouncement = async (req, res) => {
     try {
-        const [existing] = await db.query(
-            'SELECT title FROM announcements WHERE announcement_id = ?',
-            [req.params.id]
-        );
-        if (existing.length === 0) {
+        const deletedTitle = await withTransaction(db, async (connection) => {
+            // Lock linked alerts before the announcement to match disaster
+            // alert update/delete transactions.
+            await connection.query(
+                'SELECT alert_id FROM disaster_alerts WHERE linked_announcement_id = ? FOR UPDATE',
+                [req.params.id]
+            );
+            const [existing] = await connection.query(
+                'SELECT title FROM announcements WHERE announcement_id = ? FOR UPDATE',
+                [req.params.id]
+            );
+            if (existing.length === 0) return null;
+
+            // Null the optional link explicitly so behavior is consistent
+            // even where the database FK has not been installed.
+            await connection.query(
+                'UPDATE disaster_alerts SET linked_announcement_id = NULL WHERE linked_announcement_id = ?',
+                [req.params.id]
+            );
+            await connection.query('DELETE FROM announcements WHERE announcement_id = ?', [req.params.id]);
+            return existing[0].title;
+        });
+        if (deletedTitle === null) {
             return res.status(404).json({ error: 'Announcement not found.' });
         }
 
-        await db.query('DELETE FROM announcements WHERE announcement_id = ?', [req.params.id]);
-
         // Audit
-        await logAudit(req, `Deleted announcement "${existing[0].title}"`);
+        await logAudit(req, `Deleted announcement "${deletedTitle}"`);
 
         res.json({ message: 'Announcement deleted!' });
     } catch (error) {

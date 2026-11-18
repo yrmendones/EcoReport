@@ -5,6 +5,7 @@ const { logAudit } = require('../utils/auditLogger');
 const { logTimeline } = require('../utils/timelineLogger');
 const { formatRow, formatRows } = require('../utils/dateFormatter');
 const { sanitizeDescription, sanitizeText } = require('../utils/sanitizeHtml');
+const withTransaction = require('../utils/withTransaction');
 const loginLimiter = require('../utils/loginLimiter');
 const { reportReference, certificateReference } = require('../utils/referenceFormatter');
 const adminAlerts = require('../utils/adminAlerts');
@@ -1268,91 +1269,6 @@ exports.deleteWasteSchedule = async (req, res) => {
 };
 
 // ============================================================
-// BUSINESS PERMITS
-// ============================================================
-
-exports.getBusinesses = async (req, res) => {
-    try {
-        const [results] = await db.query(`
-            SELECT 
-                permit_id, business_name, owner_name, permit_number,
-                issued_date, expiry_date, created_at, updated_at,
-                CASE
-                    WHEN expiry_date IS NOT NULL AND expiry_date < CURDATE() THEN 'Inactive'
-                    ELSE status
-                END AS status
-            FROM business_permits
-            ORDER BY permit_id DESC
-        `);
-        res.json(formatRows(results, ["created_at", "updated_at"]));
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to fetch businesses.' });
-    }
-};
-
-exports.addBusiness = async (req, res) => {
-    try {
-        const { business_name, owner_name, permit_number, status } = req.body;
-        if (!business_name || !owner_name || !permit_number) {
-            return res.status(400).json({ error: 'Business name, owner, and permit number required.' });
-        }
-        const issued_date = new Date().toISOString().split('T')[0];
-        const currentYear = new Date().getFullYear();
-        const expiry_date = `${currentYear}-12-31`;
-
-        const [result] = await db.query(
-            `INSERT INTO business_permits (business_name, owner_name, permit_number, issued_date, expiry_date, status) 
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [business_name, owner_name, permit_number, issued_date, expiry_date, status || 'Active']
-        );
-
-        await logAudit(req, `Added business "${business_name}" (${permit_number})`);
-
-        res.status(201).json({ message: 'Business added!', permit_id: result.insertId });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to add business.' });
-    }
-};
-
-exports.updateBusiness = async (req, res) => {
-    try {
-        const { business_name, owner_name, permit_number, status } = req.body;
-        const updates = [];
-        const values = [];
-
-        if (business_name !== undefined) { updates.push('business_name = ?'); values.push(business_name); }
-        if (owner_name !== undefined) { updates.push('owner_name = ?'); values.push(owner_name); }
-        if (permit_number !== undefined) { updates.push('permit_number = ?'); values.push(permit_number); }
-        if (status !== undefined) { updates.push('status = ?'); values.push(status); }
-
-        if (updates.length === 0) {
-            return res.status(400).json({ error: 'No fields to update.' });
-        }
-
-        values.push(req.params.id);
-        await db.query(`UPDATE business_permits SET ${updates.join(', ')} WHERE permit_id = ?`, values);
-        await logAudit(req, `Updated business #${req.params.id}${business_name ? ` "${business_name}"` : ''}`);
-        res.json({ message: 'Business updated!' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to update business.' });
-    }
-};
-
-exports.deleteBusiness = async (req, res) => {
-    try {
-        await db.query('DELETE FROM business_permits WHERE permit_id = ?', [req.params.id]);
-        await logAudit(req, `Deleted business #${req.params.id}`);
-        res.json({ message: 'Business deleted!' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to delete business.' });
-    }
-};
-
-// ============================================================
 // INVENTORY
 // ============================================================
 
@@ -1492,23 +1408,23 @@ exports.addDisasterAlert = async (req, res) => {
         const announcementStatus = finalStatus === 'Active' ? 'Published' : 'Draft';
 
         const cleanDescription = sanitizeDescription(description || "");
-        const [result] = await db.query(
-            `INSERT INTO disaster_alerts (title, type, description, status, created_by) 
-             VALUES (?, ?, ?, ?, ?)`,
-            [title, type, cleanDescription || null, finalStatus, req.user.id]
-        );
-        const alertId = result.insertId;
-
-        const [annResult] = await db.query(
-            `INSERT INTO announcements (title, content, category, status, posted_at, posted_by) 
-             VALUES (?, ?, 'Disaster', ?, NOW(), ?)`,
-            [title, cleanDescription || 'No description provided.', announcementStatus, req.user.id]
-        );
-
-        await db.query(
-            'UPDATE disaster_alerts SET linked_announcement_id = ? WHERE alert_id = ?',
-            [annResult.insertId, alertId]
-        );
+        const { alertId, announcementId } = await withTransaction(db, async (connection) => {
+            const [result] = await connection.query(
+                `INSERT INTO disaster_alerts (title, type, description, status, created_by)
+                 VALUES (?, ?, ?, ?, ?)`,
+                [title, type, cleanDescription || null, finalStatus, req.user.id]
+            );
+            const [annResult] = await connection.query(
+                `INSERT INTO announcements (title, content, category, status, posted_at, posted_by)
+                 VALUES (?, ?, 'Disaster', ?, NOW(), ?)`,
+                [title, cleanDescription || 'No description provided.', announcementStatus, req.user.id]
+            );
+            await connection.query(
+                'UPDATE disaster_alerts SET linked_announcement_id = ? WHERE alert_id = ?',
+                [annResult.insertId, result.insertId]
+            );
+            return { alertId: result.insertId, announcementId: annResult.insertId };
+        });
 
         await logAudit(req, `Created disaster alert "${title}" (${type})`);
 
@@ -1519,7 +1435,7 @@ exports.addDisasterAlert = async (req, res) => {
                     `⚠️ Disaster Alert: ${title}`,
                     cleanDescription || 'No description provided.',
                     'Disaster Alert',
-                    annResult.insertId
+                    announcementId
                 );
             } catch (notifErr) {
                 console.error('Failed to broadcast disaster alert:', notifErr);
@@ -1542,55 +1458,66 @@ exports.updateDisasterAlert = async (req, res) => {
         const finalStatus = status || 'Active';
         const announcementStatus = finalStatus === 'Active' ? 'Published' : 'Draft';
 
-        const [alert] = await db.query('SELECT linked_announcement_id, status FROM disaster_alerts WHERE alert_id = ?', [req.params.id]);
-        if (alert.length === 0) {
-            return res.status(404).json({ error: 'Alert not found.' });
-        }
-        const previouslyActive = alert[0].status === 'Active';
-
         const cleanDescription = sanitizeDescription(description || "");
-        await db.query(
-            `UPDATE disaster_alerts SET title = ?, type = ?, description = ?, status = ? WHERE alert_id = ?`,
-            [title, type, cleanDescription || null, finalStatus, req.params.id]
-        );
+        const updateResult = await withTransaction(db, async (connection) => {
+            const [alertRows] = await connection.query(
+                'SELECT linked_announcement_id, status FROM disaster_alerts WHERE alert_id = ? FOR UPDATE',
+                [req.params.id]
+            );
+            if (alertRows.length === 0) return null;
 
-        let linkedId = alert[0].linked_announcement_id;
-        if (linkedId) {
-            const [checkAnn] = await db.query(
-                'SELECT announcement_id FROM announcements WHERE announcement_id = ?',
-                [linkedId]
+            const alert = alertRows[0];
+            const previouslyActive = alert.status === 'Active';
+            await connection.query(
+                `UPDATE disaster_alerts SET title = ?, type = ?, description = ?, status = ? WHERE alert_id = ?`,
+                [title, type, cleanDescription || null, finalStatus, req.params.id]
             );
-            if (checkAnn.length === 0) linkedId = null;
-        }
 
-        if (linkedId) {
-            await db.query(
-                `UPDATE announcements SET title = ?, content = ?, status = ? WHERE announcement_id = ?`,
-                [title, cleanDescription || 'No description provided.', announcementStatus, linkedId]
-            );
-        } else {
-            const [annResult] = await db.query(
-                `INSERT INTO announcements (title, content, category, status, posted_at, posted_by) 
-                 VALUES (?, ?, 'Disaster', ?, NOW(), ?)`,
-                [title, cleanDescription || 'No description provided.', announcementStatus, req.user.id]
-            );
-            await db.query(
-                'UPDATE disaster_alerts SET linked_announcement_id = ? WHERE alert_id = ?',
-                [annResult.insertId, req.params.id]
-            );
+            let announcementId = alert.linked_announcement_id;
+            if (announcementId) {
+                const [announcementRows] = await connection.query(
+                    'SELECT announcement_id FROM announcements WHERE announcement_id = ? FOR UPDATE',
+                    [announcementId]
+                );
+                if (announcementRows.length === 0) announcementId = null;
+            }
+
+            if (announcementId) {
+                await connection.query(
+                    `UPDATE announcements
+                     SET title = ?, content = ?, category = 'Disaster', status = ?
+                     WHERE announcement_id = ?`,
+                    [title, cleanDescription || 'No description provided.', announcementStatus, announcementId]
+                );
+            } else {
+                const [annResult] = await connection.query(
+                    `INSERT INTO announcements (title, content, category, status, posted_at, posted_by)
+                     VALUES (?, ?, 'Disaster', ?, NOW(), ?)`,
+                    [title, cleanDescription || 'No description provided.', announcementStatus, req.user.id]
+                );
+                announcementId = annResult.insertId;
+                await connection.query(
+                    'UPDATE disaster_alerts SET linked_announcement_id = ? WHERE alert_id = ?',
+                    [announcementId, req.params.id]
+                );
+            }
+
+            return { previouslyActive, announcementId };
+        });
+        if (!updateResult) {
+            return res.status(404).json({ error: 'Alert not found.' });
         }
 
         await logAudit(req, `Updated disaster alert "${title}" (status: ${finalStatus})`);
 
         // Broadcast only on Inactive → Active transition
-        if (!previouslyActive && finalStatus === 'Active') {
+        if (!updateResult.previouslyActive && finalStatus === 'Active') {
             try {
-                let announcementId = alert[0].linked_announcement_id;
                 await notificationController.broadcastToResidents(
                     `⚠️ Disaster Alert: ${title}`,
                     cleanDescription || 'No description provided.',
                     'Disaster Alert',
-                    announcementId
+                    updateResult.announcementId
                 );
             } catch (notifErr) {
                 console.error('Failed to broadcast disaster alert update:', notifErr);
@@ -1606,14 +1533,29 @@ exports.updateDisasterAlert = async (req, res) => {
 
 exports.deleteDisasterAlert = async (req, res) => {
     try {
-        const [alert] = await db.query('SELECT linked_announcement_id FROM disaster_alerts WHERE alert_id = ?', [req.params.id]);
-        if (alert.length === 0) {
+        const linkedAnnouncementId = await withTransaction(db, async (connection) => {
+            const [alertRows] = await connection.query(
+                'SELECT linked_announcement_id FROM disaster_alerts WHERE alert_id = ? FOR UPDATE',
+                [req.params.id]
+            );
+            if (alertRows.length === 0) return { found: false };
+
+            const linkedId = alertRows[0].linked_announcement_id;
+            if (linkedId) {
+                const [otherLinks] = await connection.query(
+                    'SELECT alert_id FROM disaster_alerts WHERE linked_announcement_id = ? AND alert_id <> ? LIMIT 1',
+                    [linkedId, req.params.id]
+                );
+                if (otherLinks.length === 0) {
+                    await connection.query('DELETE FROM announcements WHERE announcement_id = ?', [linkedId]);
+                }
+            }
+            await connection.query('DELETE FROM disaster_alerts WHERE alert_id = ?', [req.params.id]);
+            return { found: true, linkedId };
+        });
+        if (!linkedAnnouncementId.found) {
             return res.status(404).json({ error: 'Alert not found.' });
         }
-        if (alert[0].linked_announcement_id) {
-            await db.query('DELETE FROM announcements WHERE announcement_id = ?', [alert[0].linked_announcement_id]);
-        }
-        await db.query('DELETE FROM disaster_alerts WHERE alert_id = ?', [req.params.id]);
         await logAudit(req, `Deleted disaster alert #${req.params.id}`);
         res.json({ message: 'Disaster alert deleted!' });
     } catch (error) {

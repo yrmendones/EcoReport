@@ -71,12 +71,6 @@ router.post('/waste-schedule', adminController.addWasteSchedule);
 router.put('/waste-schedule/:id', adminController.updateWasteSchedule);
 router.delete('/waste-schedule/:id', adminController.deleteWasteSchedule);
 
-// Business (shared)
-router.get('/business', adminController.getBusinesses);
-router.post('/business', adminController.addBusiness);
-router.put('/business/:id', adminController.updateBusiness);
-router.delete('/business/:id', adminController.deleteBusiness);
-
 // Inventory (shared)
 router.get('/inventory', adminController.getInventory);
 router.post('/inventory', adminController.addInventoryItem);

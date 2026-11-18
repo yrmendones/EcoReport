@@ -84,6 +84,18 @@ exports.submitGuestReport = async (req, res) => {
         const safeName = sanitizeText(guest_name, 100);
         const safeMobile = sanitizeText(guest_mobile, 20);
         const safeCategory = sanitizeText(category, 100);
+        if (!safeCategory) {
+            return res.status(400).json({ error: 'Invalid category.' });
+        }
+
+        const [categoryRows] = await db.query(
+            'SELECT category_id FROM report_categories WHERE name = ? AND is_active = 1 LIMIT 1',
+            [safeCategory]
+        );
+        if (categoryRows.length === 0) {
+            return res.status(400).json({ error: 'Select an active report category.' });
+        }
+
         const safeDescription = description
             ? sanitizeText(description, 5000)
             : null;

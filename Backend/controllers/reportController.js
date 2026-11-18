@@ -21,6 +21,16 @@ exports.createReport = async (req, res) => {
 
         // Sanitize before insert
         const safeCategory = sanitizeText(category, 100);
+        if (!safeCategory) return res.status(400).json({ error: 'Category required.' });
+
+        const [categoryRows] = await db.query(
+            'SELECT category_id FROM report_categories WHERE name = ? AND is_active = 1 LIMIT 1',
+            [safeCategory]
+        );
+        if (categoryRows.length === 0) {
+            return res.status(400).json({ error: 'Select an active report category.' });
+        }
+
         const safeDescription = description ? sanitizeText(description, 5000) : null;
         const safeAddress = address ? sanitizeText(address, 255) : null;
 

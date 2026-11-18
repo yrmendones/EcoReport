@@ -177,23 +177,7 @@ CREATE TABLE IF NOT EXISTS assignments (
 );
 
 -- ============================================================
--- 11. BUSINESS PERMITS
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS business_permits (
-    permit_id INT AUTO_INCREMENT PRIMARY KEY,
-    business_name VARCHAR(100) NOT NULL,
-    owner_name VARCHAR(100) NOT NULL,
-    permit_number VARCHAR(50) UNIQUE NOT NULL,
-    status ENUM('Active','Inactive') DEFAULT 'Active',
-    issued_date DATE NOT NULL,
-    expiry_date DATE NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
--- ============================================================
--- 12. INVENTORY ITEMS
+-- 11. INVENTORY ITEMS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS inventory_items (
@@ -208,7 +192,7 @@ CREATE TABLE IF NOT EXISTS inventory_items (
 );
 
 -- ============================================================
--- 13. BLOTTER & INCIDENT CASES
+-- 12. BLOTTER & INCIDENT CASES
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS blotter_cases (
@@ -224,7 +208,7 @@ CREATE TABLE IF NOT EXISTS blotter_cases (
 );
 
 -- ============================================================
--- 14. DISASTER & EMERGENCY ALERTS
+-- 13. DISASTER & EMERGENCY ALERTS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS disaster_alerts (
@@ -242,7 +226,7 @@ CREATE TABLE IF NOT EXISTS disaster_alerts (
 );
 
 -- ============================================================
--- 15. WASTE SCHEDULE
+-- 14. WASTE SCHEDULE
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS waste_schedule (
@@ -255,7 +239,7 @@ CREATE TABLE IF NOT EXISTS waste_schedule (
 );
 
 -- ============================================================
--- 16. HOTLINES (Emergency Numbers)
+-- 15. HOTLINES (Emergency Numbers)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS hotlines (
@@ -270,7 +254,7 @@ CREATE TABLE IF NOT EXISTS hotlines (
 );
 
 -- ============================================================
--- 17. AUDIT LOGS
+-- 16. AUDIT LOGS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -284,7 +268,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 -- ============================================================
--- 18. NOTIFICATION CENTER
+-- 17. NOTIFICATION CENTER
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS notification_center (
@@ -296,7 +280,7 @@ CREATE TABLE IF NOT EXISTS notification_center (
 );
 
 -- ============================================================
--- 19. HEALTH CENTER INFO
+-- 18. HEALTH CENTER INFO
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS health_center_info (
@@ -309,7 +293,7 @@ CREATE TABLE IF NOT EXISTS health_center_info (
 );
 
 -- ============================================================
--- 20. HEALTH SERVICES
+-- 19. HEALTH SERVICES
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS health_services (
@@ -323,7 +307,7 @@ CREATE TABLE IF NOT EXISTS health_services (
 );
 
 -- ============================================================
--- 21. MEDICAL STAFF
+-- 20. MEDICAL STAFF
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS medical_staff (
@@ -334,7 +318,7 @@ CREATE TABLE IF NOT EXISTS medical_staff (
 );
 
 -- ============================================================
--- 22. PASSWORD RESET TOKENS
+-- 21. PASSWORD RESET TOKENS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
@@ -349,7 +333,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 );
 
 -- ============================================================
--- 23. QR TOKENS
+-- 22. QR TOKENS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS qr_tokens (
@@ -362,7 +346,7 @@ CREATE TABLE IF NOT EXISTS qr_tokens (
 );
 
 -- ============================================================
--- 24. SYSTEM SETTINGS
+-- 23. SYSTEM SETTINGS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS system_settings (
@@ -386,7 +370,7 @@ CREATE TABLE IF NOT EXISTS system_settings (
 );
 
 -- ============================================================
--- 25. REPORT CATEGORIES (admin-managed dropdown options)
+-- 24. REPORT CATEGORIES (admin-managed dropdown options)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS report_categories (
@@ -398,7 +382,7 @@ CREATE TABLE IF NOT EXISTS report_categories (
 );
 
 -- ============================================================
--- 26. LOGIN ATTEMPTS (rate limiting for failed logins)
+-- 25. LOGIN ATTEMPTS (rate limiting for failed logins)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS login_attempts (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -413,7 +397,7 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- 27. CERTIFICATE TYPES (admin-managed certificate list + fees)
+-- 26. CERTIFICATE TYPES (admin-managed certificate list + fees)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS certificate_types (
@@ -426,7 +410,7 @@ CREATE TABLE IF NOT EXISTS certificate_types (
 );
 
 -- ============================================================
--- 28. SAMPLE DATA
+-- 27. SAMPLE DATA
 -- ============================================================
 
 INSERT IGNORE INTO system_settings (id) VALUES (1);
@@ -490,7 +474,7 @@ CREATE TABLE IF NOT EXISTS certificate_types (
   COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- 29. INDEXES
+-- 28. INDEXES
 -- ============================================================
 
 CREATE INDEX idx_reports_user_id ON environmental_reports(user_id);
