@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -21,6 +21,12 @@ import {
   DEFAULT_PASSWORD_POLICY,
   fetchPasswordPolicy,
 } from "../../utils/passwordPolicy";
+import {
+  checkCameraPermission,
+  isAndroidApp,
+  openCameraAppSettings,
+  requestCameraPermission,
+} from "../../utils/cameraPermission";
 import {
   getLiveFaceYaw,
   isUsableLiveFace,
@@ -267,11 +273,13 @@ function CameraModal({
   modelsLoaded = true,
   modelsLoadError = false,
   onRetryModels,
+  onPermissionLost,
 }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const detectionIntervalRef = useRef(null);
   const detectingRef = useRef(false);
+  const onPermissionLostRef = useRef(onPermissionLost);
   const livenessRef = useRef({
     step: "position",
     stableFrames: 0,
@@ -288,6 +296,10 @@ function CameraModal({
   const [isFaceDetected, setIsFaceDetected] = useState(false);
   const [liveStep, setLiveStep] = useState("position");
   const [liveError, setLiveError] = useState("");
+
+  useEffect(() => {
+    onPermissionLostRef.current = onPermissionLost;
+  }, [onPermissionLost]);
 
   const restartLiveness = (message = "") => {
     livenessRef.current = {
@@ -328,6 +340,13 @@ function CameraModal({
         setReady(true);
       } catch (err) {
         console.error("Camera error:", err);
+        if (
+          (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") &&
+          onPermissionLostRef.current
+        ) {
+          onPermissionLostRef.current();
+          return;
+        }
         setCamError(
           "Unable to open the camera. Please allow camera access and try again."
         );
@@ -341,6 +360,33 @@ function CameraModal({
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, [facing]);
+
+  useEffect(() => {
+    if (!enableLiveFaceCheck) return undefined;
+    let checkingPermission = false;
+    const recheckPermission = async () => {
+      if (document.visibilityState === "hidden" || checkingPermission) return;
+      checkingPermission = true;
+      try {
+        const permission = await checkCameraPermission();
+        if (!permission.granted) {
+          streamRef.current?.getTracks().forEach((track) => track.stop());
+          onPermissionLostRef.current?.();
+        }
+      } catch (error) {
+        console.warn("Unable to recheck Android camera permission:", error);
+      } finally {
+        checkingPermission = false;
+      }
+    };
+
+    document.addEventListener("visibilitychange", recheckPermission);
+    window.addEventListener("focus", recheckPermission);
+    return () => {
+      document.removeEventListener("visibilitychange", recheckPermission);
+      window.removeEventListener("focus", recheckPermission);
+    };
+  }, [enableLiveFaceCheck]);
 
   useEffect(() => {
     if (!enableLiveFaceCheck || !modelsLoaded) return undefined;
@@ -970,6 +1016,8 @@ export default function Register() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [cameraPermissionFeedback, setCameraPermissionFeedback] = useState(null);
+  const [cameraPermissionLoading, setCameraPermissionLoading] = useState(false);
 
   // ============ Load face-api models ============
   useEffect(() => {
@@ -1292,6 +1340,66 @@ export default function Register() {
       setFacePreview(await fileToDataUrl(file));
     }
     setCameraMode(null);
+  };
+
+  const handleOpenLiveSelfie = async () => {
+    setCameraPermissionLoading(true);
+    setCameraPermissionFeedback(null);
+    try {
+      const permission = await requestCameraPermission();
+      if (!permission.granted) {
+        setCameraPermissionFeedback({
+          message: permission.canAskAgain
+            ? "Camera permission was denied. Allow camera access to take your Live Selfie, then try again."
+            : "Camera access is blocked. Enable Camera permission in Android Settings, then try again.",
+          canOpenSettings: !permission.canAskAgain && isAndroidApp(),
+        });
+        return;
+      }
+      setCameraMode("face");
+    } catch (permissionError) {
+      console.error("Unable to request camera permission:", permissionError);
+      setCameraPermissionFeedback({
+        message: "We couldn't check camera permission. Please try again.",
+        canOpenSettings: false,
+      });
+    } finally {
+      setCameraPermissionLoading(false);
+    }
+  };
+
+  const handleCameraPermissionLost = useCallback(() => {
+    setCameraMode(null);
+    setCameraPermissionFeedback({
+      message: isAndroidApp()
+        ? "Camera permission is no longer available. Grant it in Android Settings, then try again."
+        : "Camera access is no longer available. Check your browser's camera permission, then try again.",
+      canOpenSettings: isAndroidApp(),
+    });
+  }, []);
+
+  const handleOpenCameraSettings = async () => {
+    setCameraPermissionLoading(true);
+    try {
+      const permission = await openCameraAppSettings();
+      if (permission.granted) {
+        setCameraPermissionFeedback(null);
+        setCameraMode("face");
+      } else {
+        setCameraPermissionFeedback({
+          message: "Camera permission is still off. Enable Camera in app settings and try again.",
+          canOpenSettings: true,
+        });
+      }
+    } catch (settingsError) {
+      console.error("Unable to open camera settings:", settingsError);
+      setCameraPermissionFeedback({
+        message: "We couldn't open Android settings. Open EcoReport's App permissions and allow Camera, then retry.",
+        canOpenSettings: true,
+      });
+    } finally {
+      setCameraPermissionLoading(false);
+    }
   };
 
   // ============ Image compression (fault-tolerant) ============
@@ -1902,18 +2010,48 @@ export default function Register() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => setCameraMode("face")}
-                  className="w-full min-h-[110px] rounded-2xl border border-[#8BB37A] bg-white flex flex-col items-center justify-center text-center text-[#0B5D2A] hover:bg-[#F3F8F1] active:scale-[0.98] transition"
+                  onClick={handleOpenLiveSelfie}
+                  disabled={cameraPermissionLoading}
+                  className="w-full min-h-[110px] rounded-2xl border border-[#8BB37A] bg-white flex flex-col items-center justify-center text-center text-[#0B5D2A] hover:bg-[#F3F8F1] active:scale-[0.98] transition disabled:opacity-60"
                   style={{ padding: "12px 16px", gap: "6px" }}
                 >
-                  <FaUserCheck size={26} />
+                  {cameraPermissionLoading ? <FaSpinner className="animate-spin" size={26} /> : <FaUserCheck size={26} />}
                   <span className="font-extrabold text-[13px] leading-5">
-                    START LIVE SELFIE
+                    {cameraPermissionLoading ? "CHECKING CAMERA PERMISSION..." : "START LIVE SELFIE"}
                   </span>
                   <span className="text-[12px] text-gray-500 leading-4">
                     Take a live selfie. It will be checked by the barangay.
                   </span>
                 </button>
+              )}
+              {cameraPermissionFeedback && !facePreview && (
+                <div
+                  role="alert"
+                  className="bg-red-50 border border-red-300 rounded-xl text-red-700 text-[13px] leading-5 break-words"
+                  style={{ padding: "12px" }}
+                >
+                  <p>{cameraPermissionFeedback.message}</p>
+                  <div className="flex flex-wrap mt-2" style={{ gap: "12px" }}>
+                    <button
+                      type="button"
+                      onClick={handleOpenLiveSelfie}
+                      disabled={cameraPermissionLoading}
+                      className="underline font-bold"
+                    >
+                      Try again
+                    </button>
+                    {cameraPermissionFeedback.canOpenSettings && (
+                      <button
+                        type="button"
+                        onClick={handleOpenCameraSettings}
+                        disabled={cameraPermissionLoading}
+                        className="underline font-bold"
+                      >
+                        Open Android Settings
+                      </button>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
             )}
@@ -2014,6 +2152,7 @@ export default function Register() {
               setModelsLoaded(false);
               setModelLoadAttempt((attempt) => attempt + 1);
             }}
+            onPermissionLost={handleCameraPermissionLost}
             onCapture={handleCameraCapture}
             onClose={() => setCameraMode(null)}
           />
