@@ -52,7 +52,7 @@ try {
 // `true`  = require ID face detection + live selfie capture during
 //           registration. The admin still reviews manually.
 // `false` = skip face section entirely (temporary bypass).
-const REQUIRE_FACE_VERIFICATION = false;
+const REQUIRE_FACE_VERIFICATION = true;
 
 // ============================================================
 // CONSTANTS
