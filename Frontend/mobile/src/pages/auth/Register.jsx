@@ -1448,7 +1448,7 @@ export default function Register() {
   };
 
   // ============ Upload to Cloudinary ============
-  const uploadFile = async (file, label = "file") => {
+  const uploadFile = async (file, label = "file", traceId) => {
     if (!file) return null;
     // Extra debug — remove after confirming the fix works
     console.log(
@@ -1460,7 +1460,13 @@ export default function Register() {
     );
     const fd = new FormData();
     fd.append("files", compressed);
-    const response = await fetch(`${API_BASE_URL}/api/guest/upload`, {
+    const uploadStage = label === "ID photo" ? "id_upload" : "selfie_upload";
+    const traceQuery = new URLSearchParams({
+      registration_trace: "1",
+      trace_id: traceId,
+      stage: uploadStage,
+    });
+    const response = await fetch(`${API_BASE_URL}/api/guest/upload?${traceQuery}`, {
       method: "POST",
       body: fd,
     });
@@ -1484,12 +1490,14 @@ export default function Register() {
       return;
     }
 
+    const registrationTraceId = `reg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
     try {
       // Upload sequentially, not in parallel — avoids splitting limited
       // mobile upload bandwidth across two simultaneous requests.
-      const valid_id_url = await uploadFile(residentIdFile, "ID photo");
+      const valid_id_url = await uploadFile(residentIdFile, "ID photo", registrationTraceId);
       const selfie_image = REQUIRE_FACE_VERIFICATION
-        ? await uploadFile(faceFile, "Selfie")
+        ? await uploadFile(faceFile, "Selfie", registrationTraceId)
         : null;
 
       const resolvedStreet = findMatchingStreet(formData.street) || formData.street;
@@ -1518,7 +1526,7 @@ export default function Register() {
         selfie_image,
       };
 
-      const data = await apiFetch("/api/auth/register", {
+      const data = await apiFetch(`/api/auth/register?registration_trace=1&trace_id=${encodeURIComponent(registrationTraceId)}`, {
         method: "POST",
         body: JSON.stringify(payload),
       });

@@ -104,6 +104,15 @@ exports.guestUploadFiles = async (req, res) => {
 
         res.status(201).json({ message: 'Files uploaded successfully!', files: fileUrls });
     } catch (error) {
+        if (req.query?.registration_trace === '1') {
+            const traceId = String(req.query.trace_id || 'missing').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'missing';
+            const stage = ['id_upload', 'selfie_upload'].includes(String(req.query.stage || ''))
+                ? String(req.query.stage)
+                : 'upload';
+            console.error(
+                `[registration-trace] upload_error trace_id=${traceId} stage=${stage} message=${error.message || 'unknown error'}`
+            );
+        }
         console.error(error);
         const isClientError = /too large|Max \d+MB/i.test(error.message || '');
         res.status(isClientError ? 413 : 500).json({
