@@ -1,15 +1,12 @@
 import { handleAuthenticationFailure } from "./utils/authSession";
+import { resolveApiBaseUrl } from "./utils/apiBaseUrl";
 
 // In dev, use relative paths so Vite Proxy intercepts /api requests
 // In prod, use the deployed backend URL from the hosting dashboard
-const getApiBaseUrl = () => {
-    if (import.meta.env.DEV) {
-        return '';
-    }
-    return import.meta.env.VITE_API_URL || 'http://localhost:5000';
-};
-
-export const API_BASE_URL = getApiBaseUrl();
+export const API_BASE_URL = resolveApiBaseUrl({
+    isDevelopment: import.meta.env.DEV,
+    configuredUrl: import.meta.env.VITE_API_URL,
+});
 
 const getToken = () => localStorage.getItem("token");
 
