@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -20,8 +20,12 @@ import { apiFetch, API_BASE_URL } from "../../api";
 import {
   DEFAULT_PASSWORD_POLICY,
   fetchPasswordPolicy,
-  validatePassword as validatePasswordPolicy,
 } from "../../utils/passwordPolicy";
+import {
+  getLiveFaceYaw,
+  isUsableLiveFace,
+  validatePermanentAddressAgainstId,
+} from "../../utils/residentRegistrationValidation";
 
 // ============================================================
 // ORT CONFIG - must run before PaddleOCR.create()
@@ -200,6 +204,20 @@ function matchesName(ocrText, formData) {
   return { passed, missing };
 }
 
+function getPermanentAddressToCompare(formData, sameAddress) {
+  return sameAddress
+    ? {
+        street: formData.street,
+        barangay: "Sto. Rosario Kanluran",
+        city: "Pateros",
+      }
+    : {
+        street: formData.permanent_street,
+        barangay: formData.permanent_barangay,
+        city: formData.permanent_city,
+      };
+}
+
 function preprocessIdImage(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -247,28 +265,47 @@ function CameraModal({
   onClose,
   enableLiveFaceCheck = false,
   modelsLoaded = true,
+  modelsLoadError = false,
+  onRetryModels,
 }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const detectionIntervalRef = useRef(null);
+  const detectingRef = useRef(false);
+  const livenessRef = useRef({
+    step: "position",
+    stableFrames: 0,
+    yawSamples: [],
+    turnFrames: 0,
+    baselineYaw: 0,
+    challengeStartedAt: 0,
+    completedAt: 0,
+  });
 
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [camError, setCamError] = useState("");
   const [isFaceDetected, setIsFaceDetected] = useState(false);
+  const [liveStep, setLiveStep] = useState("position");
+  const [liveError, setLiveError] = useState("");
 
-  // 5-second fallback — allow capture even if face detection doesn't fire,
-  // so residents are never stuck on the camera screen.
-  const [fallbackReady, setFallbackReady] = useState(false);
-  useEffect(() => {
-    if (!enableLiveFaceCheck) return;
-    const t = setTimeout(() => setFallbackReady(true), 5000);
-    return () => clearTimeout(t);
-  }, [enableLiveFaceCheck]);
+  const restartLiveness = (message = "") => {
+    livenessRef.current = {
+      step: "position",
+      stableFrames: 0,
+      yawSamples: [],
+      turnFrames: 0,
+      baselineYaw: 0,
+      challengeStartedAt: 0,
+      completedAt: 0,
+    };
+    setLiveStep("position");
+    setLiveError(message);
+    setIsFaceDetected(false);
+  };
 
   useEffect(() => {
     let cancelled = false;
-
     const start = async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
         setCamError("Camera is not supported on this browser (HTTPS is required).");
@@ -289,24 +326,6 @@ function CameraModal({
           await videoRef.current.play().catch(() => {});
         }
         setReady(true);
-
-        if (enableLiveFaceCheck && modelsLoaded) {
-          detectionIntervalRef.current = setInterval(async () => {
-            if (cancelled || !videoRef.current || !videoRef.current.videoWidth) return;
-            try {
-              const detection = await faceapi.detectSingleFace(
-                videoRef.current,
-                new faceapi.TinyFaceDetectorOptions({
-                  inputSize: 224,
-                  scoreThreshold: 0.5,
-                })
-              );
-              setIsFaceDetected(!!detection);
-            } catch {
-              /* ignore */
-            }
-          }, 300);
-        }
       } catch (err) {
         console.error("Camera error:", err);
         setCamError(
@@ -319,17 +338,114 @@ function CameraModal({
 
     return () => {
       cancelled = true;
-      if (detectionIntervalRef.current) {
-        clearInterval(detectionIntervalRef.current);
-        detectionIntervalRef.current = null;
-      }
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [facing, enableLiveFaceCheck, modelsLoaded]);
+  }, [facing]);
 
-  const handleCapture = () => {
+  useEffect(() => {
+    if (!enableLiveFaceCheck || !modelsLoaded) return undefined;
+    let cancelled = false;
+
+    const completeTurnCheck = (state) => {
+      state.step = "complete";
+      state.completedAt = Date.now();
+      setLiveStep("complete");
+      setLiveError("");
+    };
+
+    const detect = async () => {
+      if (cancelled) return;
+      const video = videoRef.current;
+      if (!video || video.readyState < 2 || !video.videoWidth || detectingRef.current) return;
+      detectingRef.current = true;
+      try {
+        const faces = await faceapi
+          .detectAllFaces(
+            video,
+            new faceapi.SsdMobilenetv1Options({ minConfidence: 0.72 })
+          )
+          .withFaceLandmarks();
+        if (cancelled) return;
+        if (faces.length !== 1 || !isUsableLiveFace(faces[0], video.videoWidth, video.videoHeight)) {
+          setIsFaceDetected(false);
+          const state = livenessRef.current;
+          restartLiveness(state.step === "position"
+            ? ""
+            : "The face left the frame or could not be checked. Start the live selfie check again.");
+          return;
+        }
+
+        const yaw = getLiveFaceYaw(faces[0].landmarks);
+        if (!Number.isFinite(yaw)) {
+          setIsFaceDetected(false);
+          restartLiveness("We couldn't clearly see your face. Adjust the lighting and try again.");
+          return;
+        }
+        setIsFaceDetected(true);
+        const state = livenessRef.current;
+        if (state.step === "complete") return;
+
+        if (state.step !== "position" && Date.now() - state.challengeStartedAt > 30000) {
+          restartLiveness("The liveness check timed out. Try the selfie check again.");
+          return;
+        }
+
+        if (state.step === "position") {
+          state.stableFrames += 1;
+          state.yawSamples.push(yaw);
+          if (state.stableFrames >= 5) {
+            state.baselineYaw = state.yawSamples.reduce((sum, value) => sum + value, 0) / state.yawSamples.length;
+            state.step = "turn";
+            state.challengeStartedAt = Date.now();
+            setLiveStep("turn");
+            setLiveError("");
+          }
+        } else if (state.step === "turn") {
+          if (Math.abs(yaw - state.baselineYaw) >= 0.12) {
+            state.turnFrames += 1;
+            if (state.turnFrames >= 2) completeTurnCheck(state);
+          } else {
+            state.turnFrames = 0;
+          }
+        }
+      } catch (err) {
+        console.warn("Live selfie face check failed:", err);
+      } finally {
+        detectingRef.current = false;
+      }
+    };
+
+    detectionIntervalRef.current = setInterval(detect, 180);
+    return () => {
+      cancelled = true;
+      if (detectionIntervalRef.current) clearInterval(detectionIntervalRef.current);
+      detectionIntervalRef.current = null;
+      detectingRef.current = false;
+    };
+  }, [enableLiveFaceCheck, modelsLoaded]);
+
+  const handleCapture = async () => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
+    if (enableLiveFaceCheck) {
+      const state = livenessRef.current;
+      if (state.step !== "complete" || Date.now() - state.completedAt > 5000) {
+        restartLiveness("Complete the live face and movement checks before capturing.");
+        return;
+      }
+      try {
+        const faces = await faceapi
+          .detectAllFaces(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.72 }))
+          .withFaceLandmarks();
+        if (
+          faces.length !== 1 ||
+          !isUsableLiveFace(faces[0], video.videoWidth, video.videoHeight)
+        ) throw new Error("A clear single live face was not visible.");
+      } catch {
+        restartLiveness("We couldn't verify a clear live face in the camera. Try the selfie check again.");
+        return;
+      }
+    }
     setBusy(true);
     setCamError("");
 
@@ -368,11 +484,17 @@ function CameraModal({
     );
   };
 
-  const liveCheckReady =
-    !enableLiveFaceCheck ||
-    (modelsLoaded && isFaceDetected) ||
-    fallbackReady;
+  const liveCheckReady = !enableLiveFaceCheck || (modelsLoaded && liveStep === "complete");
   const canCapture = ready && !busy && liveCheckReady;
+  const statusMessage = !modelsLoaded
+    ? modelsLoadError
+      ? "Live selfie checks could not load. Retry to continue."
+      : "Loading live selfie checks..."
+    : liveStep === "position"
+      ? "Center one face in the oval and hold still..."
+      : liveStep === "turn"
+        ? "Turn your head slightly to either side to confirm liveness."
+        : "Live selfie verified. Capture now.";
 
   return (
     <div
@@ -430,16 +552,14 @@ function CameraModal({
               style={{
                 backgroundColor: !modelsLoaded
                   ? "#6b7280"
-                  : isFaceDetected
+                  : liveStep === "complete"
                   ? "#22c55e"
-                  : "#ef4444",
+                  : isFaceDetected
+                    ? "#eab308"
+                    : "#ef4444",
               }}
             >
-              {!modelsLoaded
-                ? "Preparing face detection..."
-                : isFaceDetected
-                ? "Face detected — ready to capture"
-                : "Position your face in the oval"}
+              {statusMessage}
             </span>
           </div>
         )}
@@ -460,6 +580,29 @@ function CameraModal({
         </div>
       )}
 
+      {liveError && enableLiveFaceCheck && (
+        <div className="bg-red-100 border border-red-300 rounded-xl text-red-700 text-[13px] leading-5 p-3 shrink-0">
+          <p>{liveError}</p>
+          <button
+            type="button"
+            onClick={() => restartLiveness("")}
+            className="underline font-bold mt-1"
+          >
+            Try the live selfie check again
+          </button>
+        </div>
+      )}
+
+      {enableLiveFaceCheck && !modelsLoaded && modelsLoadError && (
+        <button
+          type="button"
+          onClick={onRetryModels}
+          className="text-white underline text-sm font-bold"
+        >
+          Retry loading face checks
+        </button>
+      )}
+
       <button
         type="button"
         onClick={handleCapture}
@@ -468,7 +611,7 @@ function CameraModal({
         style={{ gap: "12px" }}
       >
         {busy ? <FaSpinner className="animate-spin" /> : <FaCamera />}
-        {busy ? "Capturing..." : "Capture"}
+        {busy ? "Capturing..." : enableLiveFaceCheck ? "Capture Live Selfie" : "Capture"}
       </button>
     </div>
   );
@@ -782,12 +925,35 @@ export default function Register() {
   const [ocrText, setOcrText] = useState("");
   const [ocrScanStatus, setOcrScanStatus] = useState("idle");
   const [ocrScanError, setOcrScanError] = useState("");
-  const [ocrValidation, setOcrValidation] = useState({ passed: false, reason: "" });
   const ocrRunIdRef = useRef(0);
   const ocrEngineRef = useRef(null);
 
+  const ocrValidation = useMemo(() => {
+    if (ocrScanStatus !== "done") return { passed: false, reason: "" };
+    if (!ocrText.trim()) {
+      return { passed: false, reason: "We couldn't read the ID text. Upload a clearer photo and try again." };
+    }
+    if (!looksLikeValidId(ocrText, idType)) {
+      return { passed: false, reason: "This doesn't look like a valid ID." };
+    }
+    const nameOk = matchesName(ocrText, formData);
+    if (!nameOk.passed) {
+      return {
+        passed: false,
+        reason: `Name doesn't match (missing: ${nameOk.missing.join(", ")}).`,
+      };
+    }
+    const addressOk = validatePermanentAddressAgainstId(
+      ocrText,
+      getPermanentAddressToCompare(formData, sameAddress)
+    );
+    if (!addressOk.passed) return { passed: false, reason: addressOk.reason };
+    return { passed: true, reason: "" };
+  }, [ocrScanStatus, ocrText, idType, formData, sameAddress]);
+
   const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [idDescriptor, setIdDescriptor] = useState(null);
+  const [modelsLoadError, setModelsLoadError] = useState(false);
+  const [modelLoadAttempt, setModelLoadAttempt] = useState(0);
   const [idFaceFound, setIdFaceFound] = useState(false);
   const [idFaceProcessing, setIdFaceProcessing] = useState(false);
   const [idFaceError, setIdFaceError] = useState("");
@@ -805,25 +971,27 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ============ Load face-api models once ============
+  // ============ Load face-api models ============
   useEffect(() => {
+    let cancelled = false;
     const loadModels = async () => {
+      setModelsLoadError(false);
       try {
         const MODEL_URL =
           "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights";
         await Promise.all([
           faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
         ]);
-        setModelsLoaded(true);
+        if (!cancelled) setModelsLoaded(true);
       } catch (err) {
         console.error("Failed to load face-api models:", err);
+        if (!cancelled) setModelsLoadError(true);
       }
     };
     loadModels();
-  }, []);
+    return () => { cancelled = true; };
+  }, [modelLoadAttempt]);
 
   // ============ OCR engine ============
   const getOcrEngine = async () => {
@@ -862,14 +1030,12 @@ export default function Register() {
     if (!modelsLoaded) return;
     setIdFaceProcessing(true);
     setIdFaceFound(false);
-    setIdDescriptor(null);
     setIdFaceError("");
     try {
       const img = await faceapi.bufferToImage(file);
       const detection = await faceapi
         .detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
-        .withFaceLandmarks()
-        .withFaceDescriptor();
+        .withFaceLandmarks();
 
       if (!detection) {
         setIdFaceFound(false);
@@ -890,7 +1056,6 @@ export default function Register() {
         return;
       }
 
-      setIdDescriptor(detection.descriptor);
       setIdFaceFound(true);
     } catch (err) {
       console.error("Error processing ID face:", err);
@@ -908,7 +1073,6 @@ export default function Register() {
     setOcrScanStatus("scanning");
     setOcrScanError("");
     setOcrText("");
-    setOcrValidation({ passed: false, reason: "" });
 
     try {
       const blob = await preprocessIdImage(file);
@@ -920,7 +1084,7 @@ export default function Register() {
 
       const data = Array.isArray(result) ? result[0] : result;
       const items = data?.items || [];
-      const text = items.map((i) => i.text || "").join(" ");
+      const text = items.map((i) => i.text || "").join("\n");
 
       setOcrText(text);
       setOcrScanStatus("done");
@@ -931,32 +1095,6 @@ export default function Register() {
       setOcrScanError("Couldn't read the ID photo. Please retake it.");
     }
   };
-
-  // ============ OCR validation ============
-  useEffect(() => {
-    if (ocrScanStatus !== "done" || !ocrText) {
-      setOcrValidation({ passed: false, reason: "" });
-      return;
-    }
-    const idOk = looksLikeValidId(ocrText, idType);
-    if (!idOk) {
-      setOcrValidation({ passed: false, reason: "This doesn't look like a valid ID." });
-      return;
-    }
-    const nameOk = matchesName(ocrText, formData);
-    if (!nameOk.passed) {
-      setOcrValidation({
-        passed: false,
-        reason: `Name doesn't match (missing: ${nameOk.missing.join(", ")}).`,
-      });
-      return;
-    }
-    setOcrValidation({ passed: true, reason: "" });
-  }, [
-    ocrText, ocrScanStatus,
-    formData.first_name, formData.middle_name, formData.last_name,
-    idType,
-  ]);
 
   // ============ Field validators ============
   const validateFieldValue = (name, value) => {
@@ -976,6 +1114,7 @@ export default function Register() {
       case "permanent_barangay":
       case "permanent_city":
         if (sameAddress) return "";
+        if (name === "permanent_house_no") return "";
         return v === "" ? "This field is required." : "";
 
       case "contact_number":
@@ -1017,8 +1156,7 @@ export default function Register() {
   // ============ Combined completeness check ============
   const permanentComplete = sameAddress
     ? true
-    : formData.permanent_house_no.trim() !== "" &&
-      formData.permanent_street.trim() !== "" &&
+    : formData.permanent_street.trim() !== "" &&
       formData.permanent_barangay.trim() !== "" &&
       formData.permanent_city.trim() !== "";
 
@@ -1042,9 +1180,9 @@ export default function Register() {
       missing.push("Matching Confirm Password");
     if (!idType) missing.push("Type of Resident ID");
     if (!residentIdFile) missing.push("Resident ID Photo");
-    if (ocrValidation.passed !== true) missing.push("ID Verification");
+    if (!ocrValidation.passed) missing.push("ID Verification");
     if (REQUIRE_FACE_VERIFICATION && !idFaceFound) missing.push("Clear Face on ID");
-    if (REQUIRE_FACE_VERIFICATION && !faceFile) missing.push("Face Verification Selfie");
+    if (REQUIRE_FACE_VERIFICATION && !faceFile) missing.push("Live Selfie");
     if (!agreedToTerms) missing.push("Terms & Conditions");
     return missing;
   };
@@ -1107,13 +1245,11 @@ export default function Register() {
     ocrRunIdRef.current += 1;
     setResidentIdFile(null);
     setResidentIdPreview(null);
-    setIdDescriptor(null);
     setIdFaceFound(false);
     setIdFaceError("");
     setOcrText("");
     setOcrScanStatus("idle");
     setOcrScanError("");
-    setOcrValidation({ passed: false, reason: "" });
     const fileInput = document.getElementById("resident-id-input");
     if (fileInput) fileInput.value = "";
   };
@@ -1293,10 +1429,11 @@ export default function Register() {
   // ============ Reusable field ============
   const field = (name, label, placeholder, extra = {}) => {
     const err = fieldErrors[name];
+    const { optional = false, ...inputProps } = extra;
     return (
       <div className="flex flex-col" style={{ gap: "8px" }}>
         <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
-          {label} <span className="text-red-500">*</span>
+          {label}{optional ? <span className="ml-1 text-gray-500 font-normal">(Optional)</span> : <span className="text-red-500"> *</span>}
         </label>
         <input
           type="text"
@@ -1309,7 +1446,7 @@ export default function Register() {
             err ? "border-red-500" : "border-[#8BB37A]"
           } bg-white text-[16px] text-gray-800 placeholder:text-gray-400 placeholder:text-[14px] outline-none transition focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/20`}
           style={{ padding: "0 16px" }}
-          {...extra}
+          {...inputProps}
         />
         {err && (
           <p className="text-[12px] text-red-500 leading-5 field-error-message">
@@ -1683,7 +1820,7 @@ export default function Register() {
                   {ocrScanStatus === "done" && ocrValidation.passed && (
                     <div className="flex items-center text-green-600 text-[13px]" style={{ gap: "8px" }}>
                       <FaCheck size={12} />
-                      <span>ID text verified.</span>
+                    <span>ID name and permanent address verified.</span>
                     </div>
                   )}
                   {ocrScanStatus === "done" && !ocrValidation.passed && (
@@ -1726,11 +1863,11 @@ export default function Register() {
               </p>
             </div>
 
-            {/* FACE VERIFICATION — hidden when the toggle is off */}
+            {/* LIVE SELFIE — hidden when the toggle is off */}
             {REQUIRE_FACE_VERIFICATION && (
             <div className="flex flex-col shrink-0" style={{ gap: "12px" }}>
               <label className="block text-[#0B5D2A] text-[14px] font-extrabold">
-                Face Verification <span className="text-red-500">*</span>
+                Live Selfie <span className="text-red-500">*</span>
               </label>
 
               {facePreview ? (
@@ -1738,7 +1875,7 @@ export default function Register() {
                   <div className="relative">
                     <img
                       src={facePreview}
-                      alt="Face verification"
+                      alt="Live selfie"
                       className="w-full h-[180px] rounded-2xl border border-[#8BB37A] object-cover bg-white"
                       style={{ transform: "scaleX(-1)" }}
                     />
@@ -1759,7 +1896,7 @@ export default function Register() {
                     style={{ gap: "8px" }}
                   >
                     <FaCheck size={12} />
-                    <span>Face captured</span>
+                    <span>Live selfie captured</span>
                   </div>
                 </div>
               ) : (
@@ -1771,7 +1908,7 @@ export default function Register() {
                 >
                   <FaUserCheck size={26} />
                   <span className="font-extrabold text-[13px] leading-5">
-                    START FACE VERIFICATION
+                    START LIVE SELFIE
                   </span>
                   <span className="text-[12px] text-gray-500 leading-4">
                     Take a live selfie. It will be checked by the barangay.
@@ -1867,11 +2004,16 @@ export default function Register() {
 
         {cameraMode === "face" && (
           <CameraModal
-            title="Face Verification"
-            hint="Center your face in the oval, remove glasses or a mask, and look straight at the camera."
+            title="Live Selfie"
+            hint="Center your face in the oval, hold still briefly, then turn your head slightly as prompted."
             facing="user"
             enableLiveFaceCheck={true}
             modelsLoaded={modelsLoaded}
+            modelsLoadError={modelsLoadError}
+            onRetryModels={() => {
+              setModelsLoaded(false);
+              setModelLoadAttempt((attempt) => attempt + 1);
+            }}
             onCapture={handleCameraCapture}
             onClose={() => setCameraMode(null)}
           />

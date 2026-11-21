@@ -65,9 +65,6 @@ exports.register = async (req, res) => {
         if (existing.length > 0)
             return res.status(409).json({ error: 'Email already registered.' });
 
-        const password_hash = await bcrypt.hash(password, 10);
-        const resident_id = await generateResidentId();
-
         let fullAddress = null;
         if (house_no || street) {
             fullAddress = `${house_no || ''} ${street || ''}`.trim();
@@ -91,6 +88,17 @@ exports.register = async (req, res) => {
             permCity = "Pateros";
         }
 
+        // The mobile registration OCR check compares these components with
+        // the uploaded ID. Keep them required here too; the house number is
+        // optional and is not part of that comparison.
+        if ((id_type || valid_id_url) && ![permStreet, permBrgy, permCity].every((component) =>
+            typeof component === 'string' && component.trim().length > 0
+        )) {
+            return res.status(400).json({
+                error: 'Permanent street, barangay, and city/municipality are required.',
+            });
+        }
+
         const hasStructuredPermanent =
             permHouse || permStreet || permBrgy || permCity;
 
@@ -103,6 +111,9 @@ exports.register = async (req, res) => {
                   .filter(Boolean)
                   .join(", ")
             : (legacy_permanent_address || null);
+
+        const password_hash = await bcrypt.hash(password, 10);
+        const resident_id = await generateResidentId();
 
         // Sanitize resident-supplied text. first_name/last_name/address are
         // rendered as HTML in the admin QR print view and can also reach
