@@ -8,6 +8,7 @@ const { sanitizeText } = require('../utils/sanitizeHtml');
 const { validatePassword } = require('../utils/passwordPolicy');
 const loginLimiter = require('../utils/loginLimiter');
 const registrationFlowDebugEnabled = require('../utils/registrationFlowDebug');
+const logRegistrationError = require('../utils/logRegistrationError');
 
 async function generateResidentId() {
     const year = new Date().getFullYear();
@@ -175,7 +176,7 @@ exports.register = async (req, res) => {
                 `[registration-flow] register_error trace_id=${traceId} error_name=${error.name || 'Error'}`
             );
         }
-        console.error(error);
+        logRegistrationError('resident registration', error);
         res.status(500).json({ error: 'Server error.' });
     }
 };

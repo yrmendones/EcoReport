@@ -2,6 +2,7 @@ const { v2: cloudinary } = require('cloudinary');
 const { Readable } = require('stream');
 const { MAX_VIDEO_SIZE, MAX_IMAGE_SIZE } = require('../middleware/upload');
 const registrationFlowDebugEnabled = require('../utils/registrationFlowDebug');
+const logRegistrationError = require('../utils/logRegistrationError');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -114,7 +115,7 @@ exports.guestUploadFiles = async (req, res) => {
                 `[registration-flow] upload_error trace_id=${traceId} stage=${stage} error_name=${error.name || 'Error'}`
             );
         }
-        console.error(error);
+        logRegistrationError('resident registration upload', error);
         const isClientError = /too large|Max \d+MB/i.test(error.message || '');
         res.status(isClientError ? 413 : 500).json({
             error: error.message || 'Failed to upload files.',
