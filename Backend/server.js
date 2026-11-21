@@ -9,36 +9,42 @@ const PORT = process.env.PORT || 5000;
 
 app.set('trust proxy', 1);
 
-// Opt-in trace for mobile resident registration. The client passes only a
-// random trace ID and stage name; never log request bodies or uploaded data.
+// Trace resident registration requests. The client may pass a random trace ID
+// and stage name, but cached clients without those parameters are logged too.
+// Never log request bodies or uploaded data.
 app.use((req, res, next) => {
     const isRegistrationRoute =
         req.path === '/api/auth/register' || req.path === '/api/guest/upload';
-    if (!isRegistrationRoute || req.query.registration_trace !== '1') return next();
+    if (!isRegistrationRoute || !['POST', 'OPTIONS'].includes(req.method)) return next();
 
     const rawTraceId = String(req.query.trace_id || '');
-    const traceId = /^[a-zA-Z0-9_-]{1,64}$/.test(rawTraceId) ? rawTraceId : 'missing';
+    const hasClientTrace = req.query.registration_trace === '1';
+    const traceId = hasClientTrace && /^[a-zA-Z0-9_-]{1,64}$/.test(rawTraceId)
+        ? rawTraceId
+        : 'none';
     const isUpload = req.path === '/api/guest/upload';
     const requestedStage = String(req.query.stage || '');
     const stage = isUpload
-        ? (['id_upload', 'selfie_upload'].includes(requestedStage) ? requestedStage : 'upload')
+        ? (hasClientTrace && ['id_upload', 'selfie_upload'].includes(requestedStage)
+            ? requestedStage
+            : 'unlabeled_upload')
         : 'register';
     const startedAt = Date.now();
     const origin = req.get('origin') || 'none';
     const contentLength = req.get('content-length') || 'unknown';
 
     console.info(
-        `[registration-trace] received trace_id=${traceId} stage=${stage} method=${req.method} origin=${origin} content_length=${contentLength}`
+        `[registration-flow] received trace_id=${traceId} stage=${stage} traced=${hasClientTrace} method=${req.method} origin=${origin} content_length=${contentLength}`
     );
     res.once('finish', () => {
         console.info(
-            `[registration-trace] completed trace_id=${traceId} stage=${stage} method=${req.method} status=${res.statusCode} duration_ms=${Date.now() - startedAt}`
+            `[registration-flow] completed trace_id=${traceId} stage=${stage} traced=${hasClientTrace} method=${req.method} status=${res.statusCode} duration_ms=${Date.now() - startedAt}`
         );
     });
     res.once('close', () => {
         if (!res.writableEnded) {
             console.warn(
-                `[registration-trace] connection_closed trace_id=${traceId} stage=${stage} method=${req.method} duration_ms=${Date.now() - startedAt}`
+                `[registration-flow] connection_closed trace_id=${traceId} stage=${stage} traced=${hasClientTrace} method=${req.method} duration_ms=${Date.now() - startedAt}`
             );
         }
     });

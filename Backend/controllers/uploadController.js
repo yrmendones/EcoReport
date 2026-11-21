@@ -110,7 +110,7 @@ exports.guestUploadFiles = async (req, res) => {
                 ? String(req.query.stage)
                 : 'upload';
             console.error(
-                `[registration-trace] upload_error trace_id=${traceId} stage=${stage} message=${error.message || 'unknown error'}`
+                `[registration-flow] upload_error trace_id=${traceId} stage=${stage} message=${error.message || 'unknown error'}`
             );
         }
         console.error(error);

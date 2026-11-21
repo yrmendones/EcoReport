@@ -171,7 +171,7 @@ exports.register = async (req, res) => {
         if (req.query?.registration_trace === '1') {
             const traceId = String(req.query.trace_id || 'missing').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'missing';
             console.error(
-                `[registration-trace] register_error trace_id=${traceId} message=${error.message || 'unknown error'}`
+                `[registration-flow] register_error trace_id=${traceId} message=${error.message || 'unknown error'}`
             );
         }
         console.error(error);
