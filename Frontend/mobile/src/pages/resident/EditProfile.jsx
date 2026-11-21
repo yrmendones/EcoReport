@@ -7,9 +7,7 @@ import {
   FaSpinner,
   FaCheckCircle,
 } from "react-icons/fa";
-import { apiFetch } from "../../api";
-
-const API_BASE = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_URL || "http://localhost:5000");
+import { apiFetch, apiFetchResponse } from "../../api";
 
 const INPUT_CLASS =
   "w-full min-h-[52px] bg-white border border-[#C8DCC3] rounded-2xl text-[14px] outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10 transition";
@@ -172,9 +170,8 @@ export default function EditProfile() {
       const fd = new FormData();
       fd.append("files", file);
 
-      const response = await fetch(`${API_BASE}/api/upload`, {
+      const response = await apiFetchResponse("/api/upload", {
         method: "POST",
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: fd,
       });
 

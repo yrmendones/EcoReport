@@ -1,8 +1,10 @@
+import { handleAuthenticationFailure } from "./utils/authSession";
+
 // In dev, use relative paths so Vite Proxy intercepts /api requests
 // In prod, use the deployed backend URL from the hosting dashboard
 const getApiBaseUrl = () => {
     if (import.meta.env.DEV) {
-        return ''; 
+        return '';
     }
     return import.meta.env.VITE_API_URL || 'http://localhost:5000';
 };
@@ -11,10 +13,15 @@ export const API_BASE_URL = getApiBaseUrl();
 
 const getToken = () => localStorage.getItem("token");
 
-export const apiFetch = async (endpoint, options = {}) => {
+/**
+ * Fetch an API response while applying shared session invalidation handling.
+ * Network failures never reach the response handler, so they cannot sign a
+ * resident out. Callers that need the raw Response (for example file uploads)
+ * can use this helper and parse the body themselves.
+ */
+export const apiFetchResponse = async (endpoint, options = {}) => {
     const url = `${API_BASE_URL}${endpoint}`;
-    
-    // Default headers
+
     const headers = {
         ...options.headers,
     };
@@ -34,6 +41,17 @@ export const apiFetch = async (endpoint, options = {}) => {
         headers,
     });
 
+    if (!response.ok) {
+        const errorData = await response.clone().json().catch(() => ({}));
+        handleAuthenticationFailure(errorData, { hadToken: Boolean(token), token });
+    }
+
+    return response;
+};
+
+export const apiFetch = async (endpoint, options = {}) => {
+    const response = await apiFetchResponse(endpoint, options);
+
     // Handle 204 No Content
     if (response.status === 204) {
         return {};
@@ -41,16 +59,19 @@ export const apiFetch = async (endpoint, options = {}) => {
 
     // Maintenance mode active — the backend blocked a resident/guest call.
     if (response.status === 503) {
-        const data = await response.json().catch(() => ({}));
+        const data = await response.clone().json().catch(() => ({}));
         if (data.error === 'maintenance') {
             window.location.href = '/';
             throw new Error('Maintenance mode active');
         }
     }
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-        throw new Error(data.error || "Something went wrong");
+        const error = new Error(data.error || "Something went wrong");
+        error.code = data.code;
+        error.status = response.status;
+        throw error;
     }
     return data;
 };

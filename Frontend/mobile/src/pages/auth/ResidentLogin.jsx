@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaEye, FaEyeSlash } from "react-icons/fa";
 import { useState, useEffect } from "react";
 import { apiFetch } from "../../api";
+import { AUTH_NOTICE_STORAGE_KEY } from "../../utils/authSession";
 import { DEFAULT_BARANGAY, fetchBarangayInfo } from "../../utils/barangay";
 
 import background from "../../assets/images/bg.png";
@@ -14,7 +15,15 @@ export default function ResidentLogin() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() => {
+    try {
+      const notice = sessionStorage.getItem(AUTH_NOTICE_STORAGE_KEY);
+      if (notice) sessionStorage.removeItem(AUTH_NOTICE_STORAGE_KEY);
+      return notice || "";
+    } catch {
+      return "";
+    }
+  });
 
   const [barangay, setBarangay] = useState(DEFAULT_BARANGAY);
   useEffect(() => {

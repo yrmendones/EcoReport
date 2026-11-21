@@ -14,7 +14,12 @@ exports.getProfile = async (req, res) => {
              FROM users WHERE user_id = ?`,
             [req.user.id]
         );
-        if (users.length === 0) return res.status(404).json({ error: 'User not found.' });
+        if (users.length === 0) {
+            return res.status(401).json({
+                code: 'ACCOUNT_DELETED',
+                error: 'Your account was deleted or is no longer available.',
+            });
+        }
         res.json(users[0]);
     } catch (error) {
         console.error(error);

@@ -7,7 +7,7 @@ import {
   FaImages,
   FaSpinner,
 } from "react-icons/fa";
-import { API_BASE_URL } from "../../api";
+import { apiFetchResponse } from "../../api";
 
 export default function UploadEvidence() {
   const navigate = useNavigate();
@@ -74,11 +74,8 @@ export default function UploadEvidence() {
       });
 
       // Upload to backend
-      const response = await fetch(`${API_BASE_URL}/api/upload`, {
+      const response = await apiFetchResponse("/api/upload", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
         body: formData,
       });
 

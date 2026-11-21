@@ -1,5 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate } from "react-router-dom";
 import MaintenanceGate from "../components/MaintenanceGate";
+import { apiFetch } from "../api";
+import { clearResidentSession } from "../utils/authSession";
 
 /* Authentication */
 import Welcome from "../pages/auth/Welcome";
@@ -45,34 +48,186 @@ import Description from "../pages/Report/Description";
 import ReportLocation from "../pages/Report/ReportLocation";
 import ReportSuccess from "../pages/Report/SuccessReport";
 
-// RequireResident - blocks every resident-only page when there's
-// no valid session. Redirects to the resident login screen.
-function RequireResident() {
-  const token = localStorage.getItem("token");
-  let role = null;
+function getSavedRole() {
   try {
-    role = JSON.parse(localStorage.getItem("user") || "{}").role || null;
+    return JSON.parse(localStorage.getItem("user") || "{}").role || null;
   } catch {
-    role = null;
+    return null;
   }
+}
 
-  if (!token || role !== "resident") {
+function SessionCheckScreen({ checking, message, onRetry }) {
+  return (
+    <main
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#F8FAF8] px-6 text-center"
+      role={checking ? "status" : "alert"}
+      aria-live="polite"
+    >
+      <div className="max-w-sm">
+        <h1 className="text-xl font-extrabold text-[#075B2A]">
+          {checking ? "Checking your session" : "Unable to verify your session"}
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-gray-700">
+          {checking
+            ? "Please wait while we confirm your account."
+            : message || "We couldn't verify your account right now. Check your connection and try again."}
+        </p>
+        {!checking && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="btn-primary mt-5 min-h-[48px] rounded-xl px-6 font-bold"
+          >
+            Try again
+          </button>
+        )}
+      </div>
+    </main>
+  );
+}
+
+// Check the stored session before rendering resident-only pages, then recheck
+// when the app returns to the foreground or browser history restores a page.
+function RequireResident() {
+  const navigate = useNavigate();
+  const token = localStorage.getItem("token");
+  const role = getSavedRole();
+  const hasResidentCredentials = Boolean(token && role === "resident");
+  const [sessionStatus, setSessionStatus] = useState("checking");
+  const [sessionError, setSessionError] = useState("");
+  const [hasValidated, setHasValidated] = useState(false);
+  const requestRef = useRef(null);
+  const lastRequestAtRef = useRef(0);
+  const validateRef = useRef(null);
+
+  useEffect(() => {
+    if (!hasResidentCredentials) return undefined;
+
+    let active = true;
+
+    const validateSession = async (force = false) => {
+      const currentToken = localStorage.getItem("token");
+      if (requestRef.current?.token !== currentToken) {
+        requestRef.current = null;
+      }
+      if (!requestRef.current) {
+        const now = Date.now();
+        if (!force && now - lastRequestAtRef.current < 1500) return;
+        lastRequestAtRef.current = now;
+        const pendingRequest = apiFetch("/api/users/me");
+        requestRef.current = { token: currentToken, promise: pendingRequest };
+        pendingRequest.then(
+          () => { if (requestRef.current?.promise === pendingRequest) requestRef.current = null; },
+          () => { if (requestRef.current?.promise === pendingRequest) requestRef.current = null; }
+        );
+      }
+
+      const tokenAtStart = requestRef.current.token;
+      const pendingRequest = requestRef.current.promise;
+      setSessionStatus("checking");
+      setSessionError("");
+
+      try {
+        const profile = await pendingRequest;
+        if (!active || localStorage.getItem("token") !== tokenAtStart) return;
+
+        if (profile.role !== "resident") {
+          clearResidentSession(
+            "This account no longer has resident access. Please contact the administrator if you believe this is a mistake."
+          );
+          return;
+        }
+
+        localStorage.setItem("user", JSON.stringify(profile));
+        setHasValidated(true);
+        setSessionStatus("verified");
+        if (tokenAtStart !== token) {
+          navigate("/resident-dashboard", { replace: true });
+        }
+      } catch {
+        if (!active) return;
+        setSessionError("We couldn't verify your account right now. Check your connection and try again.");
+        setSessionStatus("unavailable");
+      }
+    };
+
+    validateRef.current = validateSession;
+    void validateSession(true);
+
+    const revalidateWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void validateSession(false);
+      }
+    };
+    const revalidateAfterHistoryRestore = () => void validateSession(false);
+    const handleStorageChange = (event) => {
+      if (event.key !== "token") return;
+      if (!event.newValue) {
+        clearResidentSession("Your session has ended. Please sign in again.");
+        return;
+      }
+      void validateSession(true);
+    };
+
+    window.addEventListener("focus", revalidateWhenVisible);
+    window.addEventListener("pageshow", revalidateWhenVisible);
+    window.addEventListener("popstate", revalidateAfterHistoryRestore);
+    window.addEventListener("storage", handleStorageChange);
+    document.addEventListener("visibilitychange", revalidateWhenVisible);
+
+    return () => {
+      active = false;
+      if (validateRef.current === validateSession) validateRef.current = null;
+      window.removeEventListener("focus", revalidateWhenVisible);
+      window.removeEventListener("pageshow", revalidateWhenVisible);
+      window.removeEventListener("popstate", revalidateAfterHistoryRestore);
+      window.removeEventListener("storage", handleStorageChange);
+      document.removeEventListener("visibilitychange", revalidateWhenVisible);
+    };
+  }, [hasResidentCredentials, navigate, token]);
+
+  if (!hasResidentCredentials) {
     return <Navigate to="/resident-login" replace />;
   }
 
-  return <Outlet />;
+  const preservePage = hasValidated;
+  const blocked = sessionStatus !== "verified";
+
+  if (!preservePage) {
+    return (
+      <SessionCheckScreen
+        checking={sessionStatus === "checking"}
+        message={sessionError}
+        onRetry={() => validateRef.current?.(true)}
+      />
+    );
+  }
+
+  return (
+    <>
+      <div
+        className={`contents ${blocked ? "pointer-events-none select-none" : ""}`}
+        aria-hidden={blocked}
+        inert={blocked}
+      >
+        <Outlet />
+      </div>
+      {blocked && (
+        <SessionCheckScreen
+          checking={sessionStatus === "checking"}
+          message={sessionError}
+          onRetry={() => validateRef.current?.(true)}
+        />
+      )}
+    </>
+  );
 }
 
 // Reopen a saved resident session directly in the app instead of showing the
 // welcome or login screen after the WebView has been closed and relaunched.
 function RedirectIfResident({ children }) {
   const token = localStorage.getItem("token");
-  let role = null;
-  try {
-    role = JSON.parse(localStorage.getItem("user") || "{}").role || null;
-  } catch {
-    role = null;
-  }
+  const role = getSavedRole();
 
   if (token && role === "resident") {
     return <Navigate to="/resident-dashboard" replace />;
