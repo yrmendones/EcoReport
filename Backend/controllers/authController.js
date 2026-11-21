@@ -7,6 +7,7 @@ const { sendVerificationCodeEmail } = require('../utils/mailer');
 const { sanitizeText } = require('../utils/sanitizeHtml');
 const { validatePassword } = require('../utils/passwordPolicy');
 const loginLimiter = require('../utils/loginLimiter');
+const registrationFlowDebugEnabled = require('../utils/registrationFlowDebug');
 
 async function generateResidentId() {
     const year = new Date().getFullYear();
@@ -168,10 +169,10 @@ exports.register = async (req, res) => {
             }
         });
     } catch (error) {
-        if (req.query?.registration_trace === '1') {
+        if (registrationFlowDebugEnabled() && req.query?.registration_trace === '1') {
             const traceId = String(req.query.trace_id || 'missing').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'missing';
             console.error(
-                `[registration-flow] register_error trace_id=${traceId} message=${error.message || 'unknown error'}`
+                `[registration-flow] register_error trace_id=${traceId} error_name=${error.name || 'Error'}`
             );
         }
         console.error(error);

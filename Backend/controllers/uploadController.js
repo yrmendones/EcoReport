@@ -1,6 +1,7 @@
 const { v2: cloudinary } = require('cloudinary');
 const { Readable } = require('stream');
 const { MAX_VIDEO_SIZE, MAX_IMAGE_SIZE } = require('../middleware/upload');
+const registrationFlowDebugEnabled = require('../utils/registrationFlowDebug');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -104,13 +105,13 @@ exports.guestUploadFiles = async (req, res) => {
 
         res.status(201).json({ message: 'Files uploaded successfully!', files: fileUrls });
     } catch (error) {
-        if (req.query?.registration_trace === '1') {
+        if (registrationFlowDebugEnabled() && req.query?.registration_trace === '1') {
             const traceId = String(req.query.trace_id || 'missing').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'missing';
             const stage = ['id_upload', 'selfie_upload'].includes(String(req.query.stage || ''))
                 ? String(req.query.stage)
                 : 'upload';
             console.error(
-                `[registration-flow] upload_error trace_id=${traceId} stage=${stage} message=${error.message || 'unknown error'}`
+                `[registration-flow] upload_error trace_id=${traceId} stage=${stage} error_name=${error.name || 'Error'}`
             );
         }
         console.error(error);

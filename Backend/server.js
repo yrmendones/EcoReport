@@ -3,16 +3,18 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 require('./db');
+const registrationFlowDebugEnabled = require('./utils/registrationFlowDebug');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.set('trust proxy', 1);
 
-// Trace resident registration requests. The client may pass a random trace ID
-// and stage name, but cached clients without those parameters are logged too.
-// Never log request bodies or uploaded data.
+// Optional registration tracing for troubleshooting. Disabled by default and
+// limited to request metadata; request bodies and uploaded files are never logged.
 app.use((req, res, next) => {
+    if (!registrationFlowDebugEnabled()) return next();
+
     const isRegistrationRoute =
         req.path === '/api/auth/register' || req.path === '/api/guest/upload';
     if (!isRegistrationRoute || !['POST', 'OPTIONS'].includes(req.method)) return next();
@@ -30,21 +32,19 @@ app.use((req, res, next) => {
             : 'unlabeled_upload')
         : 'register';
     const startedAt = Date.now();
-    const origin = req.get('origin') || 'none';
-    const contentLength = req.get('content-length') || 'unknown';
 
     console.info(
-        `[registration-flow] received trace_id=${traceId} stage=${stage} traced=${hasClientTrace} method=${req.method} origin=${origin} content_length=${contentLength}`
+        `[registration-flow] received trace_id=${traceId} stage=${stage} method=${req.method}`
     );
     res.once('finish', () => {
         console.info(
-            `[registration-flow] completed trace_id=${traceId} stage=${stage} traced=${hasClientTrace} method=${req.method} status=${res.statusCode} duration_ms=${Date.now() - startedAt}`
+            `[registration-flow] completed trace_id=${traceId} stage=${stage} method=${req.method} status=${res.statusCode} duration_ms=${Date.now() - startedAt}`
         );
     });
     res.once('close', () => {
         if (!res.writableEnded) {
             console.warn(
-                `[registration-flow] connection_closed trace_id=${traceId} stage=${stage} traced=${hasClientTrace} method=${req.method} duration_ms=${Date.now() - startedAt}`
+                `[registration-flow] connection_closed trace_id=${traceId} stage=${stage} method=${req.method} duration_ms=${Date.now() - startedAt}`
             );
         }
     });

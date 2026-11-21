@@ -522,7 +522,6 @@ function CameraModal({
         const file = new File([blob], `${Date.now()}.jpg`, {
           type: "image/jpeg",
         });
-        console.log(`[capture] ${width}x${height} — ${(file.size / 1024).toFixed(0)} KB`);
         onCapture(file);
       },
       "image/jpeg",
@@ -1450,14 +1449,7 @@ export default function Register() {
   // ============ Upload to Cloudinary ============
   const uploadFile = async (file, label = "file", traceId) => {
     if (!file) return null;
-    // Extra debug — remove after confirming the fix works
-    console.log(
-      `[upload] ${label}: name="${file.name}", type="${file.type}", size=${(file.size / 1024).toFixed(0)}KB`
-    );
     const compressed = await compressImage(file);
-    console.log(
-      `[upload] ${label} after compression: name="${compressed.name}", type="${compressed.type}", size=${(compressed.size / 1024).toFixed(0)}KB`
-    );
     const fd = new FormData();
     fd.append("files", compressed);
     const uploadStage = label === "ID photo" ? "id_upload" : "selfie_upload";
@@ -1539,11 +1531,6 @@ export default function Register() {
       navigate("/resident-dashboard");
     } catch (err) {
       const message = err.message || "Registration failed. Please try again.";
-      console.error("[registration-flow] client failure", {
-        trace_id: registrationTraceId,
-        stage: failedStage,
-        message,
-      });
       setError(`${message} (stage: ${failedStage}; reference: ${registrationTraceId})`);
     } finally {
       setLoading(false);
