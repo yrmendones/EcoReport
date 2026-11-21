@@ -1491,11 +1491,13 @@ export default function Register() {
     }
 
     const registrationTraceId = `reg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    let failedStage = "id_upload";
 
     try {
       // Upload sequentially, not in parallel — avoids splitting limited
       // mobile upload bandwidth across two simultaneous requests.
       const valid_id_url = await uploadFile(residentIdFile, "ID photo", registrationTraceId);
+      failedStage = REQUIRE_FACE_VERIFICATION ? "selfie_upload" : "register";
       const selfie_image = REQUIRE_FACE_VERIFICATION
         ? await uploadFile(faceFile, "Selfie", registrationTraceId)
         : null;
@@ -1526,6 +1528,7 @@ export default function Register() {
         selfie_image,
       };
 
+      failedStage = "register";
       const data = await apiFetch(`/api/auth/register?registration_trace=1&trace_id=${encodeURIComponent(registrationTraceId)}`, {
         method: "POST",
         body: JSON.stringify(payload),
@@ -1535,8 +1538,13 @@ export default function Register() {
       localStorage.setItem("user", JSON.stringify(data.user));
       navigate("/resident-dashboard");
     } catch (err) {
-      console.error("Register error:", err);
-      setError(err.message || "Registration failed. Please try again.");
+      const message = err.message || "Registration failed. Please try again.";
+      console.error("[registration-flow] client failure", {
+        trace_id: registrationTraceId,
+        stage: failedStage,
+        message,
+      });
+      setError(`${message} (stage: ${failedStage}; reference: ${registrationTraceId})`);
     } finally {
       setLoading(false);
     }
