@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate } from "react-router-dom";
+import { FaSpinner } from "react-icons/fa";
 import MaintenanceGate from "../components/MaintenanceGate";
 import { apiFetch } from "../api";
 import { clearResidentSession } from "../utils/authSession";
@@ -62,17 +63,26 @@ function SessionCheckScreen({ checking, message, onRetry }) {
       className="fixed inset-0 z-[100] flex items-center justify-center bg-[#F8FAF8] px-6 text-center"
       role={checking ? "status" : "alert"}
       aria-live="polite"
+      aria-busy={checking}
     >
-      <div className="max-w-sm">
-        <h1 className="text-xl font-extrabold text-[#075B2A]">
-          {checking ? "Checking your session" : "Unable to verify your session"}
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-gray-700">
-          {checking
-            ? "Please wait while we confirm your account."
-            : message || "We couldn't verify your account right now. Check your connection and try again."}
-        </p>
-        {!checking && (
+      {checking ? (
+        <>
+          <FaSpinner
+            className="animate-spin text-[#0B5D2A]"
+            size={40}
+            aria-hidden="true"
+            focusable="false"
+          />
+          <span className="sr-only">Checking your session</span>
+        </>
+      ) : (
+        <div className="max-w-sm">
+          <h1 className="text-xl font-extrabold text-[#075B2A]">
+            Unable to verify your session
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-gray-700">
+            {message || "We couldn't verify your account right now. Check your connection and try again."}
+          </p>
           <button
             type="button"
             onClick={onRetry}
@@ -80,8 +90,8 @@ function SessionCheckScreen({ checking, message, onRetry }) {
           >
             Try again
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -96,6 +106,8 @@ function RequireResident() {
   const [sessionStatus, setSessionStatus] = useState("checking");
   const [sessionError, setSessionError] = useState("");
   const [hasValidated, setHasValidated] = useState(false);
+  const hasValidatedRef = useRef(false);
+  const validatedTokenRef = useRef(null);
   const requestRef = useRef(null);
   const lastRequestAtRef = useRef(0);
   const validateRef = useRef(null);
@@ -124,8 +136,12 @@ function RequireResident() {
 
       const tokenAtStart = requestRef.current.token;
       const pendingRequest = requestRef.current.promise;
-      setSessionStatus("checking");
-      setSessionError("");
+      const canReuseValidatedSession =
+        hasValidatedRef.current && validatedTokenRef.current === tokenAtStart;
+      if (!canReuseValidatedSession || force) {
+        setSessionStatus("checking");
+        setSessionError("");
+      }
 
       try {
         const profile = await pendingRequest;
@@ -139,6 +155,8 @@ function RequireResident() {
         }
 
         localStorage.setItem("user", JSON.stringify(profile));
+        hasValidatedRef.current = true;
+        validatedTokenRef.current = tokenAtStart;
         setHasValidated(true);
         setSessionStatus("verified");
         if (tokenAtStart !== token) {

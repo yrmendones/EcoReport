@@ -24,3 +24,10 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
+
+# Graphify generated files
+/graphify-out/
+/graphify-out-backup/
+
+# Graphify temporary helper scripts
+/gfy_f*.py
