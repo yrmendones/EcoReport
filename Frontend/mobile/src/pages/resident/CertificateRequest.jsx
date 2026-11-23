@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
   FaFileAlt,
   FaCheckCircle,
-  FaSpinner,
   FaExclamationTriangle,
   FaCalendarAlt,
   FaChevronLeft,
@@ -13,6 +12,8 @@ import {
   FaMoneyBillWave,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { useResidentProfile } from "../../utils/useResidentProfile";
+import { usePublicResource } from "../../utils/usePublicResource";
 
 /* ---------- Certificates ---------- */
 const formatFee = (fee) => `₱${Number(fee).toFixed(2)}`;
@@ -292,14 +293,17 @@ function DatePicker({ value, onChange, disabled }) {
 export default function CertificateRequest() {
   const navigate = useNavigate();
 
-  const [verificationLoading, setVerificationLoading] = useState(true);
-  const [userStatus, setUserStatus] = useState({
-    is_verified: 0,
-    verification_status: "Pending Verification",
-  });
+  const { profile: userStatus } = useResidentProfile();
 
-  const [certificates, setCertificates] = useState([]);
-  const [loadingCertificates, setLoadingCertificates] = useState(true);
+  const {
+    data: certificateData,
+    loading: loadingCertificates,
+    error: certificateTypesError,
+    retry: retryCertificateTypes,
+  } = usePublicResource("GET /api/public/certificate-types", () =>
+    apiFetch("/api/public/certificate-types")
+  );
+  const certificates = Array.isArray(certificateData) ? certificateData : [];
 
   const [certificate, setCertificate] = useState("");
   const [purpose, setPurpose] = useState("");
@@ -311,39 +315,9 @@ export default function CertificateRequest() {
   // null = form is shown; object = success screen.
   const [submitted, setSubmitted] = useState(null);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const data = await apiFetch("/api/users/me");
-        setUserStatus({
-          is_verified: data.is_verified || 0,
-          verification_status: data.verification_status || "Pending Verification",
-        });
-      } catch (err) {
-        console.error("Failed to load verification status:", err);
-      } finally {
-        setVerificationLoading(false);
-      }
-    };
-    fetchUser();
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    apiFetch("/api/public/certificate-types")
-      .then((data) => {
-        if (!cancelled && Array.isArray(data)) setCertificates(data);
-      })
-      .catch((err) => console.error("Failed to load certificate types:", err))
-      .finally(() => {
-        if (!cancelled) setLoadingCertificates(false);
-      });
-    return () => { cancelled = true; };
-  }, []);
-
   const isVerified =
-    userStatus.is_verified === 1 &&
-    userStatus.verification_status === "Verified Resident";
+    userStatus?.is_verified === 1 &&
+    userStatus?.verification_status === "Verified Resident";
 
   const selectedCertificate = certificates.find((c) => c.name === certificate);
 
@@ -413,17 +387,6 @@ export default function CertificateRequest() {
   const mainStyle = {
     padding: "28px 24px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
   };
-
-  if (verificationLoading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
-          <p className="text-[#0B5D2A] font-bold">Checking account status...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (!isVerified) {
     return (
@@ -601,6 +564,8 @@ export default function CertificateRequest() {
                 <option value="">Select Certificate</option>
                 {loadingCertificates ? (
                   <option value="" disabled>Loading...</option>
+                ) : certificateTypesError && certificates.length === 0 ? (
+                  <option value="" disabled>Unable to load certificate types</option>
                 ) : certificates.length === 0 ? (
                   <option value="" disabled>No certificates available</option>
                 ) : (
@@ -618,6 +583,19 @@ export default function CertificateRequest() {
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-[#0B5D2A] pointer-events-none"
               />
             </div>
+
+            {certificateTypesError && certificates.length === 0 && (
+              <div className="text-sm text-red-700" role="alert">
+                {certificateTypesError}{" "}
+                <button
+                  type="button"
+                  onClick={retryCertificateTypes}
+                  className="font-bold underline"
+                >
+                  Try Again
+                </button>
+              </div>
+            )}
 
             {selectedCertificate && (
               <div

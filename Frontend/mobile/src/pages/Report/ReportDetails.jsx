@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { FaArrowLeft, FaMapMarkerAlt, FaSpinner } from "react-icons/fa";
+import { FaArrowLeft, FaMapMarkerAlt } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { FullScreenLoading } from "../../components/LoadingIndicator";
 
 // Map backend status what the resident sees
 const getDisplayStatus = (rawStatus) => {
@@ -39,7 +40,7 @@ export default function ReportDetails() {
         try {
           const mediaData = await apiFetch(`/api/reports/${id}/media`);
           setMedia(mediaData || []);
-        } catch (err) {
+        } catch {
           setMedia([]);
         }
       } catch (err) {
@@ -75,14 +76,7 @@ export default function ReportDetails() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
-          <p className="text-[#0B5D2A] font-bold">Loading report details...</p>
-        </div>
-      </div>
-    );
+    return <FullScreenLoading label="Loading report details" />;
   }
 
   if (error || !report) {

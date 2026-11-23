@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaSpinner, FaLocationArrow } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { LoadingIndicator } from "../../components/LoadingIndicator";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -22,6 +23,10 @@ const BARANGAY_BOUNDS = {
   east: 121.07067839910466,
   west: 121.06177492093398,
 };
+const DEFAULT_CENTER = [
+  (BARANGAY_BOUNDS.north + BARANGAY_BOUNDS.south) / 2,
+  (BARANGAY_BOUNDS.east + BARANGAY_BOUNDS.west) / 2,
+];
 
 // Barangay boundary polygon
 const BARANGAY_POLYGON = [
@@ -110,11 +115,6 @@ export default function EnvironmentalMap() {
     ? reports.filter((r) => r.user_id === myUserId).length
     : 0;
 
-  const defaultCenter = [
-    (BARANGAY_BOUNDS.north + BARANGAY_BOUNDS.south) / 2,
-    (BARANGAY_BOUNDS.east + BARANGAY_BOUNDS.west) / 2,
-  ];
-
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
@@ -124,7 +124,7 @@ export default function EnvironmentalMap() {
     ];
 
     mapRef.current = L.map(mapContainerRef.current, {
-      center: defaultCenter,
+      center: DEFAULT_CENTER,
       zoom: 15,
       maxBounds: L.latLngBounds(bounds).pad(0.25),
       maxBoundsViscosity: 0.7,
@@ -250,12 +250,16 @@ export default function EnvironmentalMap() {
           fetchReports(latitude, longitude);
         },
         () => {
-          fetchReports(defaultCenter[0], defaultCenter[1]);
+          void Promise.resolve().then(() =>
+            fetchReports(DEFAULT_CENTER[0], DEFAULT_CENTER[1])
+          );
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     } else {
-      fetchReports(defaultCenter[0], defaultCenter[1]);
+      void Promise.resolve().then(() =>
+        fetchReports(DEFAULT_CENTER[0], DEFAULT_CENTER[1])
+      );
     }
   }, []);
 
@@ -317,7 +321,7 @@ export default function EnvironmentalMap() {
             <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-10">
-                <FaSpinner className="animate-spin text-[#0B5D2A]" size={30} />
+                <LoadingIndicator label="Loading map reports" size={30} showLabel={false} />
               </div>
             )}
             {/* Report visibility filter */}
@@ -486,7 +490,13 @@ export default function EnvironmentalMap() {
             >
               <p className="text-[14px] font-bold text-red-600 leading-6">{error}</p>
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  setError("");
+                  const center = userLocation
+                    ? [userLocation.lat, userLocation.lng]
+                    : DEFAULT_CENTER;
+                  fetchReports(center[0], center[1]);
+                }}
                 className="min-h-[44px] text-[#0B5D2A] font-bold underline"
                 style={{ padding: "0 16px" }}
               >

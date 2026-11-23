@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -9,16 +8,21 @@ import {
   FaHospital,
   FaBuilding,
   FaExclamationTriangle,
-  FaSpinner,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { FullScreenLoading } from "../../components/LoadingIndicator";
+import { usePublicResource } from "../../utils/usePublicResource";
 
 export default function GuestHotlines() {
   const navigate = useNavigate();
 
-  const [hotlines, setHotlines] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const {
+    data: hotlineData,
+    loading,
+    error,
+    retry,
+  } = usePublicResource("GET /api/hotlines", () => apiFetch("/api/hotlines"));
+  const hotlines = Array.isArray(hotlineData) ? hotlineData : [];
 
   const getIcon = (title = "") => {
   const t = title.toLowerCase();
@@ -31,38 +35,15 @@ export default function GuestHotlines() {
   return <FaPhoneAlt size={22} />;
 };
 
-  useEffect(() => {
-    const fetchHotlines = async () => {
-      try {
-        setLoading(true);
-        const data = await apiFetch("/api/hotlines");
-        setHotlines(data || []);
-      } catch (err) {
-        console.error("Error fetching hotlines:", err);
-        setError("Failed to load hotlines.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchHotlines();
-  }, []);
-
   const handleCall = (cleanNumber) => {
-    window.location.href = `tel:${cleanNumber}`;
+    window.location.assign(`tel:${cleanNumber}`);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
-          <p className="text-[#0B5D2A] font-bold">Loading hotlines...</p>
-        </div>
-      </div>
-    );
+  if (loading && !hotlineData) {
+    return <FullScreenLoading label="Loading hotlines" />;
   }
 
-  if (error) {
+  if (error && !hotlineData) {
     return (
       <div
         className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center"
@@ -75,7 +56,7 @@ export default function GuestHotlines() {
           <p className="text-[15px] font-bold text-red-600 leading-6">{error}</p>
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={retry}
             className="min-h-[44px] text-[#0B5D2A] font-bold underline"
             style={{ padding: "0 16px" }}
           >

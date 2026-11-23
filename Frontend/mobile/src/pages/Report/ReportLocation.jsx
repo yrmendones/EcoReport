@@ -6,6 +6,7 @@ import {
   FaSpinner,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { invalidateResidentReportData } from "../../utils/sessionRequestCache";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -394,6 +395,11 @@ export default function ReportLocation() {
           });
         }
       }
+
+      invalidateResidentReportData(
+        localStorage.getItem("token"),
+        user.user_id
+      );
 
       navigate("/report-success", { state: { reportId: response.report_id } });
     } catch (err) {

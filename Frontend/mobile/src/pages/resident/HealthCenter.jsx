@@ -13,9 +13,10 @@ import {
   FaBullhorn,
   FaChevronDown,
   FaTimes,
-  FaSpinner,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { FullScreenLoading } from "../../components/LoadingIndicator";
+import { usePublicResource } from "../../utils/usePublicResource";
 
 /* =========================================================
    GLOSSARY
@@ -97,38 +98,33 @@ function TermText({ text, onTermClick }) {
 export default function HealthCenter() {
   const navigate = useNavigate();
 
-  const [info, setInfo] = useState(null);
-  const [services, setServices] = useState([]);
-  const [staff, setStaff] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const {
+    data: healthData,
+    loading,
+    error,
+    retry,
+  } = usePublicResource("GET /api/health-center/content", async () => {
+    const results = await Promise.allSettled([
+      apiFetch("/api/health-center/info"),
+      apiFetch("/api/health-center/services"),
+      apiFetch("/api/health-center/staff"),
+    ]);
+    if (results.every((result) => result.status === "rejected")) {
+      throw new Error("Failed to load health center information.");
+    }
+    return {
+      info: results[0].status === "fulfilled" ? results[0].value : null,
+      services: results[1].status === "fulfilled" ? results[1].value : [],
+      staff: results[2].status === "fulfilled" ? results[2].value : [],
+      partialFailure: results.some((result) => result.status === "rejected"),
+    };
+  });
+  const info = healthData?.info ?? null;
+  const services = Array.isArray(healthData?.services) ? healthData.services : [];
+  const staff = Array.isArray(healthData?.staff) ? healthData.staff : [];
 
   const [openService, setOpenService] = useState(null);
   const [activeTerm, setActiveTerm] = useState(null);
-
-  // Fetch info + services + staff in parallel
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        setLoading(true);
-        setError("");
-        const [infoData, servicesData, staffData] = await Promise.all([
-          apiFetch("/api/health-center/info").catch(() => null),
-          apiFetch("/api/health-center/services").catch(() => []),
-          apiFetch("/api/health-center/staff").catch(() => []),
-        ]);
-        setInfo(infoData || null);
-        setServices(Array.isArray(servicesData) ? servicesData : []);
-        setStaff(Array.isArray(staffData) ? staffData : []);
-      } catch (err) {
-        console.error("Error fetching health center data:", err);
-        setError("Failed to load health center information.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAll();
-  }, []);
 
   // Close explanation with Escape key
   useEffect(() => {
@@ -148,18 +144,11 @@ export default function HealthCenter() {
 
   const term = activeTerm ? GLOSSARY[activeTerm] : null;
 
-  if (loading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
-          <p className="text-[#0B5D2A] font-bold">Loading health center...</p>
-        </div>
-      </div>
-    );
+  if (loading && !healthData) {
+    return <FullScreenLoading label="Loading health center" />;
   }
 
-  if (error) {
+  if (error && !healthData) {
     return (
       <div
         className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center"
@@ -172,7 +161,7 @@ export default function HealthCenter() {
           <p className="text-[15px] font-bold text-red-600 leading-6">{error}</p>
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={retry}
             className="min-h-[44px] text-[#0B5D2A] font-bold underline"
             style={{ padding: "0 16px" }}
           >
@@ -215,6 +204,19 @@ export default function HealthCenter() {
           }}
         >
           {/* CONTACT INFORMATION (location and operating hours only — no contact number) */}
+          {healthData?.partialFailure && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+              Some health center information could not be refreshed.{" "}
+              <button
+                type="button"
+                onClick={retry}
+                className="font-bold underline"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+
           <section className="shrink-0 flex flex-col" style={{ gap: "16px" }}>
             <h2 className="text-[22px] font-bold text-gray-800">
               Contact Information

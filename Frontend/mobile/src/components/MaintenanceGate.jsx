@@ -1,6 +1,21 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../api";
+import { FullScreenLoading } from "./LoadingIndicator";
 import MaintenanceScreen from "./MaintenanceScreen";
+
+let maintenanceStatusRequest = null;
+
+function fetchMaintenanceStatus() {
+  if (!maintenanceStatusRequest) {
+    const request = apiFetch("/api/public/status");
+    maintenanceStatusRequest = request;
+    const clearRequest = () => {
+      if (maintenanceStatusRequest === request) maintenanceStatusRequest = null;
+    };
+    request.then(clearRequest, clearRequest);
+  }
+  return maintenanceStatusRequest;
+}
 
 /**
  * Wraps the mobile router so every route is gated by maintenance mode.
@@ -12,7 +27,7 @@ export default function MaintenanceGate({ children }) {
     let cancelled = false;
     (async () => {
       try {
-        const data = await apiFetch("/api/public/status");
+        const data = await fetchMaintenanceStatus();
         if (cancelled) return;
         setState({
           enabled: !!data.maintenance_mode,
@@ -29,11 +44,7 @@ export default function MaintenanceGate({ children }) {
   }, []);
 
   if (state === null) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <p className="text-[#0B5D2A] font-bold">Loading…</p>
-      </div>
-    );
+    return <FullScreenLoading label="Loading app..." />;
   }
 
   if (state.enabled) {

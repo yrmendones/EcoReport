@@ -1,37 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaUserCircle } from "react-icons/fa";
-import { apiFetch } from "../../api";
+import { useResidentProfile } from "../../utils/useResidentProfile";
 
 export default function Header() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { profile: user } = useResidentProfile();
   const [imgError, setImgError] = useState(false);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          setLoading(false);
-          return;
-        }
-
-        const data = await apiFetch("/api/users/me");
-        setUser(data);
-      } catch (err) {
-        console.error("Error fetching user:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, []);
-
   const getFullName = () => {
-    if (!user) return "Loading...";
+    if (!user) return "Resident";
     return `${user.first_name || ""} ${user.last_name || ""}`.trim() || "Resident";
   };
 
@@ -43,7 +21,7 @@ export default function Header() {
   return (
     <header className="bg-[#0B5D2A] px-6 pt-6 pb-24 flex items-center justify-end gap-3 rounded-t-[38px] shrink-0">
       <h1 className="text-white text-[20px] font-bold tracking-tight">
-        {loading ? "Loading..." : getFullName()}
+        {getFullName()}
       </h1>
 
       <button className="focus:outline-none" onClick={() => navigate("/profile")}>

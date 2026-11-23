@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaClipboardList,
@@ -9,32 +8,26 @@ import {
   FaArrowLeft,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { LoadingIndicator } from "../../components/LoadingIndicator";
+import { usePublicResource } from "../../utils/usePublicResource";
 
 export default function GuestHome() {
   const navigate = useNavigate();
-  const [announcements, setAnnouncements] = useState([]);
-  const [announcementsLoading, setAnnouncementsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchAnnouncements = async () => {
-      try {
-        setAnnouncementsLoading(true);
-        const data = await apiFetch("/api/announcements");
-        const latest = (data || []).slice(0, 2).map((item) => ({
-          title: item.title,
-          subtitle: `${item.date} • ${item.category}`,
-          announcementId: item.announcement_id,
-        }));
-        setAnnouncements(latest);
-      } catch (err) {
-        console.error("Error fetching announcements:", err);
-        setAnnouncements([]);
-      } finally {
-        setAnnouncementsLoading(false);
-      }
-    };
-    fetchAnnouncements();
-  }, []);
+  const {
+    data: announcementData,
+    loading: announcementsLoading,
+    error: announcementsError,
+    retry: retryAnnouncements,
+  } = usePublicResource("GET /api/announcements", () =>
+    apiFetch("/api/announcements")
+  );
+  const announcements = (Array.isArray(announcementData) ? announcementData : [])
+    .slice(0, 2)
+    .map((item) => ({
+      title: item.title,
+      subtitle: `${item.date} • ${item.category}`,
+      announcementId: item.announcement_id,
+    }));
 
   const quickActions = [
     {
@@ -54,9 +47,7 @@ export default function GuestHome() {
     },
   ];
 
-  const displayAnnouncements = announcementsLoading
-    ? [{ title: "Loading...", subtitle: "Please wait", announcementId: null }]
-    : announcements.length > 0
+  const displayAnnouncements = announcements.length > 0
     ? announcements
     : [{ title: "No Announcements", subtitle: "Check back later", announcementId: null }];
 
@@ -159,7 +150,20 @@ export default function GuestHome() {
             </div>
 
             <div className="flex flex-col" style={{ gap: "20px" }}>
-              {displayAnnouncements.map((item, index) => (
+              {announcementsLoading && !announcementData ? (
+                <LoadingIndicator label="Loading announcements" size={20} />
+              ) : announcementsError && announcements.length === 0 ? (
+                <div className="rounded-xl border border-red-300 bg-red-100 p-4 text-center">
+                  <p className="text-sm text-red-700">{announcementsError}</p>
+                  <button
+                    type="button"
+                    onClick={retryAnnouncements}
+                    className="mt-2 text-sm font-bold text-[#0B5D2A] underline"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : displayAnnouncements.map((item, index) => (
                 <button
                   key={index}
                   type="button"

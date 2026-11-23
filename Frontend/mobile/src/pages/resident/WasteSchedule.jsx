@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -7,36 +7,24 @@ import {
   FaRecycle,
   FaTrash,
   FaExclamationTriangle,
-  FaSpinner,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { FullScreenLoading } from "../../components/LoadingIndicator";
+import { usePublicResource } from "../../utils/usePublicResource";
 
 export default function WasteSchedule() {
   const navigate = useNavigate();
 
-  // State
-  const [schedules, setSchedules] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const {
+    data: scheduleData,
+    loading,
+    error,
+    retry,
+  } = usePublicResource("GET /api/waste-schedule", () =>
+    apiFetch("/api/waste-schedule")
+  );
+  const schedules = Array.isArray(scheduleData) ? scheduleData : [];
   const [selectedDate, setSelectedDate] = useState("");
-
-  // Fetch waste schedule from backend
-  useEffect(() => {
-    const fetchSchedule = async () => {
-      try {
-        setLoading(true);
-        const data = await apiFetch("/api/waste-schedule");
-        setSchedules(data);
-      } catch (err) {
-        console.error("Error fetching schedule:", err);
-        setError("Failed to load waste schedule.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSchedule();
-  }, []);
 
   // Get day of week from date
   const getDayOfWeek = (dateString) => {
@@ -86,18 +74,11 @@ export default function WasteSchedule() {
     return icons[iconName] || <FaTrash size={20} />;
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
-          <p className="text-[#0B5D2A] font-bold">Loading schedule...</p>
-        </div>
-      </div>
-    );
+  if (loading && !scheduleData) {
+    return <FullScreenLoading label="Loading schedule" />;
   }
 
-  if (error) {
+  if (error && !scheduleData) {
     return (
       <div
         className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center"
@@ -109,7 +90,7 @@ export default function WasteSchedule() {
         >
           <p className="text-[15px] font-bold text-red-600 leading-6">{error}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={retry}
             className="min-h-[44px] text-[#0B5D2A] font-bold underline"
             style={{ padding: "0 16px" }}
           >

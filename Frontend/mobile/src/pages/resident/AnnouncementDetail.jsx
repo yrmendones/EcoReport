@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { FaArrowLeft, FaSpinner } from "react-icons/fa";
+import { FaArrowLeft } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { FullScreenLoading } from "../../components/LoadingIndicator";
 import DOMPurify from "dompurify";
+import { usePublicResource } from "../../utils/usePublicResource";
 
 // label style as the announcements list ("community" -> "Community")
 const toLabel = (value) => {
@@ -13,40 +14,19 @@ const toLabel = (value) => {
 export default function AnnouncementDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [announcement, setAnnouncement] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const { data, loading, error, retry } = usePublicResource(
+    "GET /api/announcements",
+    () => apiFetch("/api/announcements")
+  );
+  const announcement = Array.isArray(data)
+    ? data.find((item) => item.announcement_id === parseInt(id))
+    : null;
 
-  useEffect(() => {
-    const fetchAnnouncement = async () => {
-      try {
-        setLoading(true);
-        const data = await apiFetch("/api/announcements");
-        const found = data.find((item) => item.announcement_id === parseInt(id));
-        if (found) {
-          setAnnouncement(found);
-        } else {
-          setError("Announcement not found.");
-        }
-      } catch (err) {
-        console.error("Error fetching announcement:", err);
-        setError("Failed to load announcement.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAnnouncement();
-  }, [id]);
-
-  if (loading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
-      </div>
-    );
+  if (loading && !announcement) {
+    return <FullScreenLoading label="Loading announcement" />;
   }
 
-  if (error || !announcement) {
+  if (!announcement) {
     return (
       <div
         className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center"
@@ -59,6 +39,16 @@ export default function AnnouncementDetail() {
           <p className="text-[16px] font-bold text-red-600">
             {error || "Announcement not found."}
           </p>
+          {error && (
+            <button
+              type="button"
+              onClick={retry}
+              className="text-[#0B5D2A] font-bold underline"
+              style={{ padding: "8px 16px" }}
+            >
+              Try Again
+            </button>
+          )}
           <button
             type="button"
             onClick={() => navigate("/resident-dashboard")}

@@ -39,6 +39,14 @@ export function createSessionRequestCache({
       return true;
     },
 
+    delete(resource, token) {
+      if (!token || !isCurrentSession(token)) return false;
+      const key = keyFor(resource, token);
+      values.delete(key);
+      revisions.set(key, (revisions.get(key) || 0) + 1);
+      return true;
+    },
+
     fetch(resource, token, fetcher) {
       if (!token || !isCurrentSession(token)) {
         return Promise.reject(new Error("The resident session changed before the request started."));
@@ -81,12 +89,21 @@ export function createSessionRequestCache({
 
 export const sessionRequestCache = createSessionRequestCache({
   isCurrentSession: isCurrentBrowserSession,
-  onDuration(resource, durationMs) {
-    if (import.meta.env?.DEV) {
-      console.info(`[request timing] ${resource}: ${Math.round(durationMs)} ms`);
-    }
-  },
 });
+export const PUBLIC_CACHE_TOKEN = "public";
+export const publicRequestCache = createSessionRequestCache({
+  isCurrentSession: () => true,
+});
+
+export function invalidateResidentReportData(token, userId) {
+  sessionRequestCache.delete("GET /api/users/me/stats", token);
+  if (userId) {
+    sessionRequestCache.delete(
+      `GET /api/reports?user_id=${userId}:with-media`,
+      token
+    );
+  }
+}
 
 export const NOTIFICATION_CACHE_TTL_MS = 30_000;
 

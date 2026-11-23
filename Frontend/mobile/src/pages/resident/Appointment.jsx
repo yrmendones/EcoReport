@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -12,6 +12,7 @@ import {
   FaExclamationTriangle,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { useResidentProfile } from "../../utils/useResidentProfile";
 
 /* ---------- Barangay schedule (edit these) ---------- */
 
@@ -321,11 +322,7 @@ function DatePicker({ value, onChange, disabled }) {
 export default function Appointment() {
   const navigate = useNavigate();
 
-  const [verificationLoading, setVerificationLoading] = useState(true);
-  const [userStatus, setUserStatus] = useState({
-    is_verified: 0,
-    verification_status: "Pending Verification",
-  });
+  const { profile: userStatus } = useResidentProfile();
 
   const [formData, setFormData] = useState(emptyForm);
 
@@ -334,27 +331,9 @@ export default function Appointment() {
   // Holds the summary of the submitted appointment (null = form is shown)
   const [submitted, setSubmitted] = useState(null);
 
-  // Fetch verification status on mount
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const data = await apiFetch("/api/users/me");
-        setUserStatus({
-          is_verified: data.is_verified || 0,
-          verification_status: data.verification_status || "Pending Verification",
-        });
-      } catch (err) {
-        console.error("Failed to load verification status:", err);
-      } finally {
-        setVerificationLoading(false);
-      }
-    };
-    fetchUser();
-  }, []);
-
   const isVerified =
-    userStatus.is_verified === 1 &&
-    userStatus.verification_status === "Verified Resident";
+    userStatus?.is_verified === 1 &&
+    userStatus?.verification_status === "Verified Resident";
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -460,18 +439,6 @@ export default function Appointment() {
   const mainStyle = {
     padding: "28px 24px max(48px, calc(env(safe-area-inset-bottom) + 32px))",
   };
-
-  // Loading state
-  if (verificationLoading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
-          <p className="text-[#0B5D2A] font-bold">Checking account status...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Block pending/rejected residents
   if (!isVerified) {

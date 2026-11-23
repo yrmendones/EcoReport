@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -9,17 +8,15 @@ import {
   FaShieldAlt,
   FaChevronRight,
   FaSignOutAlt,
-  FaSpinner,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
 import BottomNav from "../../components/resident/BottomNav";
+import { useResidentProfile } from "../../utils/useResidentProfile";
 
 export default function Profile() {
   const navigate = useNavigate();
 
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const { profile: user } = useResidentProfile();
 
   const menus = [
     {
@@ -43,26 +40,6 @@ export default function Profile() {
       action: () => navigate("/privacy-settings"),
     },
   ];
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        setLoading(true);
-        const data = await apiFetch("/api/users/me");
-        setUser(data);
-      } catch (err) {
-        console.error("Error fetching user:", err);
-        setError("Failed to load profile.");
-        if (err.message === "Access denied." || err.message === "Invalid token.") {
-          navigate("/resident-login");
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, [navigate]);
 
   const handleLogout = async () => {
     try {
@@ -95,40 +72,6 @@ export default function Profile() {
     if (!user) return "--";
     return user.address || "P. Sto. Rosario Kanluran, Pateros";
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
-          <p className="text-[#0B5D2A] font-bold">Loading profile...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div
-        className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center"
-        style={{ padding: "0 24px" }}
-      >
-        <div
-          className="bg-white rounded-3xl border border-red-300 text-center max-w-sm w-full flex flex-col items-center"
-          style={{ padding: "32px 24px", gap: "16px" }}
-        >
-          <p className="text-[15px] font-bold text-red-600 leading-6">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="min-h-[44px] text-[#0B5D2A] font-bold underline"
-            style={{ padding: "0 16px" }}
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">

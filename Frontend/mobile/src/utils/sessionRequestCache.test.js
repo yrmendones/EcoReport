@@ -110,3 +110,11 @@ test("cache freshness expires so callers can refresh data in the background", ()
   currentTime = 531;
   assert.equal(cache.isFresh("GET /api/notifications", "resident-a", 30), false);
 });
+
+test("invalidating cached data makes the next feature visit refresh it", () => {
+  const cache = createSessionRequestCache();
+  cache.set("GET /api/users/me/stats", "resident-a", { total: 2 });
+
+  assert.equal(cache.delete("GET /api/users/me/stats", "resident-a"), true);
+  assert.equal(cache.get("GET /api/users/me/stats", "resident-a"), null);
+});

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -11,6 +11,8 @@ import {
   FaTimesCircle,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { getResidentProfile } from "../../utils/useResidentProfile";
+import { FullScreenLoading } from "../../components/LoadingIndicator";
 
 const formatDate = (d) => {
   if (!d) return "N/A";
@@ -36,7 +38,7 @@ if (!qrPublicBase && !import.meta.env.DEV) {
 export default function QRCodePage() {
   const navigate = useNavigate();
 
-  const [user, setUser] = useState(null);
+  const user = getResidentProfile();
   const [qrToken, setQrToken] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);       // seconds
   const [tokenExpiresAt, setTokenExpiresAt] = useState(0);
@@ -44,52 +46,45 @@ export default function QRCodePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const requestRef = useRef(null);
 
-  // Fetch user + generate a fresh 10-minute token
+  // Session verification already loaded the resident profile. Only generate
+  // the short-lived QR token here, and share an in-flight request during
+  // React StrictMode's development effect replay.
   const fetchUserAndToken = async (silent = false) => {
-    try {
-      if (!silent) setRefreshing(true);
+    if (requestRef.current) return requestRef.current;
 
-      // 1) Load profile
-      const data = await apiFetch("/api/users/me");
-      setUser(data);
+    const request = (async () => {
+      try {
+        if (!silent) setRefreshing(true);
 
-      // Keep localStorage in sync so other pages see verified state immediately
-      const stored = JSON.parse(localStorage.getItem("user") || "{}");
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          ...stored,
-          is_verified: data.is_verified,
-          verification_status: data.verification_status,
-        })
-      );
+        const tokenData = await apiFetch("/api/public/generate-qr-token", {
+          method: "POST",
+        });
+        const now = Date.now();
+        const expiresAt = tokenData.expires_at || now + 10 * 60 * 1000;
+        setQrToken(tokenData.token);
+        setTokenExpiresAt(expiresAt);
+        setTimeLeft(Math.max(0, Math.floor((expiresAt - now) / 1000)));
 
-      // 2) Generate a fresh token (invalidates previous one server-side)
-      const tokenData = await apiFetch("/api/public/generate-qr-token", {
-        method: "POST",
-      });
-      const now = Date.now();
-      const expiresAt = tokenData.expires_at || now + 10 * 60 * 1000;
-      setQrToken(tokenData.token);
-      setTokenExpiresAt(expiresAt);
-      setTimeLeft(Math.max(0, Math.floor((expiresAt - now) / 1000)));
-
-      if (!silent) setError("");
-    } catch (err) {
-      console.error("Error fetching user / QR token:", err);
-      if (!silent) {
-        setError("Failed to generate secure QR code. Please try again.");
+        if (!silent) setError("");
+      } catch (err) {
+        console.error("Error generating QR token:", err);
+        if (!silent) {
+          setError("Failed to generate secure QR code. Please try again.");
+        }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+        requestRef.current = null;
       }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    })();
+    requestRef.current = request;
+    return request;
   };
 
   useEffect(() => {
     fetchUserAndToken();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Countdown + auto-refresh when the token expires
@@ -110,7 +105,6 @@ export default function QRCodePage() {
     }, 1000);
 
     return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tokenExpiresAt]);
 
   // If the tab was backgrounded and the token expired while away, refresh on return
@@ -125,7 +119,6 @@ export default function QRCodePage() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () =>
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tokenExpiresAt]);
 
   const formatTimeLeft = () => {
@@ -215,14 +208,7 @@ export default function QRCodePage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
-          <p className="text-[#0B5D2A] font-bold">Generating secure QR...</p>
-        </div>
-      </div>
-    );
+    return <FullScreenLoading label="Generating secure QR" />;
   }
 
   if (error || !user) {
@@ -239,7 +225,7 @@ export default function QRCodePage() {
             {error || "Unable to load profile."}
           </p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => fetchUserAndToken()}
             className="min-h-[44px] text-[#0B5D2A] font-bold underline"
             style={{ padding: "0 16px" }}
           >

@@ -7,6 +7,9 @@ import StatsCard from "../../components/resident/StatsCard";
 import QuickAction from "../../components/resident/QuickAction";
 import AnnouncementCard from "../../components/resident/AnnouncementCard";
 import BottomNav from "../../components/resident/BottomNav";
+import { LoadingIndicator } from "../../components/LoadingIndicator";
+import { sessionRequestCache } from "../../utils/sessionRequestCache";
+import { usePublicResource } from "../../utils/usePublicResource";
 
 import {
   FaClipboardList,
@@ -17,67 +20,78 @@ import {
   FaMapMarkedAlt,
 } from "react-icons/fa";
 
+const DASHBOARD_STATS_RESOURCE = "GET /api/users/me/stats";
+const DASHBOARD_CACHE_TTL_MS = 30_000;
+
+const toStats = (data = {}) => ({
+  total: data.total || 0,
+  pending: data.pending || 0,
+  resolved: data.resolved || 0,
+});
+
+const toDashboardAnnouncements = (data) =>
+  (Array.isArray(data) ? data : []).slice(0, 2).map((item) => ({
+    title: item.title,
+    subtitle: item.date + " • " + item.category,
+    announcementId: item.announcement_id,
+  }));
+
 export default function Dashboard() {
   const navigate = useNavigate();
+  const token = localStorage.getItem("token");
+  const cachedStats = sessionRequestCache.get(DASHBOARD_STATS_RESOURCE, token);
 
   // State for stats
-  const [stats, setStats] = useState({
-    total: 0,
-    pending: 0,
-    resolved: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState(() => toStats(cachedStats?.value));
+  const [loading, setLoading] = useState(!cachedStats);
   const [error, setError] = useState("");
+  const [statsRetry, setStatsRetry] = useState(0);
 
-  // State for announcements
-  const [announcements, setAnnouncements] = useState([]);
-  const [announcementsLoading, setAnnouncementsLoading] = useState(true);
+  const {
+    data: announcementData,
+    loading: announcementsLoading,
+    error: announcementsError,
+    retry: retryAnnouncements,
+  } = usePublicResource("GET /api/announcements", () =>
+    apiFetch("/api/announcements")
+  );
+  const announcements = toDashboardAnnouncements(announcementData);
 
   // Fetch stats from backend
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const data = await apiFetch("/api/users/me/stats");
-        setStats({
-          total: data.total || 0,
-          pending: data.pending || 0,
-          resolved: data.resolved || 0,
-        });
-      } catch (err) {
+    if (!token) return undefined;
+    const cached = sessionRequestCache.get(DASHBOARD_STATS_RESOURCE, token);
+    if (
+      statsRetry === 0 &&
+      sessionRequestCache.isFresh(
+        DASHBOARD_STATS_RESOURCE,
+        token,
+        DASHBOARD_CACHE_TTL_MS
+      )
+    ) return undefined;
+
+    let active = true;
+    const request = sessionRequestCache.fetch(
+      DASHBOARD_STATS_RESOURCE,
+      token,
+      () => apiFetch("/api/users/me/stats")
+    );
+    request.then(
+      (data) => {
+        if (!active || localStorage.getItem("token") !== token) return;
+        setStats(toStats(data));
+        setError("");
+        setLoading(false);
+      },
+      (err) => {
+        if (!active || localStorage.getItem("token") !== token) return;
         console.error("Error fetching stats:", err);
-        setError("Failed to load statistics.");
-      } finally {
+        if (!cached) setError("Failed to load statistics.");
         setLoading(false);
       }
-    };
-
-    fetchStats();
-  }, []);
-
-  // Fetch announcements from backend
-  useEffect(() => {
-    const fetchAnnouncements = async () => {
-      try {
-        setAnnouncementsLoading(true);
-        const data = await apiFetch("/api/announcements");
-        // Only show latest 2 announcements on dashboard
-        const latest = data.slice(0, 2).map((item) => ({
-          title: item.title,
-          subtitle: item.date + " • " + item.category,
-          announcementId: item.announcement_id,
-        }));
-        setAnnouncements(latest);
-      } catch (err) {
-        console.error("Error fetching announcements:", err);
-        setAnnouncements([]);
-      } finally {
-        setAnnouncementsLoading(false);
-      }
-    };
-
-    fetchAnnouncements();
-  }, []);
+    );
+    return () => { active = false; };
+  }, [statsRetry, token]);
 
   // Quick actions
   const quickActions = [
@@ -133,11 +147,9 @@ export default function Dashboard() {
   ];
 
   // Loading state for announcements
-  const displayAnnouncements = announcementsLoading
-    ? [{ title: "Loading...", subtitle: "Please wait", announcementId: null }]
-    : announcements.length > 0
+  const displayAnnouncements = announcements.length > 0
     ? announcements
-    : [{ title: "No Announcements", subtitle: "Check back later", announcementId: null }];
+    : [];
 
   return (
     <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">
@@ -189,7 +201,11 @@ export default function Dashboard() {
                 <p className="text-red-700 text-[15px] leading-6">{error}</p>
                 <button
                   type="button"
-                  onClick={() => window.location.reload()}
+                  onClick={() => {
+                    setError("");
+                    setLoading(true);
+                    setStatsRetry((retry) => retry + 1);
+                  }}
                   className="text-[#0B5D2A] font-bold underline"
                   style={{ padding: "8px 16px" }}
                 >
@@ -244,14 +260,29 @@ export default function Dashboard() {
             </div>
 
             <div className="flex flex-col" style={{ gap: "24px" }}>
-              {displayAnnouncements.map((item, index) => (
+              {announcementsLoading && !announcementData ? (
+                <LoadingIndicator label="Loading announcements" size={20} />
+              ) : announcementsError && announcements.length === 0 ? (
+                <div className="rounded-xl border border-red-300 bg-red-100 p-4 text-center">
+                  <p className="text-sm text-red-700">{announcementsError}</p>
+                  <button
+                    type="button"
+                    onClick={retryAnnouncements}
+                    className="mt-2 text-sm font-bold text-[#0B5D2A] underline"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : displayAnnouncements.length > 0 ? displayAnnouncements.map((item, index) => (
                 <AnnouncementCard
                   key={index}
                   title={item.title}
                   subtitle={item.subtitle}
                   announcementId={item.announcementId}
                 />
-              ))}
+              )) : (
+                <p className="text-sm text-gray-500">No announcements available.</p>
+              )}
             </div>
           </section>
         </main>

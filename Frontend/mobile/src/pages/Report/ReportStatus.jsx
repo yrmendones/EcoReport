@@ -8,6 +8,7 @@ import {
   FaClipboardCheck,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { LoadingIndicator } from "../../components/LoadingIndicator";
 
 const STATUS_CONFIG = {
   pending: { label: "Submitted", color: "text-amber-500", icon: FaClipboardCheck },
@@ -113,10 +114,11 @@ export default function ReportStatus() {
           }}
         >
           {loading ? (
-            <div className="flex-1 flex flex-col items-center justify-center" style={{ gap: "16px" }}>
-              <FaSpinner className="animate-spin text-[#0B5D2A]" size={36} />
-              <p className="text-gray-600 text-[14px] leading-6">Loading timeline...</p>
-            </div>
+            <LoadingIndicator
+              label="Loading timeline"
+              size={36}
+              className="flex-1 justify-center"
+            />
           ) : error ? (
             <div
               className="bg-white rounded-2xl border border-red-300 shadow-sm flex flex-col items-center text-center shrink-0"

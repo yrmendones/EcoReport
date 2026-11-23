@@ -12,6 +12,7 @@ import {
   FaUser,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { FullScreenLoading } from "../../components/LoadingIndicator";
 import { DEFAULT_BARANGAY, fetchBarangayInfo } from "../../utils/barangay";
 
 export default function PrivacySettings() {
@@ -104,14 +105,7 @@ export default function PrivacySettings() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
-          <p className="text-[#0B5D2A] font-bold">Loading settings...</p>
-        </div>
-      </div>
-    );
+    return <FullScreenLoading label="Loading settings" />;
   }
 
   return (

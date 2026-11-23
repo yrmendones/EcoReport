@@ -6,13 +6,41 @@ import { apiFetch } from "../../api";
 import ReportCard from "../../components/reports/ReportCard";
 import ReportTabs from "../../components/reports/ReportTabs";
 import BottomNav from "../../components/resident/BottomNav";
+import { LoadingIndicator } from "../../components/LoadingIndicator";
+import { sessionRequestCache } from "../../utils/sessionRequestCache";
+
+const REPORTS_CACHE_TTL_MS = 30_000;
 
 export default function MyReports() {
   const navigate = useNavigate();
+  const token = localStorage.getItem("token");
+  const user = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+      return {};
+    }
+  })();
+  const userId = user.user_id;
+  const reportsResource = `GET /api/reports?user_id=${userId}:with-media`;
+  const cachedReports = token && userId
+    ? sessionRequestCache.get(reportsResource, token)
+    : null;
+  const cachedReportsAreStale = Boolean(
+    cachedReports &&
+    !sessionRequestCache.isFresh(reportsResource, token, REPORTS_CACHE_TTL_MS)
+  );
   const [activeTab, setActiveTab] = useState("All");
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [reports, setReports] = useState(cachedReports?.value ?? []);
+  const [reportsLoading, setReportsLoading] = useState(
+    Boolean(token && userId && !cachedReports)
+  );
+  const [requestError, setRequestError] = useState("");
+  const [retryVersion, setRetryVersion] = useState(0);
+  const loading = Boolean(token && userId && reportsLoading);
+  const error = token && userId
+    ? requestError
+    : "Please log in to view your reports.";
 
   const tabs = [
     "All",
@@ -23,72 +51,68 @@ export default function MyReports() {
   ];
 
   useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        setLoading(true);
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
+    if (!token || !userId) {
+      return undefined;
+    }
 
-        if (!user.user_id) {
-          setError("Please log in to view your reports.");
-          setLoading(false);
-          return;
-        }
+    if (
+      retryVersion === 0 &&
+      sessionRequestCache.isFresh(reportsResource, token, REPORTS_CACHE_TTL_MS)
+    ) return undefined;
 
-        const data = await apiFetch(`/api/reports?user_id=${user.user_id}`);
+    let active = true;
+    const request = sessionRequestCache.fetch(reportsResource, token, async () => {
+      const data = await apiFetch(`/api/reports?user_id=${userId}`);
+      return Promise.all(
+        data.map(async (report) => {
+          let imageUrl = null;
+          try {
+            const mediaData = await apiFetch(
+              `/api/reports/${report.report_id}/media`
+            );
+            const firstImage = mediaData?.find((media) => media.file_type === "image");
+            if (firstImage) imageUrl = firstImage.file_url;
+          } catch {
+            // Media is optional; keep the report visible if it cannot be loaded.
+          }
 
-        const formattedReports = await Promise.all(
-          data.map(async (report) => {
-            let imageUrl = null;
-            try {
-              const mediaData = await apiFetch(
-                `/api/reports/${report.report_id}/media`
-              );
-              if (mediaData && mediaData.length > 0) {
-                const firstImage = mediaData.find(
-                  (m) => m.file_type === "image"
-                );
-                if (firstImage) {
-                  imageUrl = firstImage.file_url;
-                }
-              }
-            } catch (err) {
-              // No media found
-            }
+          let displayStatus =
+            report.status.charAt(0).toUpperCase() + report.status.slice(1);
+          if (displayStatus === "Assigned") displayStatus = "Ongoing";
 
-            // Map "Assigned" to "Ongoing" for display
-            let displayStatus =
-              report.status.charAt(0).toUpperCase() + report.status.slice(1);
-            if (displayStatus === "Assigned") {
-              displayStatus = "Ongoing";
-            }
+          return {
+            id: report.report_id,
+            ref: `ER-2026-${String(report.report_id).padStart(4, "0")}`,
+            title: report.category || "Environmental Concern",
+            date: new Date(report.submitted_at).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            }),
+            status: displayStatus,
+            rawStatus: report.status,
+            image: imageUrl,
+          };
+        })
+      );
+    });
 
-            return {
-              id: report.report_id,
-              ref: `ER-2026-${String(report.report_id).padStart(4, "0")}`,
-              title: report.category || "Environmental Concern",
-              date: new Date(report.submitted_at).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              }),
-              status: displayStatus, // Display status (Ongoing instead of Assigned)
-              rawStatus: report.status, // Keep original for filtering
-              image: imageUrl,
-            };
-          })
-        );
-
-        setReports(formattedReports);
-      } catch (err) {
-        setError(err.message || "Failed to fetch reports.");
+    request.then(
+      (data) => {
+        if (!active || localStorage.getItem("token") !== token) return;
+        setReports(data);
+        setRequestError("");
+        setReportsLoading(false);
+      },
+      (err) => {
+        if (!active || localStorage.getItem("token") !== token) return;
         console.error("Error fetching reports:", err);
-      } finally {
-        setLoading(false);
+        setRequestError(err.message || "Failed to fetch reports.");
+        setReportsLoading(false);
       }
-    };
-
-    fetchReports();
-  }, []);
+    );
+    return () => { active = false; };
+  }, [reportsResource, retryVersion, token, userId]);
 
   // FILTER: "Ongoing" tab shows both Ongoing AND Assigned
   const filtered =
@@ -165,15 +189,17 @@ export default function MyReports() {
               </p>
             </div>
 
-            {loading && (
+            {loading && reports.length === 0 && (
               <div
                 className="bg-white rounded-2xl border border-[#D5E4D1] shadow-sm text-center"
                 style={{ padding: "48px 24px" }}
               >
-                <p className="text-[15px] font-bold text-gray-700 leading-6">
-                  Loading reports...
-                </p>
+                <LoadingIndicator label="Loading reports" size={24} />
               </div>
+            )}
+
+            {reports.length > 0 && (loading || cachedReportsAreStale) && (
+              <LoadingIndicator label="Refreshing reports" size={18} />
             )}
 
             {error && (
@@ -185,7 +211,11 @@ export default function MyReports() {
                   {error}
                 </p>
                 <button
-                  onClick={() => window.location.reload()}
+                  onClick={() => {
+                    setRequestError("");
+                    setReportsLoading(true);
+                    setRetryVersion((version) => version + 1);
+                  }}
                   className="min-h-[44px] text-[#0B5D2A] font-bold underline"
                   style={{ padding: "0 16px" }}
                 >
@@ -194,7 +224,7 @@ export default function MyReports() {
               </div>
             )}
 
-            {!loading && !error && (
+            {(!loading || reports.length > 0) && (!error || reports.length > 0) && (
               <div className="flex flex-col" style={{ gap: "16px" }}>
                 {filtered.length > 0 ? (
                   filtered.map((report) => (

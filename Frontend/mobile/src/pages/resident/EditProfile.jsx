@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -8,6 +8,11 @@ import {
   FaCheckCircle,
 } from "react-icons/fa";
 import { apiFetch, apiFetchResponse } from "../../api";
+import {
+  getResidentProfile,
+  updateResidentProfile,
+  useResidentProfile,
+} from "../../utils/useResidentProfile";
 
 const INPUT_CLASS =
   "w-full min-h-[52px] bg-white border border-[#C8DCC3] rounded-2xl text-[14px] outline-none focus:border-[#0B5D2A] focus:ring-2 focus:ring-[#0B5D2A]/10 transition";
@@ -17,21 +22,24 @@ const SUMMARY_BTN_CLASS =
 
 export default function EditProfile() {
   const navigate = useNavigate();
+  useResidentProfile();
 
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const [formData, setFormData] = useState({
-    first_name: "",
-    middle_name: "",
-    last_name: "",
-    house_no: "",
-    street: "",
-    contact_number: "",
-    profile_picture: "",
-    email: "",
+  const [formData, setFormData] = useState(() => {
+    const data = getResidentProfile() || {};
+    return {
+      first_name: data.first_name || "",
+      middle_name: data.middle_name || "",
+      last_name: data.last_name || "",
+      house_no: data.house_no || "",
+      street: data.street || "",
+      contact_number: data.contact_number || "",
+      profile_picture: data.profile_picture || "",
+      email: data.email || "",
+    };
   });
 
   const [showNameModal, setShowNameModal] = useState(false);
@@ -40,39 +48,12 @@ export default function EditProfile() {
   const [nameSnapshot, setNameSnapshot] = useState(null);
   const [addressSnapshot, setAddressSnapshot] = useState(null);
 
-  const [profilePicturePreview, setProfilePicturePreview] = useState("");
+  const [profilePicturePreview, setProfilePicturePreview] = useState(
+    () => getResidentProfile()?.profile_picture || ""
+  );
   const [uploadingPicture, setUploadingPicture] = useState(false);
 
   const BARANGAY_ADDRESS = "P. Sto. Rosario Kanluran, Pateros";
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        setLoading(true);
-        const data = await apiFetch("/api/users/me");
-        setFormData({
-          first_name: data.first_name || "",
-          middle_name: data.middle_name || "",
-          last_name: data.last_name || "",
-          house_no: data.house_no || "",
-          street: data.street || "",
-          contact_number: data.contact_number || "",
-          profile_picture: data.profile_picture || "",
-          email: data.email || "",
-        });
-        if (data.profile_picture) {
-          setProfilePicturePreview(data.profile_picture);
-        }
-      } catch (err) {
-        console.error("Error fetching user:", err);
-        setError("Failed to load profile data.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -181,9 +162,9 @@ export default function EditProfile() {
       if (data.files && data.files.length > 0) {
         const imageUrl = data.files[0].url;
         setFormData((prev) => ({ ...prev, profile_picture: imageUrl }));
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
-        user.profile_picture = imageUrl;
-        localStorage.setItem("user", JSON.stringify(user));
+        updateResidentProfile(localStorage.getItem("token"), {
+          profile_picture: imageUrl,
+        });
       }
     } catch (err) {
       console.error("Error uploading profile picture:", err);
@@ -232,11 +213,10 @@ export default function EditProfile() {
       });
 
       setSuccess(true);
-
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      user.full_name = `${formData.first_name} ${formData.last_name}`;
-      user.profile_picture = formData.profile_picture;
-      localStorage.setItem("user", JSON.stringify(user));
+      updateResidentProfile(localStorage.getItem("token"), {
+        ...updateData,
+        full_name: `${formData.first_name} ${formData.last_name}`.trim(),
+      });
 
       setTimeout(() => {
         navigate("/profile");
@@ -247,17 +227,6 @@ export default function EditProfile() {
       setSubmitting(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
-          <p className="text-[#0B5D2A] font-bold">Loading profile...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">

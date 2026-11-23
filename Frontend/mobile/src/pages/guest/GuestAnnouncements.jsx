@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaArrowLeft, FaSpinner } from "react-icons/fa";
+import { FaArrowLeft } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { LoadingIndicator } from "../../components/LoadingIndicator";
+import { usePublicResource } from "../../utils/usePublicResource";
 
 // Strip HTML so the preview shows clean text
 const stripHtml = (html) => {
@@ -34,25 +36,15 @@ const getCategoryKey = (item) => normalize(item.category) || "others";
 export default function GuestAnnouncements() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("all");
-  const [announcements, setAnnouncements] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const fetchAnnouncements = async () => {
-      try {
-        setLoading(true);
-        const data = await apiFetch("/api/announcements");
-        setAnnouncements(data);
-      } catch (err) {
-        console.error("Error fetching announcements:", err);
-        setError("Failed to load announcements.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAnnouncements();
-  }, []);
+  const {
+    data: announcementData,
+    loading,
+    error,
+    retry,
+  } = usePublicResource("GET /api/announcements", () =>
+    apiFetch("/api/announcements")
+  );
+  const announcements = Array.isArray(announcementData) ? announcementData : [];
 
   const tabMap = new Map();
   BASE_CATEGORIES.forEach((category) => tabMap.set(normalize(category), category));
@@ -132,14 +124,14 @@ export default function GuestAnnouncements() {
           </div>
 
           {/* LIST */}
-          {loading ? (
+          {loading && announcements.length === 0 ? (
             <div
               className="shrink-0 flex items-center justify-center"
               style={{ padding: "48px 0" }}
             >
-              <FaSpinner className="animate-spin text-[#0B5D2A]" size={30} />
+              <LoadingIndicator label="Loading announcements" size={30} showLabel={false} />
             </div>
-          ) : error ? (
+          ) : error && announcements.length === 0 ? (
             <div
               className="shrink-0 bg-white rounded-2xl border border-red-300 text-center flex flex-col items-center"
               style={{ padding: "32px", gap: "16px" }}
@@ -147,7 +139,7 @@ export default function GuestAnnouncements() {
               <p className="text-[15px] font-bold text-red-600">{error}</p>
               <button
                 type="button"
-                onClick={() => window.location.reload()}
+                onClick={retry}
                 className="text-[#0B5D2A] font-bold underline"
                 style={{ padding: "8px 16px" }}
               >

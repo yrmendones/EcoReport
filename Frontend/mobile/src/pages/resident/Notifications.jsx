@@ -5,10 +5,10 @@ import {
   FaBell,
   FaCheckCircle,
   FaExclamationCircle,
-  FaSpinner,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
 import BottomNav from "../../components/resident/BottomNav";
+import { FullScreenLoading } from "../../components/LoadingIndicator";
 import {
   NOTIFICATION_CACHE_TTL_MS,
   sessionRequestCache,
@@ -48,6 +48,7 @@ export default function Notifications() {
     loading: !cachedNotifications,
     error: "",
   }));
+  const [retryVersion, setRetryVersion] = useState(0);
   const sessionView = notificationView.token === token ? notificationView : null;
   const currentCache = token
     ? sessionRequestCache.get(NOTIFICATIONS_RESOURCE, token)
@@ -64,8 +65,9 @@ export default function Notifications() {
     let active = true;
     let activeRequest = null;
 
-    const refreshIfStale = () => {
+    const refreshIfStale = (force = false) => {
       if (
+        !force &&
         sessionRequestCache.isFresh(
           NOTIFICATIONS_RESOURCE,
           token,
@@ -120,7 +122,7 @@ export default function Notifications() {
       );
     };
 
-    refreshIfStale();
+    refreshIfStale(retryVersion > 0);
     const interval = setInterval(refreshIfStale, NOTIFICATION_CACHE_TTL_MS);
     const onFocus = () => refreshIfStale();
     const onVisibility = () => {
@@ -137,7 +139,7 @@ export default function Notifications() {
       window.removeEventListener("pageshow", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [token]);
+  }, [retryVersion, token]);
 
   const updateNotifications = (update) => {
     const latestCache = sessionRequestCache.get(NOTIFICATIONS_RESOURCE, token);
@@ -222,14 +224,7 @@ export default function Notifications() {
         );
 
   if (loading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
-          <p className="text-[#0B5D2A] font-bold">Loading notifications...</p>
-        </div>
-      </div>
-    );
+    return <FullScreenLoading label="Loading notifications" />;
   }
 
   return (
@@ -325,6 +320,13 @@ export default function Notifications() {
               style={{ padding: "14px 16px" }}
             >
               {error}
+              <button
+                type="button"
+                onClick={() => setRetryVersion((version) => version + 1)}
+                className="ml-2 font-bold underline"
+              >
+                Try Again
+              </button>
             </div>
           )}
 

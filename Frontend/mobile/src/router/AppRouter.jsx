@@ -1,9 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate } from "react-router-dom";
-import { FaSpinner } from "react-icons/fa";
 import MaintenanceGate from "../components/MaintenanceGate";
+import { LoadingIndicator } from "../components/LoadingIndicator";
 import { apiFetch } from "../api";
 import { clearResidentSession } from "../utils/authSession";
+import { sessionRequestCache } from "../utils/sessionRequestCache";
+import {
+  RESIDENT_PROFILE_RESOURCE,
+  saveResidentProfile,
+  SESSION_REVALIDATION_INTERVAL_MS,
+} from "../utils/useResidentProfile";
 
 /* Authentication */
 import Welcome from "../pages/auth/Welcome";
@@ -61,19 +67,13 @@ function SessionCheckScreen({ checking, message, onRetry }) {
   return (
     <main
       className="fixed inset-0 z-[100] flex items-center justify-center bg-[#F8FAF8] px-6 text-center"
-      role={checking ? "status" : "alert"}
-      aria-live="polite"
+      role={checking ? undefined : "alert"}
+      aria-live={checking ? undefined : "polite"}
       aria-busy={checking}
     >
       {checking ? (
         <>
-          <FaSpinner
-            className="animate-spin text-[#0B5D2A]"
-            size={40}
-            aria-hidden="true"
-            focusable="false"
-          />
-          <span className="sr-only">Checking your session</span>
+          <LoadingIndicator label="Checking your session" showLabel={false} />
         </>
       ) : (
         <div className="max-w-sm">
@@ -104,11 +104,18 @@ function RequireResident() {
   const token = localStorage.getItem("token");
   const role = getSavedRole();
   const hasResidentCredentials = Boolean(token && role === "resident");
-  const [sessionStatus, setSessionStatus] = useState("checking");
+  const cachedProfile = token
+    ? sessionRequestCache.get(RESIDENT_PROFILE_RESOURCE, token)
+    : null;
+  const hasCachedProfile = cachedProfile?.value?.role === "resident";
+  const [sessionStatus, setSessionStatus] = useState(() =>
+    hasCachedProfile ? "verified" : "checking"
+  );
   const [sessionError, setSessionError] = useState("");
-  const [hasValidated, setHasValidated] = useState(false);
-  const hasValidatedRef = useRef(false);
-  const validatedTokenRef = useRef(null);
+  const [hasValidated, setHasValidated] = useState(hasCachedProfile);
+  const hasValidatedRef = useRef(hasCachedProfile);
+  const validatedTokenRef = useRef(hasCachedProfile ? token : null);
+  const lastValidatedAtRef = useRef(cachedProfile?.fetchedAt ?? 0);
   const requestRef = useRef(null);
   const lastRequestAtRef = useRef(0);
   const validateRef = useRef(null);
@@ -122,8 +129,18 @@ function RequireResident() {
 
     let active = true;
 
-    const validateSession = async (force = false) => {
+    const validateSession = async (force = false, revalidate = false) => {
       const currentToken = localStorage.getItem("token");
+      const canReuseValidatedSession =
+        hasValidatedRef.current &&
+        validatedTokenRef.current === currentToken &&
+        Date.now() - lastValidatedAtRef.current < SESSION_REVALIDATION_INTERVAL_MS;
+
+      // Route changes and browser history events can fire the same listeners.
+      // Keep a recently verified session active and only recheck after it ages
+      // out or when a token change explicitly forces validation.
+      if (!force && !revalidate && canReuseValidatedSession) return;
+
       if (requestRef.current?.token !== currentToken) {
         requestRef.current = null;
       }
@@ -131,15 +148,13 @@ function RequireResident() {
         const now = Date.now();
         if (!force && now - lastRequestAtRef.current < 1500) return;
         lastRequestAtRef.current = now;
-        const requestStartedAt = performance.now();
-        const pendingRequest = apiFetch("/api/users/me");
+        const pendingRequest = apiFetch(
+          "/api/users/me",
+          {},
+          "session verification"
+        );
         requestRef.current = { token: currentToken, promise: pendingRequest };
         const finishRequest = () => {
-          if (import.meta.env.DEV) {
-            console.info(
-              `[request timing] GET /api/users/me: ${Math.round(performance.now() - requestStartedAt)} ms`
-            );
-          }
           if (requestRef.current?.promise === pendingRequest) requestRef.current = null;
         };
         pendingRequest.then(finishRequest, finishRequest);
@@ -147,9 +162,9 @@ function RequireResident() {
 
       const tokenAtStart = requestRef.current.token;
       const pendingRequest = requestRef.current.promise;
-      const canReuseValidatedSession =
+      const canKeepValidatedPage =
         hasValidatedRef.current && validatedTokenRef.current === tokenAtStart;
-      if (!canReuseValidatedSession || force) {
+      if (!canKeepValidatedPage || force) {
         setSessionStatus("checking");
         setSessionError("");
       }
@@ -165,23 +180,45 @@ function RequireResident() {
           return;
         }
 
-        localStorage.setItem("user", JSON.stringify(profile));
+        saveResidentProfile(tokenAtStart, profile);
         hasValidatedRef.current = true;
         validatedTokenRef.current = tokenAtStart;
+        lastValidatedAtRef.current = Date.now();
         setHasValidated(true);
         setSessionStatus("verified");
         if (tokenAtStart !== token) {
           navigateRef.current("/resident-dashboard", { replace: true });
         }
       } catch {
-        if (!active) return;
+        if (!active || localStorage.getItem("token") !== tokenAtStart) return;
         setSessionError("We couldn't verify your account right now. Check your connection and try again.");
         setSessionStatus("unavailable");
       }
     };
 
     validateRef.current = validateSession;
-    void validateSession(true);
+    const currentCachedProfile = token
+      ? sessionRequestCache.get(RESIDENT_PROFILE_RESOURCE, token)
+      : null;
+    const currentProfileIsResident =
+      currentCachedProfile?.value?.role === "resident";
+    const currentProfileIsFresh = Boolean(
+      currentProfileIsResident &&
+      sessionRequestCache.isFresh(
+        RESIDENT_PROFILE_RESOURCE,
+        token,
+        SESSION_REVALIDATION_INTERVAL_MS
+      )
+    );
+    if (currentProfileIsFresh) {
+      void validateSession(false);
+    } else if (currentProfileIsResident) {
+      // Reused route guards keep the current page visible while they refresh
+      // an older in-memory validation result in the background.
+      void validateSession(false, true);
+    } else {
+      void validateSession(true);
+    }
 
     const revalidateWhenVisible = () => {
       if (document.visibilityState === "visible") {

@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { FaArrowLeft, FaSpinner } from "react-icons/fa";
+import { useNavigate, useLocation, Navigate } from "react-router-dom";
+import { FaArrowLeft } from "react-icons/fa";
 
 // "1 minute ago", "2 minutes ago", "1 hour ago", ...
 const timeAgo = (dateString) => {
@@ -54,29 +53,13 @@ export default function NotificationDetail() {
   const location = useLocation();
   const notification = location.state?.notification;
 
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (notification) {
-      setLoading(false);
-    } else {
-      navigate("/notifications");
-    }
-  }, [notification, navigate]);
+  if (!notification) return <Navigate to="/notifications" replace />;
 
   const handleGoToReport = () => {
     if (notification.reference_id) {
       navigate(`/report-details/${notification.reference_id}`);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#E5E7EB] flex items-center justify-center">
-        <FaSpinner className="animate-spin text-[#0B5D2A]" size={40} />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-[100dvh] bg-[#E5E7EB] flex justify-center items-center sm:py-6 sm:px-3">
