@@ -9,6 +9,13 @@ import {
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
 import BottomNav from "../../components/resident/BottomNav";
+import {
+  NOTIFICATION_CACHE_TTL_MS,
+  sessionRequestCache,
+  updateCachedUnreadCount,
+} from "../../utils/sessionRequestCache";
+
+const NOTIFICATIONS_RESOURCE = "GET /api/notifications";
 
 // Safe HTML → plain-text conversion for the list preview.
 const stripHtml = (html) => {
@@ -29,31 +36,121 @@ const ago = (value, unit) => `${value} ${unit}${value === 1 ? "" : "s"} ago`;
 
 export default function Notifications() {
   const navigate = useNavigate();
+  const token = localStorage.getItem("token");
+  const cachedNotifications = token
+    ? sessionRequestCache.get(NOTIFICATIONS_RESOURCE, token)
+    : null;
 
   const [activeTab, setActiveTab] = useState("All");
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationView, setNotificationView] = useState(() => ({
+    token,
+    data: cachedNotifications?.value ?? null,
+    loading: !cachedNotifications,
+    error: "",
+  }));
+  const sessionView = notificationView.token === token ? notificationView : null;
+  const currentCache = token
+    ? sessionRequestCache.get(NOTIFICATIONS_RESOURCE, token)
+    : null;
+  const notificationData = sessionView?.data ?? currentCache?.value ?? null;
+  const notifications = notificationData ?? [];
+  const loading = notificationData === null && (sessionView?.loading ?? true);
+  const error = sessionView?.error ?? "";
+  const unreadCount = notifications.filter((notification) => notification.is_read === 0).length;
 
   useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        setLoading(true);
-        const data = await apiFetch("/api/notifications");
-        setNotifications(data);
-        const unread = data.filter((n) => n.is_read === 0).length;
-        setUnreadCount(unread);
-      } catch (err) {
-        console.error("Error fetching notifications:", err);
-        setError("Failed to load notifications.");
-      } finally {
-        setLoading(false);
+    if (!token) return undefined;
+
+    let active = true;
+    let activeRequest = null;
+
+    const refreshIfStale = () => {
+      if (
+        sessionRequestCache.isFresh(
+          NOTIFICATIONS_RESOURCE,
+          token,
+          NOTIFICATION_CACHE_TTL_MS
+        )
+      ) {
+        return;
       }
+
+      const cached = sessionRequestCache.get(NOTIFICATIONS_RESOURCE, token);
+
+      if (!cached) {
+        setNotificationView((current) =>
+          current.token === token && current.loading
+            ? current
+            : { token, data: null, loading: true, error: "" }
+        );
+      } else {
+        setNotificationView((current) =>
+          current.token === token
+            ? { ...current, data: cached.value, loading: false, error: "" }
+            : current
+        );
+      }
+
+      if (activeRequest) return;
+      const request = sessionRequestCache.fetch(
+        NOTIFICATIONS_RESOURCE,
+        token,
+        () => apiFetch("/api/notifications")
+      );
+      activeRequest = request;
+      request.then(
+        (data) => {
+          if (active && localStorage.getItem("token") === token) {
+            setNotificationView({ token, data, loading: false, error: "" });
+          }
+          if (activeRequest === request) activeRequest = null;
+        },
+        (err) => {
+          if (active && localStorage.getItem("token") === token) {
+            console.error("Error fetching notifications:", err);
+            setNotificationView((current) => ({
+              token,
+              data: current.token === token ? current.data : cached?.value ?? null,
+              loading: false,
+              error: "Failed to load notifications.",
+            }));
+          }
+          if (activeRequest === request) activeRequest = null;
+        }
+      );
     };
 
-    fetchNotifications();
-  }, []);
+    refreshIfStale();
+    const interval = setInterval(refreshIfStale, NOTIFICATION_CACHE_TTL_MS);
+    const onFocus = () => refreshIfStale();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshIfStale();
+    };
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("pageshow", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("pageshow", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [token]);
+
+  const updateNotifications = (update) => {
+    const latestCache = sessionRequestCache.get(NOTIFICATIONS_RESOURCE, token);
+    const current = latestCache?.value ?? notifications;
+    const updated = update(current);
+    if (!sessionRequestCache.set(NOTIFICATIONS_RESOURCE, token, updated)) return;
+
+    setNotificationView({ token, data: updated, loading: false, error: "" });
+    updateCachedUnreadCount(
+      token,
+      updated.filter((notification) => notification.is_read === 0).length
+    );
+  };
 
   const formatTime = (dateString) => {
     const date = new Date(dateString);
@@ -70,7 +167,7 @@ export default function Notifications() {
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
-  const getIcon = (type, isRead) => {
+  const getIcon = (type) => {
     if (type === "Report Update") return <FaCheckCircle size={19} />;
     if (type === "Notification Center") return <FaExclamationCircle size={19} />;
     return <FaBell size={19} />;
@@ -81,14 +178,13 @@ export default function Notifications() {
       await apiFetch(`/api/notifications/${id}/read`, {
         method: "PUT",
       });
-      setNotifications((prev) =>
+      updateNotifications((prev) =>
         prev.map((notif) =>
           notif.notification_id === id
             ? { ...notif, is_read: 1 }
             : notif
         )
       );
-      setUnreadCount((prev) => Math.max(prev - 1, 0));
     } catch (err) {
       console.error("Error marking notification as read:", err);
     }
@@ -99,10 +195,9 @@ export default function Notifications() {
       await apiFetch("/api/notifications/read-all", {
         method: "PUT",
       });
-      setNotifications((prev) =>
+      updateNotifications((prev) =>
         prev.map((notif) => ({ ...notif, is_read: 1 }))
       );
-      setUnreadCount(0);
     } catch (err) {
       console.error("Error marking all as read:", err);
     }
@@ -262,7 +357,7 @@ export default function Notifications() {
                         : "bg-gray-100 text-gray-500"
                     }`}
                   >
-                    {getIcon(item.type, item.is_read === 1)}
+                    {getIcon(item.type)}
                   </div>
 
                   <div

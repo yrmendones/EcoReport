@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate } from "react-router-dom";
 import { FaSpinner } from "react-icons/fa";
 import MaintenanceGate from "../components/MaintenanceGate";
@@ -100,6 +100,7 @@ function SessionCheckScreen({ checking, message, onRetry }) {
 // when the app returns to the foreground or browser history restores a page.
 function RequireResident() {
   const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
   const token = localStorage.getItem("token");
   const role = getSavedRole();
   const hasResidentCredentials = Boolean(token && role === "resident");
@@ -111,6 +112,10 @@ function RequireResident() {
   const requestRef = useRef(null);
   const lastRequestAtRef = useRef(0);
   const validateRef = useRef(null);
+
+  useLayoutEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
 
   useEffect(() => {
     if (!hasResidentCredentials) return undefined;
@@ -126,12 +131,18 @@ function RequireResident() {
         const now = Date.now();
         if (!force && now - lastRequestAtRef.current < 1500) return;
         lastRequestAtRef.current = now;
+        const requestStartedAt = performance.now();
         const pendingRequest = apiFetch("/api/users/me");
         requestRef.current = { token: currentToken, promise: pendingRequest };
-        pendingRequest.then(
-          () => { if (requestRef.current?.promise === pendingRequest) requestRef.current = null; },
-          () => { if (requestRef.current?.promise === pendingRequest) requestRef.current = null; }
-        );
+        const finishRequest = () => {
+          if (import.meta.env.DEV) {
+            console.info(
+              `[request timing] GET /api/users/me: ${Math.round(performance.now() - requestStartedAt)} ms`
+            );
+          }
+          if (requestRef.current?.promise === pendingRequest) requestRef.current = null;
+        };
+        pendingRequest.then(finishRequest, finishRequest);
       }
 
       const tokenAtStart = requestRef.current.token;
@@ -160,7 +171,7 @@ function RequireResident() {
         setHasValidated(true);
         setSessionStatus("verified");
         if (tokenAtStart !== token) {
-          navigate("/resident-dashboard", { replace: true });
+          navigateRef.current("/resident-dashboard", { replace: true });
         }
       } catch {
         if (!active) return;
@@ -202,7 +213,7 @@ function RequireResident() {
       window.removeEventListener("storage", handleStorageChange);
       document.removeEventListener("visibilitychange", revalidateWhenVisible);
     };
-  }, [hasResidentCredentials, navigate, token]);
+  }, [hasResidentCredentials, token]);
 
   if (!hasResidentCredentials) {
     return <Navigate to="/resident-login" replace />;

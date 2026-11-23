@@ -8,32 +8,80 @@ import {
   FaUser,
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import {
+  NOTIFICATION_CACHE_TTL_MS,
+  NOTIFICATION_COUNT_UPDATED_EVENT,
+  sessionRequestCache,
+} from "../../utils/sessionRequestCache";
+
+const UNREAD_COUNT_RESOURCE = "GET /api/notifications/unread-count";
 
 export default function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [unreadCount, setUnreadCount] = useState(0);
+  const token = localStorage.getItem("token");
+  const cachedUnreadCount = token
+    ? sessionRequestCache.get(UNREAD_COUNT_RESOURCE, token)
+    : null;
+  const [unreadCountState, setUnreadCountState] = useState(() => ({
+    token,
+    count: cachedUnreadCount?.value || 0,
+  }));
+  const unreadCount = unreadCountState.token === token
+    ? unreadCountState.count
+    : cachedUnreadCount?.value || 0;
 
   useEffect(() => {
+    if (!token) return undefined;
+
+    let active = true;
+
     const fetchUnreadCount = async () => {
+      if (
+        sessionRequestCache.isFresh(
+          UNREAD_COUNT_RESOURCE,
+          token,
+          NOTIFICATION_CACHE_TTL_MS
+        )
+      ) {
+        return;
+      }
+
       try {
-        const data = await apiFetch("/api/notifications/unread-count");
-        setUnreadCount(data.count || 0);
+        const count = await sessionRequestCache.fetch(
+          UNREAD_COUNT_RESOURCE,
+          token,
+          async () => {
+            const data = await apiFetch("/api/notifications/unread-count");
+            return data.count || 0;
+          }
+        );
+        if (active && localStorage.getItem("token") === token) {
+          setUnreadCountState({ token, count });
+        }
       } catch (err) {
-        console.error("Error fetching unread count:", err);
+        if (active && localStorage.getItem("token") === token) {
+          console.error("Error fetching unread count:", err);
+        }
       }
     };
 
-    // Initial fetch on mount
-    fetchUnreadCount();
+    const onCountUpdated = (event) => {
+      if (event.detail?.token === token) {
+        setUnreadCountState({ token, count: event.detail.count || 0 });
+      }
+    };
+    window.addEventListener(NOTIFICATION_COUNT_UPDATED_EVENT, onCountUpdated);
+
+    void fetchUnreadCount();
 
     // Poll every 30 seconds so the badge stays fresh
-    const interval = setInterval(fetchUnreadCount, 30000);
+    const interval = setInterval(fetchUnreadCount, NOTIFICATION_CACHE_TTL_MS);
 
-    const onFocus = () => fetchUnreadCount();
+    const onFocus = () => void fetchUnreadCount();
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
-        fetchUnreadCount();
+        void fetchUnreadCount();
       }
     };
 
@@ -41,11 +89,13 @@ export default function BottomNav() {
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
+      active = false;
       clearInterval(interval);
+      window.removeEventListener(NOTIFICATION_COUNT_UPDATED_EVENT, onCountUpdated);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, []);
+  }, [token]);
 
   // "matches" = every route that should keep this tab highlighted
   const navItems = [
