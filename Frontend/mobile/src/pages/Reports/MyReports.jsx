@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft } from "react-icons/fa";
 import { apiFetch } from "../../api";
@@ -7,9 +7,43 @@ import ReportCard from "../../components/reports/ReportCard";
 import ReportTabs from "../../components/reports/ReportTabs";
 import BottomNav from "../../components/resident/BottomNav";
 import { LoadingIndicator } from "../../components/LoadingIndicator";
+import { usePullToRefresh } from "../../components/usePullToRefresh";
 import { sessionRequestCache } from "../../utils/sessionRequestCache";
 
 const REPORTS_CACHE_TTL_MS = 30_000;
+
+async function fetchReportsWithMedia(userId) {
+  const data = await apiFetch(`/api/reports?user_id=${userId}`);
+  return Promise.all(
+    data.map(async (report) => {
+      let imageUrl = null;
+      try {
+        const mediaData = await apiFetch(`/api/reports/${report.report_id}/media`);
+        const firstImage = mediaData?.find((media) => media.file_type === "image");
+        if (firstImage) imageUrl = firstImage.file_url;
+      } catch {
+        // Media is optional; keep the report visible if it cannot be loaded.
+      }
+
+      let displayStatus = report.status.charAt(0).toUpperCase() + report.status.slice(1);
+      if (displayStatus === "Assigned") displayStatus = "Ongoing";
+
+      return {
+        id: report.report_id,
+        ref: `ER-2026-${String(report.report_id).padStart(4, "0")}`,
+        title: report.category || "Environmental Concern",
+        date: new Date(report.submitted_at).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        }),
+        status: displayStatus,
+        rawStatus: report.status,
+        image: imageUrl,
+      };
+    })
+  );
+}
 
 export default function MyReports() {
   const navigate = useNavigate();
@@ -42,6 +76,20 @@ export default function MyReports() {
     ? requestError
     : "Please log in to view your reports.";
 
+  const refreshReports = useCallback(async () => {
+    if (!token || !userId) return;
+    const data = await sessionRequestCache.fetch(
+      reportsResource,
+      token,
+      () => fetchReportsWithMedia(userId)
+    );
+    if (localStorage.getItem("token") !== token) return;
+    setReports(data);
+    setRequestError("");
+    setReportsLoading(false);
+  }, [reportsResource, token, userId]);
+  usePullToRefresh(refreshReports, Boolean(token && userId) && !loading);
+
   const tabs = [
     "All",
     "Pending",
@@ -61,41 +109,11 @@ export default function MyReports() {
     ) return undefined;
 
     let active = true;
-    const request = sessionRequestCache.fetch(reportsResource, token, async () => {
-      const data = await apiFetch(`/api/reports?user_id=${userId}`);
-      return Promise.all(
-        data.map(async (report) => {
-          let imageUrl = null;
-          try {
-            const mediaData = await apiFetch(
-              `/api/reports/${report.report_id}/media`
-            );
-            const firstImage = mediaData?.find((media) => media.file_type === "image");
-            if (firstImage) imageUrl = firstImage.file_url;
-          } catch {
-            // Media is optional; keep the report visible if it cannot be loaded.
-          }
-
-          let displayStatus =
-            report.status.charAt(0).toUpperCase() + report.status.slice(1);
-          if (displayStatus === "Assigned") displayStatus = "Ongoing";
-
-          return {
-            id: report.report_id,
-            ref: `ER-2026-${String(report.report_id).padStart(4, "0")}`,
-            title: report.category || "Environmental Concern",
-            date: new Date(report.submitted_at).toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            }),
-            status: displayStatus,
-            rawStatus: report.status,
-            image: imageUrl,
-          };
-        })
-      );
-    });
+    const request = sessionRequestCache.fetch(
+      reportsResource,
+      token,
+      () => fetchReportsWithMedia(userId)
+    );
 
     request.then(
       (data) => {

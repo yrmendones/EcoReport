@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -11,6 +11,7 @@ import {
   FaHome,
 } from "react-icons/fa";
 import { apiFetch, API_BASE_URL } from "../../api";
+import { usePullToRefresh } from "../../components/usePullToRefresh";
 
 // API_BASE_URL is imported from ../../api - uses the Vite
 // proxy in development and VITE_API_URL in production
@@ -55,23 +56,38 @@ export default function GuestReport() {
   ];
 
   const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const fetchCategories = useCallback(
+    () => apiFetch("/api/public/categories"),
+    []
+  );
+  const applyCategories = useCallback((data) => {
+    if (Array.isArray(data) && data.length > 0) setCategories(data);
+  }, []);
+  const refreshCategories = useCallback(async () => {
+    applyCategories(await fetchCategories());
+  }, [applyCategories, fetchCategories]);
+  usePullToRefresh(
+    refreshCategories,
+    !categoriesLoading && !loading && !submittedData
+  );
 
   useEffect(() => {
     let cancelled = false;
     const loadCategories = async () => {
       try {
-        const data = await apiFetch("/api/public/categories");
+        const data = await fetchCategories();
         if (cancelled) return;
-        if (Array.isArray(data) && data.length > 0) {
-          setCategories(data);
-        }
+        applyCategories(data);
       } catch (err) {
         console.error("Failed to load categories:", err);
+      } finally {
+        if (!cancelled) setCategoriesLoading(false);
       }
     };
     loadCategories();
     return () => { cancelled = true; };
-  }, []);
+  }, [applyCategories, fetchCategories]);
 
   // ============ CONTACT NUMBER INPUT HANDLER ============
   const handleContactChange = (value) => {

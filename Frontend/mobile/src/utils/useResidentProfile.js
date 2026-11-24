@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "../api";
 import { sessionRequestCache } from "./sessionRequestCache";
 
@@ -52,6 +52,35 @@ export function useResidentProfile() {
   const loading = !profile && (currentView?.loading ?? true);
   const error = currentView?.error ?? "";
 
+  const refresh = useCallback(async () => {
+    if (!token) return null;
+    const cachedAtStart = sessionRequestCache.get(RESIDENT_PROFILE_RESOURCE, token);
+    try {
+      const data = await sessionRequestCache.fetch(
+        RESIDENT_PROFILE_RESOURCE,
+        token,
+        () => apiFetch("/api/users/me")
+      );
+      if (localStorage.getItem("token") === token) {
+        saveResidentProfile(token, data);
+        setView({ token, profile: data, loading: false, error: "" });
+      }
+      return data;
+    } catch (requestError) {
+      if (localStorage.getItem("token") === token) {
+        setView((current) => ({
+          token,
+          profile: current.token === token
+            ? current.profile
+            : cachedAtStart?.value ?? null,
+          loading: false,
+          error: requestError.message || "Failed to refresh resident profile.",
+        }));
+      }
+      throw requestError;
+    }
+  }, [token]);
+
   useEffect(() => {
     if (!token) return undefined;
 
@@ -102,6 +131,7 @@ export function useResidentProfile() {
     profile,
     loading,
     error,
+    refresh,
     retry: () => setRetryVersion((version) => version + 1),
   };
 }

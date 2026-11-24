@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   PUBLIC_CACHE_TOKEN,
   publicRequestCache,
 } from "./sessionRequestCache";
+import { usePullToRefresh } from "../components/usePullToRefresh";
 
 export const PUBLIC_RESOURCE_CACHE_TTL_MS = 30_000;
 
@@ -24,6 +25,31 @@ export function usePublicResource(resource, fetcher) {
   const data = currentView?.data ?? cached?.value ?? null;
   const loading = data === null && (currentView?.loading ?? true);
   const error = currentView?.error ?? "";
+
+  const refresh = useCallback(async () => {
+    const cachedAtStart = publicRequestCache.get(resource, PUBLIC_CACHE_TOKEN);
+    try {
+      const value = await publicRequestCache.fetch(
+        resource,
+        PUBLIC_CACHE_TOKEN,
+        () => fetcherRef.current()
+      );
+      setView({ resource, data: value, loading: false, error: "" });
+      return value;
+    } catch (requestError) {
+      setView((current) => ({
+        resource,
+        data: current.resource === resource
+          ? current.data
+          : cachedAtStart?.value ?? null,
+        loading: false,
+        error: requestError.message || "Failed to load data.",
+      }));
+      throw requestError;
+    }
+  }, [resource]);
+
+  usePullToRefresh(refresh, !loading);
 
   useEffect(() => {
     const forceRetry = retryTicket.resource === resource;

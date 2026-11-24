@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -9,6 +9,7 @@ import {
 import { apiFetch } from "../../api";
 import BottomNav from "../../components/resident/BottomNav";
 import { FullScreenLoading } from "../../components/LoadingIndicator";
+import { usePullToRefresh } from "../../components/usePullToRefresh";
 import {
   NOTIFICATION_CACHE_TTL_MS,
   sessionRequestCache,
@@ -140,6 +141,22 @@ export default function Notifications() {
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [retryVersion, token]);
+
+  const refreshNotifications = useCallback(async () => {
+    if (!token) return;
+    const data = await sessionRequestCache.fetch(
+      NOTIFICATIONS_RESOURCE,
+      token,
+      () => apiFetch("/api/notifications")
+    );
+    if (localStorage.getItem("token") !== token) return;
+    setNotificationView({ token, data, loading: false, error: "" });
+    updateCachedUnreadCount(
+      token,
+      data.filter((notification) => notification.is_read === 0).length
+    );
+  }, [token]);
+  usePullToRefresh(refreshNotifications, Boolean(token) && !loading);
 
   const updateNotifications = (update) => {
     const latestCache = sessionRequestCache.get(NOTIFICATIONS_RESOURCE, token);

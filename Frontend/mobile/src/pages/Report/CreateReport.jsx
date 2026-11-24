@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaCheck, FaChevronDown } from "react-icons/fa";
 import { apiFetch } from "../../api";
+import { usePullToRefresh } from "../../components/usePullToRefresh";
 
 // Categories that belong in the "Other Concerns" collapsible group.
 // Everything else goes in the main list.
@@ -31,25 +32,36 @@ export default function CreateReport() {
   const [otherTypes, setOtherTypes] = useState(FALLBACK_OTHER);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
 
+  const applyCategories = useCallback((data) => {
+    const list = Array.isArray(data) ? data : [];
+    if (list.length === 0) return;
+    const main = [];
+    const other = [];
+    list.forEach((category) => {
+      if (OTHER_CATEGORY_KEYS.includes(category)) other.push(category);
+      else main.push(category);
+    });
+    setMainTypes(main);
+    setOtherTypes(other);
+  }, []);
+
+  const fetchCategories = useCallback(
+    () => apiFetch("/api/public/categories"),
+    []
+  );
+  const refreshCategories = useCallback(async () => {
+    applyCategories(await fetchCategories());
+  }, [applyCategories, fetchCategories]);
+  usePullToRefresh(refreshCategories, !categoriesLoading);
+
   // Fetch live categories from admin-managed list
   useEffect(() => {
     let cancelled = false;
     const loadCategories = async () => {
       try {
-        const data = await apiFetch("/api/public/categories");
+        const data = await fetchCategories();
         if (cancelled) return;
-        const list = Array.isArray(data) ? data : [];
-        if (list.length === 0) return;
-
-        const main = [];
-        const other = [];
-        list.forEach((c) => {
-          if (OTHER_CATEGORY_KEYS.includes(c)) other.push(c);
-          else main.push(c);
-        });
-
-        setMainTypes(main);
-        setOtherTypes(other);
+        applyCategories(data);
       } catch (err) {
         console.error("Failed to load categories:", err);
         // silently fall back to hardcoded list
@@ -59,7 +71,7 @@ export default function CreateReport() {
     };
     loadCategories();
     return () => { cancelled = true; };
-  }, []);
+  }, [applyCategories, fetchCategories]);
 
   const isOtherSelected = otherTypes.includes(selected);
   // Stay open while one of the other options is selected

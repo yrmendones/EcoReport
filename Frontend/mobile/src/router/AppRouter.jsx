@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate } from "react-router-dom";
 import MaintenanceGate from "../components/MaintenanceGate";
 import { LoadingIndicator } from "../components/LoadingIndicator";
+import { PullToRefreshProvider } from "../components/PullToRefreshProvider";
 import { apiFetch } from "../api";
 import { clearResidentSession } from "../utils/authSession";
 import { sessionRequestCache } from "../utils/sessionRequestCache";
@@ -305,8 +306,9 @@ function RedirectIfResident({ children }) {
 export default function AppRouter() {
   return (
     <BrowserRouter>
-      <MaintenanceGate>
-        <Routes>
+      <PullToRefreshProvider>
+        <MaintenanceGate>
+          <Routes>
           {/* ================= AUTHENTICATION ================= */}
           <Route
             path="/"
@@ -371,8 +373,9 @@ export default function AppRouter() {
             <Route path="/change-password" element={<ChangePassword />} />
             <Route path="/privacy-settings" element={<PrivacySettings />} />
           </Route>
-        </Routes>
-      </MaintenanceGate>
+          </Routes>
+        </MaintenanceGate>
+      </PullToRefreshProvider>
     </BrowserRouter>
   );
 }

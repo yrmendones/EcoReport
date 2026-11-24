@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -13,6 +13,7 @@ import {
 import { apiFetch } from "../../api";
 import { getResidentProfile } from "../../utils/useResidentProfile";
 import { FullScreenLoading } from "../../components/LoadingIndicator";
+import { usePullToRefresh } from "../../components/usePullToRefresh";
 
 const formatDate = (d) => {
   if (!d) return "N/A";
@@ -51,7 +52,7 @@ export default function QRCodePage() {
   // Session verification already loaded the resident profile. Only generate
   // the short-lived QR token here, and share an in-flight request during
   // React StrictMode's development effect replay.
-  const fetchUserAndToken = async (silent = false) => {
+  const fetchUserAndToken = async (silent = false, throwOnError = false) => {
     if (requestRef.current) return requestRef.current;
 
     const request = (async () => {
@@ -73,6 +74,7 @@ export default function QRCodePage() {
         if (!silent) {
           setError("Failed to generate secure QR code. Please try again.");
         }
+        if (throwOnError) throw err;
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -82,6 +84,12 @@ export default function QRCodePage() {
     requestRef.current = request;
     return request;
   };
+
+  const refreshQrCode = useCallback(
+    () => fetchUserAndToken(false, true),
+    []
+  );
+  usePullToRefresh(refreshQrCode, Boolean(qrToken) && !loading && !refreshing);
 
   useEffect(() => {
     fetchUserAndToken();

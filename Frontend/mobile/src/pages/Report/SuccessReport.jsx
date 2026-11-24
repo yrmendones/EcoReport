@@ -1,7 +1,8 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaCheckCircle } from "react-icons/fa";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "../../api";
+import { usePullToRefresh } from "../../components/usePullToRefresh";
 
 // Same format as the Report Details page: ER-2026-0012
 export default function ReportSuccess() {
@@ -10,26 +11,36 @@ export default function ReportSuccess() {
   const reportId = location.state?.reportId || null;
   const [reportRef, setReportRef] = useState("");
 
+  const refreshReference = useCallback(async () => {
+    if (!reportId) return;
+    const data = await apiFetch(`/api/reports/${reportId}`);
+    const reference = data.reference ||
+      `ER-${new Date().getFullYear()}-${String(reportId).padStart(4, "0")}`;
+    setReportRef(reference);
+    return reference;
+  }, [reportId]);
+  usePullToRefresh(refreshReference, Boolean(reportId));
+
   useEffect(() => {
-    if (reportId) {
-      // Fetch the report details to get the backend-computed reference.
-      // The backend uses the report's submitted_at year
-      const fetchReport = async () => {
-        try {
-          const data = await apiFetch(`/api/reports/${reportId}`);
-          setReportRef(
-            data.reference ||
-              `ER-${new Date().getFullYear()}-${String(reportId).padStart(4, "0")}`
-          );
-        } catch (error) {
-          console.error("Failed to fetch report:", error);
+    if (!reportId) return undefined;
+    let active = true;
+    const fetchReport = async () => {
+      try {
+        const data = await apiFetch(`/api/reports/${reportId}`);
+        if (!active) return;
+        setReportRef(data.reference ||
+          `ER-${new Date().getFullYear()}-${String(reportId).padStart(4, "0")}`);
+      } catch (error) {
+        console.error("Failed to fetch report:", error);
+        if (active) {
           setReportRef(
             `ER-${new Date().getFullYear()}-${String(reportId).padStart(4, "0")}`
           );
         }
-      };
-      fetchReport();
-    }
+      }
+    };
+    void fetchReport();
+    return () => { active = false; };
   }, [reportId]);
 
   return (

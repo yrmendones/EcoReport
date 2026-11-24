@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -9,6 +9,7 @@ import {
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
 import { LoadingIndicator } from "../../components/LoadingIndicator";
+import { usePullToRefresh } from "../../components/usePullToRefresh";
 
 const STATUS_CONFIG = {
   pending: { label: "Submitted", color: "text-amber-500", icon: FaClipboardCheck },
@@ -43,6 +44,14 @@ export default function ReportStatus() {
   const [timeline, setTimeline] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const refreshTimeline = useCallback(async () => {
+    if (!id) return;
+    const data = await apiFetch(`/api/reports/${id}/timeline`);
+    setTimeline(data || []);
+    setError("");
+  }, [id]);
+  usePullToRefresh(refreshTimeline, Boolean(id) && !loading);
 
   useEffect(() => {
     const fetchTimeline = async () => {

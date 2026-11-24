@@ -11,12 +11,14 @@ import {
 } from "react-icons/fa";
 import { apiFetch } from "../../api";
 import BottomNav from "../../components/resident/BottomNav";
+import { usePullToRefresh } from "../../components/usePullToRefresh";
 import { useResidentProfile } from "../../utils/useResidentProfile";
 
 export default function Profile() {
   const navigate = useNavigate();
 
-  const { profile: user } = useResidentProfile();
+  const { profile: user, refresh: refreshProfile, loading } = useResidentProfile();
+  usePullToRefresh(refreshProfile, Boolean(user) && !loading);
 
   const menus = [
     {

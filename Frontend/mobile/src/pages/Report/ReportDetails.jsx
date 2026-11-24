@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaArrowLeft, FaMapMarkerAlt } from "react-icons/fa";
 import { apiFetch } from "../../api";
 import { FullScreenLoading } from "../../components/LoadingIndicator";
+import { usePullToRefresh } from "../../components/usePullToRefresh";
 
 // Map backend status what the resident sees
 const getDisplayStatus = (rawStatus) => {
@@ -29,6 +30,21 @@ export default function ReportDetails() {
   const [media, setMedia] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const refreshReport = useCallback(async () => {
+    if (!id) return;
+    const data = await apiFetch(`/api/reports/${id}`);
+    let mediaData = [];
+    try {
+      mediaData = await apiFetch(`/api/reports/${id}/media`);
+    } catch {
+      // Keep the report visible if optional evidence cannot be refreshed.
+    }
+    setReport(data);
+    setMedia(mediaData || []);
+    setError("");
+  }, [id]);
+  usePullToRefresh(refreshReport, Boolean(report) && !loading);
 
   useEffect(() => {
     const fetchReport = async () => {

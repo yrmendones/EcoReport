@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaSpinner, FaLocationArrow } from "react-icons/fa";
 import { apiFetch } from "../../api";
 import { LoadingIndicator } from "../../components/LoadingIndicator";
+import { usePullToRefresh } from "../../components/usePullToRefresh";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -156,22 +157,35 @@ export default function EnvironmentalMap() {
     };
   }, []);
 
-  const fetchReports = async (lat, lng) => {
+  const fetchReports = useCallback(async (lat, lng, { silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
+      setError("");
       let url = "/api/reports/nearby";
       if (lat && lng) url += `?lat=${lat}&lng=${lng}`;
       const data = await apiFetch(url);
       // Only exclude deleted reports; assigned shows up (as ongoing)
       const visible = data.filter((r) => r.status?.toLowerCase() !== "deleted");
       setReports(visible);
+      return visible;
     } catch (err) {
       console.error("Error fetching reports:", err);
       setError("Failed to load nearby reports.");
+      if (silent) throw err;
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, []);
+
+  const refreshReports = useCallback(async () => {
+    const center = mapRef.current?.getCenter();
+    await fetchReports(
+      center?.lat ?? DEFAULT_CENTER[0],
+      center?.lng ?? DEFAULT_CENTER[1],
+      { silent: true }
+    );
+  }, [fetchReports]);
+  usePullToRefresh(refreshReports, !loading);
 
   const renderMarkers = useCallback((data) => {
     if (!mapRef.current) return;
@@ -261,7 +275,7 @@ export default function EnvironmentalMap() {
         fetchReports(DEFAULT_CENTER[0], DEFAULT_CENTER[1])
       );
     }
-  }, []);
+  }, [fetchReports]);
 
   const handleGetLocation = () => {
     setGettingLocation(true);

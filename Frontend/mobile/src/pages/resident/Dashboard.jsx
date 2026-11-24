@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../../api";
 
@@ -8,6 +8,7 @@ import QuickAction from "../../components/resident/QuickAction";
 import AnnouncementCard from "../../components/resident/AnnouncementCard";
 import BottomNav from "../../components/resident/BottomNav";
 import { LoadingIndicator } from "../../components/LoadingIndicator";
+import { usePullToRefresh } from "../../components/usePullToRefresh";
 import { sessionRequestCache } from "../../utils/sessionRequestCache";
 import { usePublicResource } from "../../utils/usePublicResource";
 
@@ -56,6 +57,20 @@ export default function Dashboard() {
     apiFetch("/api/announcements")
   );
   const announcements = toDashboardAnnouncements(announcementData);
+
+  const refreshStats = useCallback(async () => {
+    if (!token) return;
+    const data = await sessionRequestCache.fetch(
+      DASHBOARD_STATS_RESOURCE,
+      token,
+      () => apiFetch("/api/users/me/stats")
+    );
+    if (localStorage.getItem("token") !== token) return;
+    setStats(toStats(data));
+    setError("");
+    setLoading(false);
+  }, [token]);
+  usePullToRefresh(refreshStats, Boolean(token) && !loading);
 
   // Fetch stats from backend
   useEffect(() => {
