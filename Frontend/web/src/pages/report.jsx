@@ -42,6 +42,13 @@ const FALLBACK_CATEGORIES = [
 export default function Report() {
   const navigate = useNavigate();
   const menuItems = getMenuItems();
+  const isBarangayOfficial = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("admin") || "{}").role === "barangay_official";
+    } catch {
+      return false;
+    }
+  })();
 
   // ============================================================
   // STATE
@@ -486,14 +493,16 @@ export default function Report() {
                                 >
                                   ✎
                                 </button>
-                                <button
-                                  type="button"
-                                  className="action-button delete"
-                                  title="Delete"
-                                  onClick={() => handleDelete(report.report_id)}
-                                >
-                                  <FaTrash size={12} />
-                                </button>
+                                {isBarangayOfficial && (
+                                  <button
+                                    type="button"
+                                    className="action-button delete"
+                                    title="Delete"
+                                    onClick={() => handleDelete(report.report_id)}
+                                  >
+                                    <FaTrash size={12} />
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>

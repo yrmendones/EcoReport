@@ -3,7 +3,7 @@ const router = express.Router();
 const adminController = require('../controllers/adminController');
 const settingsController = require('../controllers/settingsController');
 const announcementController = require('../controllers/announcementController');
-const { authenticate, isAdmin, isStaff, requireAssignPermission } = require('../middleware/auth');
+const { authenticate, isAdmin, isBarangayOfficial, isStaff, requireAssignPermission } = require('../middleware/auth');
 
 // All staff routes require authentication + a staff role (admin OR barangay_official)
 router.use(authenticate, isStaff);
@@ -19,7 +19,7 @@ router.get('/reports', adminController.getAllReports);
 router.get('/reports/:id', adminController.getReportDetails);
 router.put('/reports/:id/status', adminController.updateReportStatus);
 router.put('/reports/:id/assign', requireAssignPermission, adminController.assignReport);
-router.delete('/reports/:id', adminController.deleteReport);
+router.delete('/reports/:id', isBarangayOfficial, adminController.deleteReport);
 
 // Assignments (shared)
 router.get('/assignments', adminController.getAssignments);

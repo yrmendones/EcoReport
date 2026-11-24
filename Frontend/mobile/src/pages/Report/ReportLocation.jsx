@@ -371,30 +371,16 @@ export default function ReportLocation() {
         address: "Barangay Sto. Rosario Kanluran, Pateros",
         latitude: formData.latitude,
         longitude: formData.longitude,
+        media: [
+          ...(images || []).map((file_url) => ({ file_url, file_type: "image" })),
+          ...(videos || []).map((file_url) => ({ file_url, file_type: "video" })),
+        ],
       };
 
       const response = await apiFetch("/api/reports", {
         method: "POST",
         body: JSON.stringify(reportData),
       });
-
-      if (images && images.length > 0) {
-        for (const imageUrl of images) {
-          await apiFetch(`/api/reports/${response.report_id}/media`, {
-            method: "POST",
-            body: JSON.stringify({ file_url: imageUrl, file_type: "image" }),
-          });
-        }
-      }
-
-      if (videos && videos.length > 0) {
-        for (const videoUrl of videos) {
-          await apiFetch(`/api/reports/${response.report_id}/media`, {
-            method: "POST",
-            body: JSON.stringify({ file_url: videoUrl, file_type: "video" }),
-          });
-        }
-      }
 
       invalidateResidentReportData(
         localStorage.getItem("token"),

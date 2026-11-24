@@ -3,6 +3,7 @@ const { logTimeline } = require('../utils/timelineLogger');
 const { formatRow, formatRows } = require('../utils/dateFormatter');
 const { sanitizeText } = require('../utils/sanitizeHtml');
 const { reportReference } = require('../utils/referenceFormatter');
+const withTransaction = require('../utils/withTransaction');
 
 function parseSettings(raw) {
     if (!raw) return {};
@@ -17,7 +18,18 @@ exports.createReport = async (req, res) => {
         // user_id is derived from the verified JWT cannot be spoofed
         const user_id = req.user.id;
         const { category, description, address, latitude, longitude } = req.body;
+        const media = req.body.media === undefined ? [] : req.body.media;
         if (!category) return res.status(400).json({ error: 'Category required.' });
+        if (!Array.isArray(media)) return res.status(400).json({ error: 'Media must be a list.' });
+
+        const safeMedia = [];
+        for (const item of media) {
+            if (!item || typeof item.file_url !== 'string' || !item.file_url.trim() ||
+                !['image', 'video'].includes(item.file_type)) {
+                return res.status(400).json({ error: 'Each media item requires a URL and an image or video type.' });
+            }
+            safeMedia.push({ file_url: item.file_url.trim(), file_type: item.file_type });
+        }
 
         // Sanitize before insert
         const safeCategory = sanitizeText(category, 100);
@@ -34,25 +46,38 @@ exports.createReport = async (req, res) => {
         const safeDescription = description ? sanitizeText(description, 5000) : null;
         const safeAddress = address ? sanitizeText(address, 255) : null;
 
-        const [result] = await db.query(
-            `INSERT INTO environmental_reports 
-            (user_id, category, description, address, latitude, longitude, status, submitted_at) 
-            VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())`,
-            [
-                user_id,
-                safeCategory,
-                safeDescription,
-                safeAddress,
-                latitude || null,
-                longitude || null,
-            ]
-        );
+        const reportId = await withTransaction(db, async (connection) => {
+            const [result] = await connection.query(
+                `INSERT INTO environmental_reports
+                (user_id, category, description, address, latitude, longitude, status, submitted_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())`,
+                [
+                    user_id,
+                    safeCategory,
+                    safeDescription,
+                    safeAddress,
+                    latitude || null,
+                    longitude || null,
+                ]
+            );
 
-        // Log the initial "submitted" step in the timeline
-        await logTimeline(result.insertId, 'pending', 'Report submitted');
+            await connection.query(
+                'INSERT INTO report_timeline (report_id, status, note) VALUES (?, ?, ?)',
+                [result.insertId, 'pending', 'Report submitted']
+            );
 
-        const reference = reportReference(result.insertId, new Date());
-        res.status(201).json({ message: 'Report submitted!', report_id: result.insertId, reference });
+            for (const item of safeMedia) {
+                await connection.query(
+                    'INSERT INTO report_media (report_id, file_url, file_type) VALUES (?, ?, ?)',
+                    [result.insertId, item.file_url, item.file_type]
+                );
+            }
+
+            return result.insertId;
+        });
+
+        const reference = reportReference(reportId, new Date());
+        res.status(201).json({ message: 'Report submitted!', report_id: reportId, reference });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to submit report.' });

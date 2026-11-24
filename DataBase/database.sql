@@ -407,7 +407,9 @@ CREATE TABLE IF NOT EXISTS certificate_types (
     display_order INT DEFAULT 0,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
 -- 27. SAMPLE DATA
@@ -461,17 +463,6 @@ INSERT INTO medical_staff (staff_name, role, display_order) VALUES
 ('Glaiza Gallano', 'BHW', 2),
 ('Ma. Theresa Dela Cruz', 'BHW', 3),
 ('Gloria Berame', 'BNS', 4);
-
-CREATE TABLE IF NOT EXISTS certificate_types (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    fee DECIMAL(10,2) NULL,
-    display_order INT DEFAULT 0,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
 -- 28. INDEXES
