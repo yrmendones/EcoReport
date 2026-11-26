@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -13,9 +14,7 @@ import {
   FaTimes,
   FaExclamationTriangle,
 } from "react-icons/fa";
-import { PaddleOCR } from "@paddleocr/paddleocr-js";
 import * as faceapi from "face-api.js";
-import * as ort from "onnxruntime-web";
 import { apiFetch, API_BASE_URL } from "../../api";
 import {
   DEFAULT_PASSWORD_POLICY,
@@ -30,21 +29,13 @@ import {
 import {
   getLiveFaceYaw,
   isUsableLiveFace,
-  validatePermanentAddressAgainstId,
 } from "../../utils/residentRegistrationValidation";
-
-// ============================================================
-// ORT CONFIG - must run before PaddleOCR.create()
-// ============================================================
-try {
-  const cores = navigator.hardwareConcurrency || 4;
-  ort.env.wasm.numThreads = Math.min(4, cores);
-  ort.env.wasm.simd = true;
-  ort.env.wasm.wasmPaths =
-    "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/";
-} catch (e) {
-  console.warn("[ORT] Could not configure WASM:", e);
-}
+import {
+  extractResidentIdFields,
+  isIdOcrReadInsufficient,
+  matchResidentName,
+  suggestIdImageRotation,
+} from "../../utils/residentIdProcessing";
 
 // ============================================================
 // FACE VERIFICATION TOGGLE
@@ -186,69 +177,168 @@ function looksLikeValidId(ocrText, idType) {
   return hasIdKeyword || hasPhMarker;
 }
 
-function matchesName(ocrText, formData) {
-  const text = normalizeText(ocrText);
-  const first = normalizeText(formData.first_name);
-  const last = normalizeText(formData.last_name);
-  const middle = normalizeText(formData.middle_name);
-
-  const firstMatch = first ? text.includes(first) : true;
-  const lastMatch = last ? text.includes(last) : true;
-  const midIsBlank = !middle || middle === "na" || middle === "n/a";
-  let middleMatch = true;
-
-  if (!midIsBlank) {
-    middleMatch = text.includes(middle) || text.includes(middle.charAt(0));
+async function loadIdImageSource(file) {
+  if (typeof createImageBitmap === "function") {
+    try {
+      return await createImageBitmap(file, {
+        imageOrientation: "from-image",
+        resizeWidth: 2400,
+        resizeQuality: "high",
+      });
+    } catch {
+      try {
+        return await createImageBitmap(file, { imageOrientation: "from-image" });
+      } catch {
+        // Fall through to the browser image decoder for older WebViews.
+      }
+    }
   }
-
-  const passed = firstMatch && lastMatch && middleMatch;
-  const missing = [];
-  if (!firstMatch) missing.push("first name");
-  if (!lastMatch) missing.push("last name");
-  if (!middleMatch) missing.push("middle name");
-
-  return { passed, missing };
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = reject;
+      element.src = objectUrl;
+    });
+    return {
+      image,
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+      close: () => URL.revokeObjectURL(objectUrl),
+    };
+  } catch (error) {
+    URL.revokeObjectURL(objectUrl);
+    throw error;
+  }
 }
 
-function getPermanentAddressToCompare(formData, sameAddress) {
-  return sameAddress
-    ? {
-        street: formData.street,
-        barangay: "Sto. Rosario Kanluran",
-        city: "Pateros",
-      }
-    : {
-        street: formData.permanent_street,
-        barangay: formData.permanent_barangay,
-        city: formData.permanent_city,
-      };
+const nowMs = () => globalThis.performance?.now?.() ?? Date.now();
+const ID_OCR_TIMEOUT_MS = 60000;
+const ID_FACE_DETECTION_TIMEOUT_MS = 30000;
+
+function withTimeout(promise, timeoutMs, message) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 }
 
-function preprocessIdImage(file) {
+function renderOcrImage(bitmap, { enhance = false, rotation = 0 } = {}) {
+  const startedAt = nowMs();
+  const imageSource = bitmap.image || bitmap;
+
+  // The uploaded original is kept untouched. This OCR-only derivative is capped
+  // at 2400px to keep WASM memory use predictable while retaining ID text detail.
+  const maxSide = 2400;
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const sourceWidth = Math.max(1, Math.round(bitmap.width * scale));
+  const sourceHeight = Math.max(1, Math.round(bitmap.height * scale));
+  const normalizedRotation = ((rotation % 360) + 360) % 360;
+  const swapDimensions = normalizedRotation === 90 || normalizedRotation === 270;
+  const canvas = document.createElement("canvas");
+  canvas.width = swapDimensions ? sourceHeight : sourceWidth;
+  canvas.height = swapDimensions ? sourceWidth : sourceHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Image processing is unavailable.");
+  }
+  if (normalizedRotation === 90) {
+    ctx.translate(canvas.width, 0);
+    ctx.rotate(Math.PI / 2);
+  } else if (normalizedRotation === 180) {
+    ctx.translate(canvas.width, canvas.height);
+    ctx.rotate(Math.PI);
+  } else if (normalizedRotation === 270) {
+    ctx.translate(0, canvas.height);
+    ctx.rotate(-Math.PI / 2);
+  }
+  if (enhance && "filter" in ctx) ctx.filter = "grayscale(1) contrast(118%)";
+  ctx.drawImage(imageSource, 0, 0, sourceWidth, sourceHeight);
+  ctx.filter = "none";
+
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const maxDim = 960;
-      let { width, height } = img;
-      if (width > maxDim || height > maxDim) {
-        const scale = maxDim / Math.max(width, height);
-        width = Math.round(width * scale);
-        height = Math.round(height * scale);
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, width, height);
-      canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.85);
-    };
-    img.onerror = (e) => {
-      URL.revokeObjectURL(url);
-      reject(e);
-    };
-    img.src = url;
+    canvas.toBlob(
+      (blob) => blob
+        ? resolve({ blob, preprocessingMs: nowMs() - startedAt })
+        : reject(new Error("Could not prepare the ID image.")),
+      "image/jpeg",
+      0.96
+    );
+  });
+}
+
+async function createFocusedTextCrop(sourceBlob, nameLines) {
+  const bounds = (nameLines || []).map(({ bounds: lineBounds }) => lineBounds).filter(Boolean);
+  if (!sourceBlob || !bounds.length) return null;
+
+  let image;
+  let objectUrl = null;
+  try {
+    if (typeof createImageBitmap === "function") {
+      image = await createImageBitmap(sourceBlob);
+    } else {
+      objectUrl = URL.createObjectURL(sourceBlob);
+      image = await new Promise((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = reject;
+        element.src = objectUrl;
+      });
+    }
+
+    const imageWidth = image.width || image.naturalWidth;
+    const imageHeight = image.height || image.naturalHeight;
+    const textLeft = Math.min(...bounds.map(({ left }) => left));
+    const textTop = Math.min(...bounds.map(({ top }) => top));
+    const textRight = Math.max(...bounds.map(({ right }) => right));
+    const textBottom = Math.max(...bounds.map(({ bottom }) => bottom));
+    const textWidth = textRight - textLeft;
+    const textHeight = textBottom - textTop;
+    if (!imageWidth || !imageHeight || textWidth < 1 || textHeight < 1) return null;
+
+    const paddingX = Math.max(20, textWidth * 0.06);
+    const paddingY = Math.max(16, textHeight * 0.35);
+    const left = Math.max(0, Math.floor(textLeft - paddingX));
+    const top = Math.max(0, Math.floor(textTop - paddingY));
+    const right = Math.min(imageWidth, Math.ceil(textRight + paddingX));
+    const bottom = Math.min(imageHeight, Math.ceil(textBottom + paddingY));
+    const cropWidth = right - left;
+    const cropHeight = bottom - top;
+    if (cropWidth < 1 || cropHeight < 1 || cropWidth * cropHeight > imageWidth * imageHeight * 0.72) {
+      return null;
+    }
+
+    const scale = Math.min(3, 1600 / Math.max(cropWidth, cropHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(cropWidth * scale));
+    canvas.height = Math.max(1, Math.round(cropHeight * scale));
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    const startedAt = nowMs();
+    context.drawImage(image, left, top, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.97));
+    return blob ? { blob, left, top, scale, preprocessingMs: nowMs() - startedAt } : null;
+  } catch {
+    return null;
+  } finally {
+    image?.close?.();
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function mapFocusedTextItems(items, crop) {
+  return (items || []).map((item) => {
+    if (!Array.isArray(item?.poly)) return item;
+    const poly = item.poly.map((point) => {
+      const x = Number(Array.isArray(point) ? point[0] : point?.x);
+      const y = Number(Array.isArray(point) ? point[1] : point?.y);
+      return [crop.left + x / crop.scale, crop.top + y / crop.scale];
+    });
+    return { ...item, poly };
   });
 }
 
@@ -267,6 +357,7 @@ function CameraModal({
   title,
   hint,
   facing,
+  captureType = "selfie",
   onCapture,
   onClose,
   enableLiveFaceCheck = false,
@@ -276,7 +367,9 @@ function CameraModal({
   onPermissionLost,
 }) {
   const videoRef = useRef(null);
+  const previewRef = useRef(null);
   const streamRef = useRef(null);
+  const capturedUrlRef = useRef(null);
   const detectionIntervalRef = useRef(null);
   const detectingRef = useRef(false);
   const onPermissionLostRef = useRef(onPermissionLost);
@@ -296,10 +389,28 @@ function CameraModal({
   const [isFaceDetected, setIsFaceDetected] = useState(false);
   const [liveStep, setLiveStep] = useState("position");
   const [liveError, setLiveError] = useState("");
+  const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const [videoAspectRatio, setVideoAspectRatio] = useState(null);
+  const [isLandscape, setIsLandscape] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(orientation: landscape)").matches
+  );
+  const [guideSize, setGuideSize] = useState(null);
 
   useEffect(() => {
     onPermissionLostRef.current = onPermissionLost;
   }, [onPermissionLost]);
+
+  useEffect(() => {
+    if (captureType !== "id") return undefined;
+    const bodyOverflow = document.body.style.overflow;
+    const pageOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = bodyOverflow;
+      document.documentElement.style.overflow = pageOverflow;
+    };
+  }, [captureType]);
 
   const restartLiveness = (message = "") => {
     livenessRef.current = {
@@ -317,6 +428,58 @@ function CameraModal({
   };
 
   useEffect(() => {
+    if (captureType !== "id") return undefined;
+    const mediaQuery = window.matchMedia("(orientation: landscape)");
+    const updateOrientation = () => setIsLandscape(mediaQuery.matches);
+    updateOrientation();
+    if (mediaQuery.addEventListener) mediaQuery.addEventListener("change", updateOrientation);
+    else mediaQuery.addListener?.(updateOrientation);
+    window.addEventListener("resize", updateOrientation);
+    return () => {
+      if (mediaQuery.removeEventListener) mediaQuery.removeEventListener("change", updateOrientation);
+      else mediaQuery.removeListener?.(updateOrientation);
+      window.removeEventListener("resize", updateOrientation);
+    };
+  }, [captureType]);
+
+  useEffect(() => {
+    if (captureType !== "id") return undefined;
+    const preview = previewRef.current;
+    if (!preview) return undefined;
+    const measureGuide = () => {
+      const { width, height } = preview.getBoundingClientRect();
+      if (!width || !height) return;
+      let videoWidth = width;
+      let videoHeight = height;
+      if (videoAspectRatio > 0) {
+        if (width / height > videoAspectRatio) {
+          videoWidth = height * videoAspectRatio;
+        } else {
+          videoHeight = width / videoAspectRatio;
+        }
+      }
+      const frameWidth = Math.min(videoWidth * 0.95, videoHeight * 0.95 * 1.586);
+      const next = { width: frameWidth, height: frameWidth / 1.586 };
+      setGuideSize((current) => current &&
+        Math.abs(current.width - next.width) < 0.5 &&
+        Math.abs(current.height - next.height) < 0.5
+        ? current
+        : next);
+    };
+    measureGuide();
+    const observer = typeof ResizeObserver === "function"
+      ? new ResizeObserver(measureGuide)
+      : null;
+    observer?.observe(preview);
+    window.addEventListener("resize", measureGuide);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measureGuide);
+    };
+  }, [captureType, isLandscape, videoAspectRatio]);
+
+  useEffect(() => {
+    if (captureType === "id" && capturedPhoto) return undefined;
     let cancelled = false;
     const start = async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -324,8 +487,18 @@ function CameraModal({
         return;
       }
       try {
+        setCamError("");
+        setReady(false);
+        const idLandscape = captureType === "id" && isLandscape;
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: facing },
+          video: {
+            facingMode: { ideal: facing },
+            width: { ideal: captureType === "id" ? (idLandscape ? 1920 : 1080) : 1280 },
+            height: { ideal: captureType === "id" ? (idLandscape ? 1080 : 1920) : 720 },
+            aspectRatio: {
+              ideal: captureType === "id" ? (idLandscape ? 16 / 9 : 9 / 16) : 4 / 3,
+            },
+          },
           audio: false,
         });
         if (cancelled) {
@@ -359,7 +532,11 @@ function CameraModal({
       cancelled = true;
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [facing]);
+  }, [facing, captureType, isLandscape, capturedPhoto]);
+
+  useEffect(() => () => {
+    if (capturedUrlRef.current) URL.revokeObjectURL(capturedUrlRef.current);
+  }, []);
 
   useEffect(() => {
     if (!enableLiveFaceCheck) return undefined;
@@ -495,10 +672,8 @@ function CameraModal({
     setBusy(true);
     setCamError("");
 
-    // Cap capture at 1280px on the longest side — 4K phone cameras produce
-    // 2-5 MB JPEGs that time out on mobile WiFi. 1280px is more than enough
-    // resolution for a face or an ID card.
-    const MAX_DIM = 1280;
+    // Bound canvas memory while retaining enough pixels for ID text and portrait review.
+    const MAX_DIM = captureType === "id" ? 2400 : 1280;
     let width = video.videoWidth;
     let height = video.videoHeight;
     if (width > MAX_DIM || height > MAX_DIM) {
@@ -522,11 +697,39 @@ function CameraModal({
         const file = new File([blob], `${Date.now()}.jpg`, {
           type: "image/jpeg",
         });
+        if (captureType === "id") {
+          const previewUrl = URL.createObjectURL(blob);
+          capturedUrlRef.current = previewUrl;
+          streamRef.current?.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+          setReady(false);
+          setCapturedPhoto({
+            file,
+            previewUrl,
+          });
+          setBusy(false);
+          return;
+        }
         onCapture(file);
       },
       "image/jpeg",
-      0.85
+      captureType === "id" ? 0.96 : 0.85
     );
+  };
+
+  const retakeCapturedPhoto = () => {
+    if (capturedUrlRef.current) URL.revokeObjectURL(capturedUrlRef.current);
+    capturedUrlRef.current = null;
+    setCapturedPhoto(null);
+  };
+
+  const useCapturedPhoto = () => {
+    if (!capturedPhoto) return;
+    const { file } = capturedPhoto;
+    if (capturedUrlRef.current) URL.revokeObjectURL(capturedUrlRef.current);
+    capturedUrlRef.current = null;
+    setCapturedPhoto(null);
+    onCapture(file);
   };
 
   const liveCheckReady = !enableLiveFaceCheck || (modelsLoaded && liveStep === "complete");
@@ -540,6 +743,113 @@ function CameraModal({
       : liveStep === "turn"
         ? "Turn your head slightly to either side to confirm liveness."
         : "Live selfie verified. Capture now.";
+
+  if (captureType === "id") {
+    return createPortal(
+      <div
+        className="resident-id-camera-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
+        <div className={`resident-id-camera-layout ${isLandscape ? "is-landscape" : "is-portrait"}`}>
+            <div className="resident-id-camera-preview" ref={previewRef}>
+              <video
+                ref={videoRef}
+                onLoadedMetadata={(event) => {
+                  const { videoWidth, videoHeight } = event.currentTarget;
+                  if (videoWidth > 0 && videoHeight > 0) {
+                    setVideoAspectRatio(videoWidth / videoHeight);
+                  }
+                }}
+                playsInline
+                muted
+                autoPlay
+                aria-label="Live resident ID camera preview"
+              />
+              {capturedPhoto && (
+                <img
+                  src={capturedPhoto.previewUrl}
+                  alt="Captured resident ID photo"
+                  className="resident-id-camera-captured"
+                />
+              )}
+              {!ready && !camError && !capturedPhoto && (
+                <div className="resident-id-camera-spinner">
+                  <FaSpinner className="animate-spin" size={32} />
+                </div>
+              )}
+              {ready && !capturedPhoto && (
+                <div className="resident-id-camera-guide-wrap" aria-hidden="true">
+                  <div
+                    className="resident-id-camera-guide"
+                    style={guideSize ? { width: `${guideSize.width}px`, height: `${guideSize.height}px` } : undefined}
+                  />
+                </div>
+              )}
+            </div>
+
+            <aside className="resident-id-camera-panel">
+              <header className="resident-id-camera-header">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="Close camera"
+                  className="resident-id-camera-close"
+                >
+                  <FaTimes />
+                </button>
+              </header>
+              <div className="resident-id-camera-guidance">
+                <h2>{title}</h2>
+                <p>Keep your entire ID inside the frame. Make sure the text is visible and avoid glare or shadows.</p>
+              </div>
+
+              <div className="resident-id-camera-messages" aria-live="polite">
+                {camError && <p className="resident-id-camera-error">{camError}</p>}
+                {busy && !capturedPhoto && (
+                  <p className="resident-id-camera-scan-status">
+                    Capturing the full-resolution ID photo...
+                  </p>
+                )}
+              </div>
+
+              <div className={`resident-id-camera-actions ${capturedPhoto ? "is-review" : "is-capture"}`}>
+                {capturedPhoto ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={retakeCapturedPhoto}
+                      className="resident-id-camera-retake"
+                    >
+                      Retake
+                    </button>
+                    <button
+                      type="button"
+                      onClick={useCapturedPhoto}
+                      className="resident-id-camera-confirm"
+                    >
+                      Use this photo
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleCapture}
+                    disabled={!ready || busy}
+                    className="resident-id-camera-capture"
+                  >
+                    {busy ? <FaSpinner className="animate-spin" /> : <FaCamera />}
+                    {busy ? "Capturing…" : "Capture ID"}
+                  </button>
+                )}
+              </div>
+            </aside>
+        </div>
+      </div>,
+      document.body
+    );
+  }
 
   return (
     <div
@@ -566,12 +876,30 @@ function CameraModal({
           playsInline
           muted
           autoPlay
-          className="w-full h-full object-cover"
+          className={`w-full h-full ${captureType === "id" ? "object-contain" : "object-cover"}`}
           style={{ transform: facing === "user" ? "scaleX(-1)" : "none" }}
         />
-        {!ready && !camError && (
+        {capturedPhoto && (
+          <img
+            src={capturedPhoto.previewUrl}
+            alt="Captured resident ID preview"
+            className="absolute inset-0 w-full h-full object-contain bg-black"
+          />
+        )}
+        {!ready && !camError && !capturedPhoto && (
           <div className="absolute inset-0 flex items-center justify-center">
             <FaSpinner className="animate-spin text-white" size={32} />
+          </div>
+        )}
+        {captureType === "id" && ready && !capturedPhoto && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div
+              className="rounded-xl border-[3px] border-white"
+              style={{ width: "90%", aspectRatio: "1.586 / 1", boxShadow: "0 0 0 999px rgba(0,0,0,0.34)" }}
+            />
+            <span className="absolute top-4 left-4 right-4 text-center text-white text-[13px] font-bold drop-shadow-lg">
+              Fit the entire ID inside the rectangle
+            </span>
           </div>
         )}
         {facing === "user" && ready && (
@@ -648,16 +976,37 @@ function CameraModal({
         </button>
       )}
 
-      <button
-        type="button"
-        onClick={handleCapture}
-        disabled={!canCapture}
-        className="w-full min-h-[54px] rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[16px] flex items-center justify-center shadow-md hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50 shrink-0"
-        style={{ gap: "12px" }}
-      >
-        {busy ? <FaSpinner className="animate-spin" /> : <FaCamera />}
-        {busy ? "Capturing..." : enableLiveFaceCheck ? "Capture Live Selfie" : "Capture"}
-      </button>
+      {capturedPhoto ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={retakeCapturedPhoto}
+              className="min-h-[54px] rounded-2xl border border-white/60 text-white font-extrabold text-[15px]"
+            >
+              Retake
+            </button>
+            <button
+              type="button"
+              onClick={useCapturedPhoto}
+              className="min-h-[54px] rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[15px]"
+            >
+              Use this photo
+            </button>
+          </div>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={handleCapture}
+          disabled={!canCapture}
+          className="w-full min-h-[54px] rounded-2xl bg-[#0B5D2A] text-white font-extrabold text-[16px] flex items-center justify-center shadow-md hover:bg-[#084A21] active:scale-[0.98] transition disabled:opacity-50 shrink-0"
+          style={{ gap: "12px" }}
+        >
+          {busy ? <FaSpinner className="animate-spin" /> : <FaCamera />}
+          {busy ? "Capturing..." : enableLiveFaceCheck ? "Capture Live Selfie" : "Capture"}
+        </button>
+      )}
     </div>
   );
 }
@@ -966,42 +1315,108 @@ export default function Register() {
   // ---------- ID + OCR + face ----------
   const [residentIdFile, setResidentIdFile] = useState(null);
   const [residentIdPreview, setResidentIdPreview] = useState(null);
+  const residentIdPreviewUrlRef = useRef(null);
+  useEffect(() => () => {
+    if (residentIdPreviewUrlRef.current) URL.revokeObjectURL(residentIdPreviewUrlRef.current);
+  }, []);
 
   const [ocrText, setOcrText] = useState("");
+  const [ocrItems, setOcrItems] = useState([]);
+  const [ocrConfidence, setOcrConfidence] = useState(null);
   const [ocrScanStatus, setOcrScanStatus] = useState("idle");
-  const [ocrScanError, setOcrScanError] = useState("");
+  const [ocrStage, setOcrStage] = useState("");
   const ocrRunIdRef = useRef(0);
   const ocrEngineRef = useRef(null);
+  const ocrPerformanceRef = useRef(null);
+  const ocrPerformanceLoggedRunRef = useRef(0);
+
+  const extractedIdFields = useMemo(
+    () => extractResidentIdFields(ocrItems, {
+      first_name: formData.first_name,
+      last_name: formData.last_name,
+    }),
+    [ocrItems, formData.first_name, formData.last_name]
+  );
 
   const ocrValidation = useMemo(() => {
-    if (ocrScanStatus !== "done") return { passed: false, reason: "" };
-    if (!ocrText.trim()) {
-      return { passed: false, reason: "We couldn't read the ID text. Upload a clearer photo and try again." };
-    }
-    if (!looksLikeValidId(ocrText, idType)) {
-      return { passed: false, reason: "This doesn't look like a valid ID." };
-    }
-    const nameOk = matchesName(ocrText, formData);
-    if (!nameOk.passed) {
-      return {
+    const startedAt = nowMs();
+    let result;
+    if (ocrScanStatus === "idle" || ocrScanStatus === "scanning") {
+      result = { passed: false, requiresManualReview: false, reason: "", confidence: null };
+    } else if (ocrScanStatus === "error") {
+      result = {
         passed: false,
-        reason: `Name doesn't match (missing: ${nameOk.missing.join(", ")}).`,
+        requiresManualReview: true,
+        reason: "The ID name is missing or unclear. Retake the photo.",
+        confidence: null,
       };
+    } else {
+      const idLooksReadable = looksLikeValidId(ocrText, idType);
+      const nameOk = matchResidentName(ocrItems, formData, extractedIdFields);
+      const confidence = nameOk.confidence ?? extractedIdFields.nameConfidence ?? ocrConfidence;
+      const hasRegistrationFirstName = Boolean(String(formData.first_name || "").trim());
+      const hasRegistrationLastName = Boolean(String(formData.last_name || "").trim());
+
+      if (!hasRegistrationFirstName || !hasRegistrationLastName) {
+        result = { passed: false, requiresManualReview: false, reason: "", confidence, nameOk };
+      } else {
+        const uncertain =
+          !idLooksReadable ||
+          !extractedIdFields.nameLines.length ||
+          (!nameOk.passed && (!extractedIdFields.firstName || !extractedIdFields.lastName)) ||
+          nameOk.confidence == null ||
+          nameOk.confidence < 0.5;
+
+        if (idLooksReadable && nameOk.passed && !uncertain) {
+          result = { passed: true, requiresManualReview: false, reason: "", confidence, nameOk };
+        } else if (uncertain) {
+          result = {
+            passed: false,
+            requiresManualReview: true,
+            reason: "The ID name is missing or unclear. Retake the photo.",
+            confidence,
+            nameOk,
+          };
+        } else {
+          result = {
+            passed: false,
+            requiresManualReview: false,
+            reason: `The readable name does not match (missing: ${nameOk.missing.join(", ")}). Check the form or retake the ID.`,
+            confidence,
+            nameOk,
+          };
+        }
+      }
     }
-    const addressOk = validatePermanentAddressAgainstId(
-      ocrText,
-      getPermanentAddressToCompare(formData, sameAddress)
-    );
-    if (!addressOk.passed) return { passed: false, reason: addressOk.reason };
-    return { passed: true, reason: "" };
-  }, [ocrScanStatus, ocrText, idType, formData, sameAddress]);
+    return { ...result, finalRegistrationMatchingMs: nowMs() - startedAt };
+  }, [ocrScanStatus, ocrText, ocrItems, ocrConfidence, idType, formData, extractedIdFields]);
+
+  useEffect(() => {
+    const runId = ocrRunIdRef.current;
+    const timings = ocrPerformanceRef.current;
+    if (
+      !residentIdFile ||
+      !["done", "error"].includes(ocrScanStatus) ||
+      !runId ||
+      ocrPerformanceLoggedRunRef.current === runId ||
+      timings?.runId !== runId
+    ) return;
+    ocrPerformanceLoggedRunRef.current = runId;
+    console.info("[ID OCR performance]", {
+      ...timings,
+      finalRegistrationMatchingMs: ocrValidation.finalRegistrationMatchingMs,
+      endToEndThroughMatchingMs: nowMs() - timings.startedAt,
+    });
+  }, [ocrScanStatus, ocrValidation, residentIdFile]);
 
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [modelsLoadError, setModelsLoadError] = useState(false);
   const [modelLoadAttempt, setModelLoadAttempt] = useState(0);
   const [idFaceFound, setIdFaceFound] = useState(false);
   const [idFaceProcessing, setIdFaceProcessing] = useState(false);
+  const [idFaceChecked, setIdFaceChecked] = useState(false);
   const [idFaceError, setIdFaceError] = useState("");
+  const idFaceRunIdRef = useRef(0);
 
   // ---------- Selfie ----------
   const [faceFile, setFaceFile] = useState(null);
@@ -1042,6 +1457,11 @@ export default function Register() {
 
   // ============ OCR engine ============
   const getOcrEngine = async () => {
+    if (window.__ecoOcrEngine?.failed) {
+      window.__ecoOcrEngine.terminate();
+      delete window.__ecoOcrEngine;
+    }
+    if (ocrEngineRef.current?.failed) ocrEngineRef.current = null;
     if (window.__ecoOcrEngine) {
       ocrEngineRef.current = window.__ecoOcrEngine;
       return window.__ecoOcrEngine;
@@ -1051,49 +1471,147 @@ export default function Register() {
       return ocrEngineRef.current;
     }
 
-    const originalWarn = console.warn;
-    console.warn = (...args) => {
-      const msg = args.join(" ");
-      if (msg.includes("CleanUnusedInitializersAndNodeArgs")) return;
-      originalWarn(...args);
-    };
-
-    try {
-      const engine = await PaddleOCR.create({
-        lang: "en",
-        ocrVersion: "PP-OCRv5",
-        ortOptions: { backend: "wasm" },
-      });
+    if (window.__ecoOcrEnginePromise) {
+      const engine = await window.__ecoOcrEnginePromise;
       ocrEngineRef.current = engine;
+      return engine;
+    }
+
+    const enginePromise = (async () => {
+      const worker = new Worker(new URL("../../utils/residentIdOcr.worker.js", import.meta.url), {
+        type: "module",
+      });
+      let requestId = 0;
+      let failed = false;
+      const pending = new Map();
+      const fail = (error) => {
+        if (failed) return;
+        failed = true;
+        worker.terminate();
+        for (const request of pending.values()) request.reject(error);
+        pending.clear();
+      };
+      worker.onmessage = ({ data }) => {
+        const request = pending.get(data?.id);
+        if (!request) return;
+        pending.delete(data.id);
+        if (data.error) {
+          const workerError = new Error(data.error);
+          request.reject(workerError);
+          fail(workerError);
+        } else {
+          request.resolve(data.results);
+        }
+      };
+      worker.onerror = (event) => fail(new Error(event.message || "Background OCR worker failed."));
+      worker.onmessageerror = () => fail(new Error("Background OCR returned an unreadable result."));
+      const engine = {
+        get failed() {
+          return failed;
+        },
+        terminate() {
+          fail(new Error("Background OCR stopped."));
+        },
+        predict(blob) {
+          if (failed) return Promise.reject(new Error("Background OCR worker is unavailable."));
+          return new Promise((resolve, reject) => {
+            const id = ++requestId;
+            pending.set(id, { resolve, reject });
+            try {
+              worker.postMessage({ id, blob });
+            } catch (error) {
+              pending.delete(id);
+              reject(error);
+              fail(error);
+            }
+          });
+        },
+      };
+      window.__ecoOcrWorkerMode = true;
       window.__ecoOcrEngine = engine;
       return engine;
+    })();
+    window.__ecoOcrEnginePromise = enginePromise;
+    try {
+      const engine = await enginePromise;
+      ocrEngineRef.current = engine;
+      return engine;
+    } catch (error) {
+      if (window.__ecoOcrEnginePromise === enginePromise) {
+        delete window.__ecoOcrEnginePromise;
+      }
+      throw error;
     } finally {
-      console.warn = originalWarn;
+      if (window.__ecoOcrEnginePromise === enginePromise) {
+        delete window.__ecoOcrEnginePromise;
+      }
     }
   };
 
   // ============ Face detection on ID ============
   const processIdFace = async (file) => {
-    if (!modelsLoaded) return;
+    const runId = ++idFaceRunIdRef.current;
+    if (!modelsLoaded) {
+      setIdFaceChecked(false);
+      return;
+    }
     setIdFaceProcessing(true);
+    setIdFaceChecked(false);
     setIdFaceFound(false);
     setIdFaceError("");
     try {
-      const img = await faceapi.bufferToImage(file);
-      const detection = await faceapi
-        .detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
-        .withFaceLandmarks();
+      const result = await withTimeout((async () => {
+        let img;
+        if (typeof createImageBitmap === "function") {
+          try {
+            img = await createImageBitmap(file, {
+              imageOrientation: "from-image",
+              resizeWidth: 1600,
+              resizeQuality: "high",
+            });
+          } catch {
+            img = await faceapi.bufferToImage(file);
+          }
+        } else {
+          img = await faceapi.bufferToImage(file);
+        }
+        if (runId !== idFaceRunIdRef.current) {
+          img.close?.();
+          return null;
+        }
+        const imageWidth = img.width || img.naturalWidth;
+        const imageHeight = img.height || img.naturalHeight;
+        const scale = Math.min(1, 1600 / Math.max(imageWidth, imageHeight));
+        const detectionImage = document.createElement("canvas");
+        detectionImage.width = Math.max(1, Math.round(imageWidth * scale));
+        detectionImage.height = Math.max(1, Math.round(imageHeight * scale));
+        detectionImage.getContext("2d")?.drawImage(
+          img,
+          0,
+          0,
+          detectionImage.width,
+          detectionImage.height
+        );
+        img.close?.();
+        const detection = await faceapi
+          .detectSingleFace(detectionImage, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.35 }))
+          .withFaceLandmarks();
+        return detection;
+      })(), ID_FACE_DETECTION_TIMEOUT_MS, "ID portrait detection timed out.");
+      if (runId !== idFaceRunIdRef.current) return;
+      if (!result) return;
+      const detection = result;
 
       if (!detection) {
         setIdFaceFound(false);
         setIdFaceError(
-          "No face detected on this ID. Please retake the photo in a well-lit area."
+          "No face detected on this ID. Please upload a clear photo."
         );
         return;
       }
 
       const box = detection.detection.box;
-      if (box.width < 80 || box.height < 80) {
+      if (box.width < 48 || box.height < 48) {
         setIdFaceFound(false);
         setIdFaceError(
           `The face on your ID is too small (${Math.round(box.width)}×${Math.round(
@@ -1105,42 +1623,235 @@ export default function Register() {
 
       setIdFaceFound(true);
     } catch (err) {
+      if (runId !== idFaceRunIdRef.current) return;
       console.error("Error processing ID face:", err);
       setIdFaceFound(false);
-      setIdFaceError("Couldn't analyze the ID photo. Please try again.");
+      setIdFaceError(err?.message === "ID portrait detection timed out."
+        ? "Portrait detection is taking too long. Please retake the ID so we can check the portrait."
+        : "Couldn't analyze the ID photo. Please try again.");
     } finally {
-      setIdFaceProcessing(false);
+      if (runId === idFaceRunIdRef.current) {
+        setIdFaceProcessing(false);
+        setIdFaceChecked(true);
+      }
     }
   };
 
   // ============ OCR on ID ============
-  const runIdOcr = async (file) => {
+  const runIdOcr = async (file, source = "gallery") => {
     if (!file) return;
     const runId = ++ocrRunIdRef.current;
+    const startedAt = nowMs();
+    const timings = {
+      runId,
+      source,
+      startedAt,
+      workerMode: null,
+      modelCacheHit: Boolean(window.__ecoOcrEngine || ocrEngineRef.current),
+      imageDecodeMs: 0,
+      modelInitializationMs: 0,
+      preprocessingMs: 0,
+      predictionMs: 0,
+      detectorMs: 0,
+      recognizerMs: 0,
+      fieldExtractionMs: 0,
+      retryPasses: 0,
+      recognizedRegions: 0,
+    };
     setOcrScanStatus("scanning");
-    setOcrScanError("");
+    setOcrStage("Waiting for text recognition…");
     setOcrText("");
+    setOcrItems([]);
+    setOcrConfidence(null);
 
-    try {
-      const blob = await preprocessIdImage(file);
-      const engine = await getOcrEngine();
+    const previousJob = window.__ecoOcrQueue || Promise.resolve();
+    const job = previousJob.catch(() => {}).then(async () => {
       if (runId !== ocrRunIdRef.current) return;
+      let bitmap;
+      try {
+        setOcrStage("Preparing ID image…");
+        const decodeStartedAt = nowMs();
+        const modelStartedAt = nowMs();
+        const [imageResult, engineResult] = await Promise.allSettled([
+          loadIdImageSource(file).finally(() => {
+            timings.imageDecodeMs = nowMs() - decodeStartedAt;
+          }),
+          getOcrEngine().finally(() => {
+            timings.modelInitializationMs = nowMs() - modelStartedAt;
+          }),
+        ]);
+        if (imageResult.status === "fulfilled") bitmap = imageResult.value;
+        if (engineResult.status === "rejected") throw engineResult.reason;
+        if (imageResult.status === "rejected") throw imageResult.reason;
+        const engine = engineResult.value;
+        timings.workerMode = Boolean(window.__ecoOcrWorkerMode);
+        if (runId !== ocrRunIdRef.current) return;
 
-      const result = await engine.predict(blob);
-      if (runId !== ocrRunIdRef.current) return;
+        const readCandidate = async ({ enhance = false, rotation = 0, label }) => {
+          if (runId !== ocrRunIdRef.current) return null;
+          setOcrStage(label);
+          const prepared = await renderOcrImage(bitmap, { enhance, rotation });
+          timings.preprocessingMs += prepared.preprocessingMs;
+          const predictionStartedAt = nowMs();
+          const results = await engine.predict(prepared.blob);
+          timings.predictionMs += nowMs() - predictionStartedAt;
+          if (runId !== ocrRunIdRef.current) return null;
+          const data = Array.isArray(results) ? results[0] : results;
+          const items = data?.items || [];
+          timings.detectorMs += Number(data?.metrics?.detMs) || 0;
+          timings.recognizerMs += Number(data?.metrics?.recMs) || 0;
+          timings.recognizedRegions = Math.max(timings.recognizedRegions, items.length);
 
-      const data = Array.isArray(result) ? result[0] : result;
-      const items = data?.items || [];
-      const text = items.map((i) => i.text || "").join("\n");
+          const extractionStartedAt = nowMs();
+          const text = items.map((item) => item.text || "").join("\n");
+          const confidenceScores = items
+            .filter((item) => item.score != null)
+            .map((item) => Number(item.score))
+            .filter(Number.isFinite);
+          const confidence = confidenceScores.length
+            ? confidenceScores.reduce((sum, value) => sum + value, 0) / confidenceScores.length
+            : null;
+          const fields = extractResidentIdFields(items, formData);
+          const idLooksReadable = looksLikeValidId(text, idType);
+          const score = (confidence ?? 0) * 0.6 +
+            (fields.nameText ? 0.15 : 0) +
+            (idLooksReadable ? 0.25 : 0);
+          timings.fieldExtractionMs += nowMs() - extractionStartedAt;
+          const insufficient = isIdOcrReadInsufficient({
+            itemCount: items.length,
+            text,
+            confidence,
+          });
+          return { items, text, confidence, fields, score, insufficient, sourceBlob: prepared.blob };
+        };
 
-      setOcrText(text);
-      setOcrScanStatus("done");
-    } catch (err) {
-      if (runId !== ocrRunIdRef.current) return;
-      console.error("[OCR] Error:", err);
-      setOcrScanStatus("error");
-      setOcrScanError("Couldn't read the ID photo. Please retake it.");
-    }
+        let best = await readCandidate({ label: "Reading ID text…" });
+        if (!best || runId !== ocrRunIdRef.current) return;
+        let foundSufficientCandidate = !best.insufficient;
+        if (!foundSufficientCandidate) {
+          timings.retryPasses += 1;
+          const enhanced = await readCandidate({
+            enhance: true,
+            label: "Improving text contrast…",
+          });
+          if (!enhanced || runId !== ocrRunIdRef.current) return;
+          if (!enhanced.insufficient || enhanced.score > best.score) best = enhanced;
+          foundSufficientCandidate = !enhanced.insufficient;
+        }
+        if (!foundSufficientCandidate && runId === ocrRunIdRef.current) {
+          const rotation = suggestIdImageRotation(best.items, bitmap.width, bitmap.height);
+          if (rotation != null) {
+            timings.retryPasses += 1;
+            const rotated = await readCandidate({
+              enhance: true,
+              rotation,
+              label: "Correcting ID orientation…",
+            });
+            if (!rotated || runId !== ocrRunIdRef.current) return;
+            if (!rotated.insufficient || rotated.score > best.score) best = rotated;
+          }
+        }
+        if (runId !== ocrRunIdRef.current) return;
+
+        const registrationNamesComplete = Boolean(
+          String(formData.first_name || "").trim() && String(formData.last_name || "").trim()
+        );
+        const retryFocusedRegion = async (candidateLines, label, isUseful) => {
+          if (!candidateLines?.length || runId !== ocrRunIdRef.current) return;
+          const focusedCrop = await createFocusedTextCrop(best.sourceBlob, candidateLines);
+          if (!focusedCrop || runId !== ocrRunIdRef.current) return;
+          try {
+            setOcrStage(`Zooming in on the ID ${label} text…`);
+            timings.preprocessingMs += focusedCrop.preprocessingMs;
+            timings.retryPasses += 1;
+            const predictionStartedAt = nowMs();
+            const focusedResults = await engine.predict(focusedCrop.blob);
+            timings.predictionMs += nowMs() - predictionStartedAt;
+            if (runId !== ocrRunIdRef.current) return;
+
+            const focusedData = Array.isArray(focusedResults) ? focusedResults[0] : focusedResults;
+            const focusedItems = focusedData?.items || [];
+            const focusedText = focusedItems.map((item) => item.text || "").join("\n");
+            const focusedItemsInOriginalCoordinates = mapFocusedTextItems(focusedItems, focusedCrop);
+            const focusedFields = extractResidentIdFields(focusedItems, formData);
+            const focusedConfidence = isUseful(focusedFields, focusedItems);
+
+            timings.detectorMs += Number(focusedData?.metrics?.detMs) || 0;
+            timings.recognizerMs += Number(focusedData?.metrics?.recMs) || 0;
+            timings.recognizedRegions += focusedItems.length;
+
+            if (focusedConfidence && focusedItemsInOriginalCoordinates.length) {
+              const mergedItems = [...best.items, ...focusedItemsInOriginalCoordinates];
+              best = {
+                ...best,
+                items: mergedItems,
+                text: [best.text, focusedText].filter(Boolean).join("\n"),
+                fields: extractResidentIdFields(mergedItems, formData),
+              };
+            }
+          } catch (error) {
+            console.warn(`[OCR] Focused ${label} read failed; keeping the full ID read.`, error);
+          }
+        };
+
+        const fullImageNameMatch = matchResidentName(best.items, formData, best.fields);
+        const fullImageNameConfidence = fullImageNameMatch.confidence ?? best.fields.nameConfidence;
+        const shouldRetryNameRegion = Boolean(
+          best.fields.nameCandidateLines?.length &&
+          (!best.fields.nameLines.length ||
+            (registrationNamesComplete && !fullImageNameMatch.passed) ||
+            fullImageNameConfidence == null ||
+            fullImageNameConfidence < 0.78)
+        );
+        if (shouldRetryNameRegion) {
+          await retryFocusedRegion(best.fields.nameCandidateLines, "name", (fields, items) => {
+            const match = matchResidentName(items, formData, fields);
+            const confidence = match.confidence ?? fields.nameConfidence;
+            const hasName = Boolean(fields.firstName || fields.lastName || fields.nameText);
+            return confidence != null && confidence >= 0.65 && (
+              registrationNamesComplete ? match.passed : hasName
+            );
+          });
+        }
+
+        if (runId !== ocrRunIdRef.current) return;
+
+        ocrPerformanceRef.current = { ...timings };
+        setOcrItems(best.items);
+        setOcrText(best.text);
+        setOcrConfidence(best.confidence);
+        setOcrStage("");
+        setOcrScanStatus("done");
+      } catch (err) {
+        if (runId !== ocrRunIdRef.current) return;
+        console.error("[OCR] Error:", err);
+        ocrPerformanceRef.current = { ...timings };
+        setOcrStage("");
+        setOcrScanStatus("error");
+      } finally {
+        bitmap?.close?.();
+      }
+    });
+    let timeoutId;
+    const timeout = new Promise((resolve) => {
+      timeoutId = setTimeout(() => {
+        if (runId === ocrRunIdRef.current) {
+          ocrRunIdRef.current += 1;
+          const engine = window.__ecoOcrEngine || ocrEngineRef.current;
+          engine?.terminate?.();
+          if (window.__ecoOcrEngine === engine) delete window.__ecoOcrEngine;
+          if (ocrEngineRef.current === engine) ocrEngineRef.current = null;
+          delete window.__ecoOcrEnginePromise;
+          ocrPerformanceRef.current = { ...timings };
+          setOcrStage("");
+          setOcrScanStatus("error");
+        }
+        resolve();
+      }, ID_OCR_TIMEOUT_MS);
+    });
+    const monitoredJob = Promise.race([job, timeout]).finally(() => clearTimeout(timeoutId));
+    window.__ecoOcrQueue = monitoredJob.catch(() => {});
+    await monitoredJob;
   };
 
   // ============ Field validators ============
@@ -1227,7 +1938,7 @@ export default function Register() {
       missing.push("Matching Confirm Password");
     if (!idType) missing.push("Type of Resident ID");
     if (!residentIdFile) missing.push("Resident ID Photo");
-    if (!ocrValidation.passed) missing.push("ID Verification");
+    if (!ocrValidation.passed && !ocrValidation.requiresManualReview) missing.push("ID Verification");
     if (REQUIRE_FACE_VERIFICATION && !idFaceFound) missing.push("Clear Face on ID");
     if (REQUIRE_FACE_VERIFICATION && !faceFile) missing.push("Live Selfie");
     if (!agreedToTerms) missing.push("Terms & Conditions");
@@ -1264,9 +1975,24 @@ export default function Register() {
     }
   };
 
-  const setIdFile = async (file) => {
+  const processResidentIdFile = (file, source) => {
+    ocrRunIdRef.current += 1;
+    idFaceRunIdRef.current += 1;
     setResidentIdFile(file);
-    setResidentIdPreview(await fileToDataUrl(file));
+    if (residentIdPreviewUrlRef.current) URL.revokeObjectURL(residentIdPreviewUrlRef.current);
+    residentIdPreviewUrlRef.current = URL.createObjectURL(file);
+    setResidentIdPreview(residentIdPreviewUrlRef.current);
+    setIdFaceProcessing(false);
+    setIdFaceChecked(false);
+    setIdFaceFound(false);
+    setIdFaceError("");
+    setOcrItems([]);
+    setOcrText("");
+    setOcrConfidence(null);
+    setOcrScanStatus("scanning");
+    setOcrStage("Reading text from the original ID image...");
+    void runIdOcr(file, source);
+    void processIdFace(file);
   };
 
   const handleResidentIdUpload = (e) => {
@@ -1283,20 +2009,25 @@ export default function Register() {
       return;
     }
 
-    setIdFile(file);
-    runIdOcr(file);
-    processIdFace(file);
+    void processResidentIdFile(file, "gallery");
   };
 
   const removeResidentId = () => {
     ocrRunIdRef.current += 1;
+    idFaceRunIdRef.current += 1;
+    if (residentIdPreviewUrlRef.current) URL.revokeObjectURL(residentIdPreviewUrlRef.current);
+    residentIdPreviewUrlRef.current = null;
     setResidentIdFile(null);
     setResidentIdPreview(null);
+    setIdFaceProcessing(false);
+    setIdFaceChecked(false);
     setIdFaceFound(false);
     setIdFaceError("");
     setOcrText("");
+    setOcrItems([]);
+    setOcrConfidence(null);
     setOcrScanStatus("idle");
-    setOcrScanError("");
+    setOcrStage("");
     const fileInput = document.getElementById("resident-id-input");
     if (fileInput) fileInput.value = "";
   };
@@ -1331,9 +2062,9 @@ export default function Register() {
 
   const handleCameraCapture = async (file) => {
     if (cameraMode === "id") {
-      await setIdFile(file);
-      runIdOcr(file);
-      processIdFace(file);
+      setCameraMode(null);
+      processResidentIdFile(file, "camera");
+      return;
     } else if (cameraMode === "face") {
       setFaceFile(file);
       setFacePreview(await fileToDataUrl(file));
@@ -1447,11 +2178,11 @@ export default function Register() {
   };
 
   // ============ Upload to Cloudinary ============
-  const uploadFile = async (file, label = "file", traceId) => {
+  const uploadFile = async (file, label = "file", traceId, { preserveOriginal = false } = {}) => {
     if (!file) return null;
-    const compressed = await compressImage(file);
+    const uploadImage = preserveOriginal ? file : await compressImage(file);
     const fd = new FormData();
-    fd.append("files", compressed);
+    fd.append("files", uploadImage);
     const uploadStage = label === "ID photo" ? "id_upload" : "selfie_upload";
     const traceQuery = new URLSearchParams({
       registration_trace: "1",
@@ -1488,7 +2219,12 @@ export default function Register() {
     try {
       // Upload sequentially, not in parallel — avoids splitting limited
       // mobile upload bandwidth across two simultaneous requests.
-      const valid_id_url = await uploadFile(residentIdFile, "ID photo", registrationTraceId);
+      const valid_id_url = await uploadFile(
+        residentIdFile,
+        "ID photo",
+        registrationTraceId,
+        { preserveOriginal: true }
+      );
       failedStage = REQUIRE_FACE_VERIFICATION ? "selfie_upload" : "register";
       const selfie_image = REQUIRE_FACE_VERIFICATION
         ? await uploadFile(faceFile, "Selfie", registrationTraceId)
@@ -1871,14 +2607,20 @@ export default function Register() {
                 className="hidden"
               />
 
-              {residentIdPreview ? (
+              {residentIdFile ? (
                 <div className="flex flex-col" style={{ gap: "12px" }}>
                   <div className="relative">
-                    <img
-                      src={residentIdPreview}
-                      alt="Resident ID Preview"
-                      className="w-full h-[180px] rounded-2xl border border-[#8BB37A] object-cover bg-white"
-                    />
+                    {residentIdPreview ? (
+                      <img
+                        src={residentIdPreview}
+                        alt="Original resident ID photo"
+                        className="w-full h-[180px] rounded-2xl border border-[#8BB37A] object-contain bg-gray-100"
+                      />
+                    ) : (
+                      <div className="w-full h-[180px] rounded-2xl border border-[#8BB37A] flex items-center justify-center gap-2 bg-gray-100 text-gray-600 text-sm">
+                        <FaSpinner className="animate-spin" /> Checking the ID image...
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={removeResidentId}
@@ -1888,27 +2630,28 @@ export default function Register() {
                       ✕
                     </button>
                   </div>
-
                   {idFaceProcessing && (
                     <p className="text-[13px] text-blue-600 leading-5">Analyzing ID face...</p>
                   )}
 
-                  {!idFaceProcessing && !idFaceFound && residentIdPreview && (
+                  {idFaceChecked && !idFaceProcessing && !idFaceFound && residentIdPreview && (
                     <div
                       className="flex items-start bg-red-50 border border-red-300 rounded-xl text-red-700 text-[13px] leading-5"
                       style={{ padding: "10px 12px", gap: "8px" }}
                     >
                       <FaExclamationTriangle className="mt-0.5 shrink-0" size={12} />
                       <span className="break-words">
-                        {idFaceError || "No face detected on this ID. Please upload a clearer photo."}
+                        {idFaceError || "No face detected on this ID. Please upload a clear photo."}
                       </span>
                     </div>
                   )}
 
                   {!idFaceProcessing && idFaceFound && (
-                    <div className="flex items-center text-green-600 text-[13px]" style={{ gap: "8px" }}>
-                      <FaCheck size={12} />
-                      <span>Face found on ID.</span>
+                    <div className="flex items-center text-green-700 text-[13px]" style={{ gap: "8px" }}>
+                      <div className="flex items-center" style={{ gap: "8px" }}>
+                        <FaCheck size={12} />
+                        <span>Portrait found.</span>
+                      </div>
                     </div>
                   )}
 
@@ -1917,26 +2660,42 @@ export default function Register() {
                       className="bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-[13px]"
                       style={{ padding: "10px 12px" }}
                     >
-                      Reading ID text...
+                      {ocrStage || "Reading ID text…"}
+                    </div>
+                  )}
+                  {ocrScanStatus === "done" && ocrValidation.reason === "The ID name is missing or unclear. Retake the photo." && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl text-gray-800 text-[12px] leading-5 space-y-2 p-3">
+                      <div>
+                        <span className="font-bold">First name on ID: </span>
+                        {extractedIdFields.firstName || "Not clearly identified"}
+                      </div>
+                      <div>
+                        <span className="font-bold">Last name on ID: </span>
+                        {extractedIdFields.lastName || "Not clearly identified"}
+                      </div>
+                      <div>
+                        <span className="font-bold">Full name read: </span>
+                        {extractedIdFields.nameText || "No clear name region found"}
+                      </div>
                     </div>
                   )}
                   {ocrScanStatus === "error" && (
                     <div
-                      className="bg-red-50 border border-red-300 rounded-xl text-red-700 text-[13px] break-words"
+                      className="bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-[13px] break-words"
                       style={{ padding: "10px 12px" }}
                     >
-                      {ocrScanError}
+                      {ocrValidation.reason}
                     </div>
                   )}
                   {ocrScanStatus === "done" && ocrValidation.passed && (
                     <div className="flex items-center text-green-600 text-[13px]" style={{ gap: "8px" }}>
                       <FaCheck size={12} />
-                    <span>ID name and permanent address verified.</span>
+                      <span>ID name verified</span>
                     </div>
                   )}
-                  {ocrScanStatus === "done" && !ocrValidation.passed && (
+                  {ocrScanStatus === "done" && !ocrValidation.passed && ocrValidation.reason && (
                     <div
-                      className="bg-red-50 border border-red-300 rounded-xl text-red-700 text-[13px] break-words"
+                      className={`${ocrValidation.requiresManualReview ? "bg-amber-50 border-amber-300 text-amber-900" : "bg-red-50 border-red-300 text-red-700"} border rounded-xl text-[13px] break-words`}
                       style={{ padding: "10px 12px" }}
                     >
                       {ocrValidation.reason}
@@ -2134,9 +2893,10 @@ export default function Register() {
         {/* CAMERA MODALS */}
         {cameraMode === "id" && (
           <CameraModal
-            title="Take Photo of ID"
-            hint="Place your ID inside the frame. Make sure the text is clear and not blurry."
+            title="Capture Resident ID"
+            hint="Keep your entire ID inside the frame. Make sure the text is visible and avoid glare or shadows."
             facing="environment"
+            captureType="id"
             modelsLoaded={modelsLoaded}
             onCapture={handleCameraCapture}
             onClose={() => setCameraMode(null)}

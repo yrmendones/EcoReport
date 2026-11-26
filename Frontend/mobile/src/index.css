@@ -252,3 +252,285 @@ body{
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/* Full-viewport ID camera that opens in the device's current orientation. */
+.resident-id-camera-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #000;
+  color: #fff;
+  padding-top: max(6px, env(safe-area-inset-top, 0px));
+  padding-right: max(6px, env(safe-area-inset-right, 0px));
+  padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(6px, env(safe-area-inset-left, 0px));
+}
+
+.resident-id-camera-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: clamp(6px, 1vw, 12px);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.resident-id-camera-layout.is-landscape {
+  grid-template-columns: minmax(0, 1fr) clamp(136px, 20vw, 238px);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.resident-id-camera-layout.is-portrait {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.resident-id-camera-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+.resident-id-camera-preview video,
+.resident-id-camera-captured {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.resident-id-camera-guide-wrap,
+.resident-id-camera-spinner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.resident-id-camera-spinner {
+  color: #fff;
+}
+
+.resident-id-camera-guide {
+  width: min(95%, 68dvh);
+  aspect-ratio: 1.586 / 1;
+  box-sizing: border-box;
+  border: 3px solid #fff;
+  border-radius: 10px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+.resident-id-camera-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: clamp(6px, 1.2dvh, 12px);
+  min-width: 0;
+  min-height: 0;
+  max-height: min(42dvh, 300px);
+  box-sizing: border-box;
+  padding: clamp(8px, 1.2vw, 14px);
+  overflow: hidden;
+  background: #111713;
+}
+
+.resident-id-camera-layout.is-landscape .resident-id-camera-panel {
+  max-height: none;
+}
+
+.resident-id-camera-layout.is-portrait .resident-id-camera-panel {
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  max-height: min(34dvh, 260px);
+  gap: 6px;
+  padding: 8px 12px;
+}
+
+.resident-id-camera-layout.is-portrait .resident-id-camera-header {
+  min-height: 40px;
+}
+
+.resident-id-camera-layout.is-portrait .resident-id-camera-guidance h2 {
+  margin-bottom: 4px;
+  font-size: 16px;
+}
+
+.resident-id-camera-layout.is-portrait .resident-id-camera-guidance p {
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.resident-id-camera-layout.is-portrait .resident-id-camera-capture,
+.resident-id-camera-layout.is-portrait .resident-id-camera-confirm {
+  min-height: 52px;
+}
+
+.resident-id-camera-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  min-height: 44px;
+}
+
+.resident-id-camera-guidance {
+  align-self: center;
+  min-width: 0;
+}
+
+.resident-id-camera-guidance h2 {
+  margin: 0 0 8px;
+  color: #fff;
+  font-size: clamp(16px, 2.2vw, 20px);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.resident-id-camera-guidance p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: clamp(12px, 1.55vw, 14px);
+  line-height: 1.4;
+}
+
+.resident-id-camera-close,
+.resident-id-camera-retake,
+.resident-id-camera-confirm,
+.resident-id-camera-capture {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.resident-id-camera-close {
+  flex: 0 0 44px;
+  width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 17px;
+}
+
+.resident-id-camera-messages {
+  min-height: 0;
+  overflow: auto;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.4;
+  overscroll-behavior: contain;
+}
+
+.resident-id-camera-error {
+  padding: 9px 10px;
+  border: 1px solid #fbbf24;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #713f12;
+}
+
+.resident-id-camera-error {
+  border-color: #f87171;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.resident-id-camera-scan-status {
+  margin-bottom: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(147, 197, 253, 0.65);
+  border-radius: 10px;
+  background: rgba(30, 64, 175, 0.3);
+  color: #eff6ff;
+}
+
+.resident-id-camera-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.resident-id-camera-actions.is-capture {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (orientation: landscape) and (max-width: 700px) {
+  .resident-id-camera-actions.is-review {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.resident-id-camera-retake {
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: transparent;
+}
+
+.resident-id-camera-confirm,
+.resident-id-camera-capture {
+  min-height: 58px;
+  gap: 9px;
+  background: #0b5d2a;
+}
+
+.resident-id-camera-confirm:disabled,
+.resident-id-camera-capture:disabled {
+  opacity: 0.55;
+}
+
+.resident-id-camera-close:focus-visible,
+.resident-id-camera-retake:focus-visible,
+.resident-id-camera-confirm:focus-visible,
+.resident-id-camera-capture:focus-visible {
+  outline: 3px solid #facc15;
+  outline-offset: 2px;
+}
+
+@media (orientation: landscape) and (max-height: 420px) {
+  .resident-id-camera-panel {
+    gap: 5px;
+    padding: 6px;
+  }
+
+  .resident-id-camera-header {
+    min-height: 38px;
+  }
+
+  .resident-id-camera-header .resident-id-camera-close {
+    width: 38px;
+    min-height: 38px;
+  }
+
+  .resident-id-camera-guidance h2 {
+    margin-bottom: 4px;
+    font-size: 16px;
+  }
+
+  .resident-id-camera-guidance p {
+    font-size: 12px;
+  }
+
+  .resident-id-camera-confirm,
+  .resident-id-camera-capture {
+    min-height: 48px;
+  }
+}
