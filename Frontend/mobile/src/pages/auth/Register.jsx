@@ -312,7 +312,7 @@ async function createFocusedTextCrop(sourceBlob, nameLines) {
       return null;
     }
 
-    const scale = Math.min(3, 1600 / Math.max(cropWidth, cropHeight));
+    const scale = Math.min(3, 1920 / Math.max(cropWidth, cropHeight));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(cropWidth * scale));
     canvas.height = Math.max(1, Math.round(cropHeight * scale));
@@ -1480,63 +1480,50 @@ export default function Register() {
     }
 
     const enginePromise = (async () => {
-      const worker = new Worker(new URL("../../utils/residentIdOcr.worker.js", import.meta.url), {
-        type: "module",
+      const { PaddleOCR } = await import("@paddleocr/paddleocr-js");
+      const cores = navigator.hardwareConcurrency || 4;
+      const paddleEngine = await PaddleOCR.create({
+        lang: "en",
+        ocrVersion: "PP-OCRv5",
+        // PaddleOCR owns the worker, so image conversion and inference stay off
+        // the UI thread without creating a worker inside another worker.
+        worker: true,
+        ortOptions: {
+          backend: "wasm",
+          wasmPaths: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/",
+          numThreads: Math.max(1, Math.min(2, cores - 1)),
+          simd: true,
+        },
       });
-      let requestId = 0;
       let failed = false;
-      const pending = new Map();
-      const fail = (error) => {
+      const terminate = () => {
         if (failed) return;
         failed = true;
-        worker.terminate();
-        for (const request of pending.values()) request.reject(error);
-        pending.clear();
+        void paddleEngine.dispose().catch(() => {});
       };
-      worker.onmessage = ({ data }) => {
-        const request = pending.get(data?.id);
-        if (!request) return;
-        pending.delete(data.id);
-        if (data.error) {
-          const workerError = new Error(data.error);
-          request.reject(workerError);
-          fail(workerError);
-        } else {
-          request.resolve(data.results);
-        }
-      };
-      worker.onerror = (event) => fail(new Error(event.message || "Background OCR worker failed."));
-      worker.onmessageerror = () => fail(new Error("Background OCR returned an unreadable result."));
       const engine = {
         get failed() {
           return failed;
         },
-        terminate() {
-          fail(new Error("Background OCR stopped."));
-        },
-        predict(blob) {
-          if (failed) return Promise.reject(new Error("Background OCR worker is unavailable."));
-          return new Promise((resolve, reject) => {
-            const id = ++requestId;
-            pending.set(id, { resolve, reject });
-            try {
-              worker.postMessage({ id, blob });
-            } catch (error) {
-              pending.delete(id);
-              reject(error);
-              fail(error);
-            }
-          });
+        terminate,
+        async predict(blob, params = {}) {
+          if (failed) throw new Error("Background OCR worker is unavailable.");
+          try {
+            return await paddleEngine.predict(blob, params);
+          } catch (error) {
+            terminate();
+            throw error;
+          }
         },
       };
       window.__ecoOcrWorkerMode = true;
-      window.__ecoOcrEngine = engine;
       return engine;
     })();
     window.__ecoOcrEnginePromise = enginePromise;
     try {
       const engine = await enginePromise;
       ocrEngineRef.current = engine;
+      window.__ecoOcrEngine = engine;
       return engine;
     } catch (error) {
       if (window.__ecoOcrEnginePromise === enginePromise) {
@@ -1549,6 +1536,32 @@ export default function Register() {
       }
     }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    let idleHandle = null;
+    let timeoutHandle = null;
+    const warmUpOcr = () => {
+      if (cancelled || document.visibilityState === "hidden") return;
+      getOcrEngine().catch((error) => {
+        console.info("[ID OCR] Engine will initialize again when an ID is selected.", error);
+      });
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      idleHandle = window.requestIdleCallback(warmUpOcr, { timeout: 2500 });
+    } else {
+      timeoutHandle = window.setTimeout(warmUpOcr, 1200);
+    }
+
+    return () => {
+      cancelled = true;
+      if (idleHandle != null) window.cancelIdleCallback?.(idleHandle);
+      if (timeoutHandle != null) window.clearTimeout(timeoutHandle);
+    };
+    // The OCR engine uses window-level caching and does not depend on form state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ============ Face detection on ID ============
   const processIdFace = async (file) => {
@@ -1688,6 +1701,9 @@ export default function Register() {
         const engine = engineResult.value;
         timings.workerMode = Boolean(window.__ecoOcrWorkerMode);
         if (runId !== ocrRunIdRef.current) return;
+        const registrationNamesComplete = Boolean(
+          String(formData.first_name || "").trim() && String(formData.last_name || "").trim()
+        );
 
         const readCandidate = async ({ enhance = false, rotation = 0, label }) => {
           if (runId !== ocrRunIdRef.current) return null;
@@ -1715,7 +1731,15 @@ export default function Register() {
             : null;
           const fields = extractResidentIdFields(items, formData);
           const idLooksReadable = looksLikeValidId(text, idType);
-          const score = (confidence ?? 0) * 0.6 +
+          const nameMatch = matchResidentName(items, formData, fields);
+          const nameConfidence = nameMatch.confidence ?? fields.nameConfidence;
+          const verifiedNameAndId = registrationNamesComplete &&
+            idLooksReadable &&
+            nameMatch.passed &&
+            nameConfidence != null &&
+            nameConfidence >= 0.5;
+          const score = (registrationNamesComplete && nameMatch.passed ? 0.75 : 0) +
+            (confidence ?? 0) * 0.6 +
             (fields.nameText ? 0.15 : 0) +
             (idLooksReadable ? 0.25 : 0);
           timings.fieldExtractionMs += nowMs() - extractionStartedAt;
@@ -1724,40 +1748,58 @@ export default function Register() {
             text,
             confidence,
           });
-          return { items, text, confidence, fields, score, insufficient, sourceBlob: prepared.blob };
+          return {
+            items,
+            text,
+            confidence,
+            fields,
+            nameMatch,
+            nameConfidence,
+            score,
+            insufficient,
+            verifiedNameAndId,
+            sourceBlob: prepared.blob,
+          };
         };
 
         let best = await readCandidate({ label: "Reading ID text…" });
         if (!best || runId !== ocrRunIdRef.current) return;
-        let foundSufficientCandidate = !best.insufficient;
-        if (!foundSufficientCandidate) {
+        const needsFullImageRetry = (candidate) => candidate.insufficient && !candidate.verifiedNameAndId;
+        if (needsFullImageRetry(best)) {
+          // Use detected text direction only. The photo itself may be portrait
+          // while the ID inside it is correctly horizontal.
+          const firstRotation = suggestIdImageRotation(best.items, 0, 0);
           timings.retryPasses += 1;
           const enhanced = await readCandidate({
             enhance: true,
-            label: "Improving text contrast…",
+            rotation: firstRotation ?? 0,
+            label: firstRotation == null
+              ? "Improving text contrast…"
+              : "Correcting ID orientation…",
           });
           if (!enhanced || runId !== ocrRunIdRef.current) return;
-          if (!enhanced.insufficient || enhanced.score > best.score) best = enhanced;
-          foundSufficientCandidate = !enhanced.insufficient;
-        }
-        if (!foundSufficientCandidate && runId === ocrRunIdRef.current) {
-          const rotation = suggestIdImageRotation(best.items, bitmap.width, bitmap.height);
-          if (rotation != null) {
+          if (!needsFullImageRetry(enhanced) || enhanced.score > best.score) best = enhanced;
+
+          // A clearer retry can expose sideways text the first pass couldn't
+          // orient. Only pay for one more full-card pass when OCR shows that.
+          const retryRotation = suggestIdImageRotation(enhanced.items, 0, 0);
+          if (
+            needsFullImageRetry(best) &&
+            retryRotation != null &&
+            retryRotation !== firstRotation
+          ) {
             timings.retryPasses += 1;
-            const rotated = await readCandidate({
+            const corrected = await readCandidate({
               enhance: true,
-              rotation,
+              rotation: retryRotation,
               label: "Correcting ID orientation…",
             });
-            if (!rotated || runId !== ocrRunIdRef.current) return;
-            if (!rotated.insufficient || rotated.score > best.score) best = rotated;
+            if (!corrected || runId !== ocrRunIdRef.current) return;
+            if (!needsFullImageRetry(corrected) || corrected.score > best.score) best = corrected;
           }
         }
         if (runId !== ocrRunIdRef.current) return;
 
-        const registrationNamesComplete = Boolean(
-          String(formData.first_name || "").trim() && String(formData.last_name || "").trim()
-        );
         const retryFocusedRegion = async (candidateLines, label, isUseful) => {
           if (!candidateLines?.length || runId !== ocrRunIdRef.current) return;
           const focusedCrop = await createFocusedTextCrop(best.sourceBlob, candidateLines);
@@ -1767,7 +1809,11 @@ export default function Register() {
             timings.preprocessingMs += focusedCrop.preprocessingMs;
             timings.retryPasses += 1;
             const predictionStartedAt = nowMs();
-            const focusedResults = await engine.predict(focusedCrop.blob);
+            // Name text is a small part of the full ID. Spend more detector
+            // resolution on this small crop instead of slowing every full-card pass.
+            const focusedResults = await engine.predict(focusedCrop.blob, {
+              textDetLimitSideLen: 1280,
+            });
             timings.predictionMs += nowMs() - predictionStartedAt;
             if (runId !== ocrRunIdRef.current) return;
 

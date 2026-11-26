@@ -217,7 +217,7 @@ function collectNameFields(lines) {
   };
 }
 
-function collectNameCandidateLines(lines) {
+function collectNameCandidateLines(lines, expectedPerson = {}) {
   const candidates = [];
   lines.forEach((line, index) => {
     if (!NAME_LABELS.some(({ pattern }) => pattern.test(line.text))) return;
@@ -225,13 +225,54 @@ function collectNameCandidateLines(lines) {
     const next = followingLine(lines, index);
     if (next) candidates.push(next);
   });
-  return [...new Set(candidates)];
+  const labelledCandidates = [...new Set(candidates)];
+  if (labelledCandidates.length) return labelledCandidates;
+
+  // Some IDs print the holder's name without a readable NAME/GIVEN NAME label.
+  // Keep likely name rows available for the focused high-resolution OCR retry.
+  const expectedTokens = [
+    ...normalizeIdTokens(expectedPerson.first_name),
+    ...normalizeIdTokens(expectedPerson.last_name),
+  ];
+  if (!expectedTokens.length) return [];
+
+  const textRows = lines.filter((line) => {
+    const tokens = normalizeIdTokens(line.text);
+    return line.bounds &&
+      !isFieldLabel(line.text) &&
+      /[a-z]/i.test(line.text) &&
+      line.text.length <= 40 &&
+      tokens.length > 0 &&
+      tokens.length <= 5;
+  });
+  if (!textRows.length) return [];
+
+  const likelyNameRows = textRows.filter((line) => {
+    const actualTokens = normalizeIdTokens(line.text);
+    return expectedTokens.some((expected) => expectedTokensMatch([expected], actualTokens));
+  });
+  if (likelyNameRows.length) {
+    const nearbyRows = likelyNameRows.flatMap((line) => {
+      const next = followingLine(lines, lines.indexOf(line));
+      return next && textRows.includes(next) ? [line, next] : [line];
+    });
+    return [...new Set(nearbyRows)];
+  }
+
+  // If the first read is too garbled to compare with the form, try a small
+  // upper-card text region. The final name check still has to match both names.
+  const minTop = Math.min(...textRows.map(({ bounds }) => bounds.top));
+  const maxBottom = Math.max(...textRows.map(({ bounds }) => bounds.bottom));
+  const nameZoneBottom = minTop + (maxBottom - minTop) * 0.82;
+  return textRows
+    .filter(({ bounds }) => (bounds.top + bounds.bottom) / 2 <= nameZoneBottom)
+    .slice(0, 3);
 }
 
 export function extractResidentIdFields(items = [], expectedPerson = {}) {
   const lines = normalizeOcrLines(items);
   const named = collectNameFields(lines);
-  const nameCandidateLines = collectNameCandidateLines(lines);
+  const nameCandidateLines = collectNameCandidateLines(lines, expectedPerson);
   const nameLines = named.lines.length
     ? named.lines
     : collectExpectedNameLines(lines, expectedPerson);
@@ -257,30 +298,56 @@ export function extractResidentIdFields(items = [], expectedPerson = {}) {
 }
 
 function tokenMatches(expected, actual) {
-  if (expected === actual) return true;
-  if (expected.length < 4 || actual.length < 4 || Math.abs(expected.length - actual.length) > 1) return false;
+  const normalizedActual = /[a-z]/i.test(expected)
+    ? actual.toLowerCase().replace(/0/g, "o").replace(/1/g, "i").replace(/5/g, "s").replace(/8/g, "b")
+    : actual;
+  if (expected === normalizedActual) return true;
+  if (expected.length < 4 || normalizedActual.length < 4 || Math.abs(expected.length - normalizedActual.length) > 1) return false;
+
+  if (expected.length === normalizedActual.length) {
+    const differences = [];
+    for (let index = 0; index < expected.length; index += 1) {
+      if (expected[index] !== normalizedActual[index]) differences.push(index);
+    }
+    if (
+      differences.length === 2 &&
+      differences[1] === differences[0] + 1 &&
+      expected[differences[0]] === normalizedActual[differences[1]] &&
+      expected[differences[1]] === normalizedActual[differences[0]]
+    ) return true;
+  }
+
   let i = 0;
   let j = 0;
   let edits = 0;
-  while (i < expected.length && j < actual.length) {
-    if (expected[i] === actual[j]) {
+  while (i < expected.length && j < normalizedActual.length) {
+    if (expected[i] === normalizedActual[j]) {
       i += 1;
       j += 1;
       continue;
     }
     edits += 1;
     if (edits > 1) return false;
-    if (expected.length > actual.length) i += 1;
-    else if (expected.length < actual.length) j += 1;
+    if (expected.length > normalizedActual.length) i += 1;
+    else if (expected.length < normalizedActual.length) j += 1;
     else { i += 1; j += 1; }
   }
-  return edits + ((expected.length - i) + (actual.length - j) <= 1 ? 0 : 2) <= 1;
+  return edits + ((expected.length - i) + (normalizedActual.length - j) <= 1 ? 0 : 2) <= 1;
 }
 
 function expectedTokensMatch(expectedTokens, actualTokens) {
   if (!expectedTokens.length) return false;
+  const joinedActualTokens = [];
+  for (let start = 0; start < actualTokens.length; start += 1) {
+    let joined = "";
+    for (let end = start; end < Math.min(actualTokens.length, start + 3); end += 1) {
+      joined += actualTokens[end];
+      if (end > start) joinedActualTokens.push(joined);
+    }
+  }
   const matched = expectedTokens.map((expected) =>
-    actualTokens.some((actual) => tokenMatches(expected, actual))
+    actualTokens.some((actual) => tokenMatches(expected, actual)) ||
+      joinedActualTokens.some((actual) => tokenMatches(expected, actual))
   );
 
   for (let start = 0; start < expectedTokens.length;) {
