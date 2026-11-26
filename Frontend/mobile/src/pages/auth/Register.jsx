@@ -125,8 +125,10 @@ const ID_TYPES = [
   "National ID (PhilID)",
   "National Police Clearance",
   "PWD ID",
+  "Passport",
   "Postal ID",
   "Senior Citizen ID",
+  "Tin ID",
   "Unified Multi-purpose ID (UMID)",
 ];
 
@@ -2666,16 +2668,12 @@ export default function Register() {
                   {ocrScanStatus === "done" && ocrValidation.reason === "The ID name is missing or unclear. Retake the photo." && (
                     <div className="bg-gray-50 border border-gray-200 rounded-xl text-gray-800 text-[12px] leading-5 space-y-2 p-3">
                       <div>
-                        <span className="font-bold">First name on ID: </span>
+                        <span className="font-bold">First name match: </span>
                         {extractedIdFields.firstName || "Not clearly identified"}
                       </div>
                       <div>
-                        <span className="font-bold">Last name on ID: </span>
+                        <span className="font-bold">Last name match: </span>
                         {extractedIdFields.lastName || "Not clearly identified"}
-                      </div>
-                      <div>
-                        <span className="font-bold">Full name read: </span>
-                        {extractedIdFields.nameText || "No clear name region found"}
                       </div>
                     </div>
                   )}

@@ -316,7 +316,7 @@ export default function GenerateReports() {
   const handleDownloadCSV = () => {
     if (!report) return;
     const rows = [
-      ["EcoReport — Generate Reports"],
+      ["EcoReport Generate Reports"],
       ["Barangay Sto. Rosario Kanluran"],
       [`Generated: ${new Date().toLocaleString()}`],
       [],
@@ -717,6 +717,19 @@ export default function GenerateReports() {
 
         /* PRINT */
         @media print {
+          /* Preserve chart fills and dimensions in the browser print renderer. */
+          html,
+          body,
+          #root,
+          #print-area,
+          .chart-card,
+          .chart-bars,
+          .chart-bar-wrap,
+          .chart-bar {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
           /* 1. Reset viewport-based sizing. */
           html, body, #root {
             height: auto !important;
@@ -754,6 +767,23 @@ export default function GenerateReports() {
           #print-area {
             border: none !important;
             box-shadow: none !important;
+          }
+
+          .chart-bars {
+            display: flex !important;
+            height: 140px !important;
+            min-height: 140px !important;
+            overflow: visible !important;
+          }
+
+          .chart-bar-wrap {
+            height: 100% !important;
+          }
+
+          .chart-bar {
+            background: #15803d !important;
+            border: 1px solid #14532d !important;
+            transition: none !important;
           }
 
           /* 5. Keep cards / chart / title from splitting across pages */
