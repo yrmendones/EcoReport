@@ -120,7 +120,6 @@ function findMatchingStreet(typed) {
 
 const ID_TYPES = [
   "Barangay ID",
-  "Driver's License",
   "ePhilID / Digital National ID",
   "National ID (PhilID)",
   "National Police Clearance",
